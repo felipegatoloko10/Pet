@@ -16,8 +16,11 @@ export type Job = {
   entityId?: string;
 };
 export function nextSummary(w: Workspace, now = new Date()) {
-  const [h, m] = w.preferences.summaryTime.split(":").map(Number);
-  const local = TZDate.tz(w.preferences.timezone, now);
+  return nextWallTime(w.preferences.summaryTime, w.preferences.timezone, now);
+}
+function nextWallTime(time: string, timezone: string, now: Date) {
+  const [h, m] = time.split(":").map(Number);
+  const local = TZDate.tz(timezone, now);
   let next = new TZDate(
     local.getFullYear(),
     local.getMonth(),
@@ -25,7 +28,7 @@ export function nextSummary(w: Workspace, now = new Date()) {
     h,
     m,
     0,
-    w.preferences.timezone,
+    timezone,
   );
   if (+next <= +now) next = addDays(next, 1) as TZDate;
   return +next;
@@ -38,7 +41,14 @@ export function jobsFor(userId: string, w: Workspace): Job[] {
       userId,
       kind: "routine",
       dueAt: isQuiet(new Date(now), w.preferences)
-        ? nextSummary(w)
+        ? Math.min(
+            nextSummary(w),
+            nextWallTime(
+              w.preferences.quietEnd,
+              w.preferences.timezone,
+              new Date(now),
+            ),
+          )
         : Math.min(nextSummary(w), now + 15 * 60000),
     },
     ...w.events
@@ -82,7 +92,7 @@ export async function processJob(job: Job) {
   if (job.kind === "routine") {
     const prior = await readWorkspace(job.userId);
     const { time } = zonedParts(new Date(), prior.preferences.timezone);
-    if (time >= "08:00" && time < "22:00") await syncGoogle(job.userId);
+    if (!isQuiet(new Date(), prior.preferences)) await syncGoogle(job.userId);
   }
   await mutateWorkspace(job.userId, (w) => {
     const now = new Date();

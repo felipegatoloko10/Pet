@@ -1932,7 +1932,10 @@ function Conversation({
               {item.suggestions?.map((s) => (
                 <div className="suggestion" key={s.approvalId}>
                   <strong>Sugestão para sua aprovação</strong>
-                  <pre>{JSON.stringify(s.command, null, 2)}</pre>
+                  <SuggestionPreview
+                    command={s.command}
+                    workspace={client.workspace}
+                  />
                   <button
                     className="button"
                     disabled={busy}
@@ -2023,6 +2026,68 @@ function Conversation({
       </section>
     </>
   );
+}
+function SuggestionPreview({
+  command: c,
+  workspace: w,
+}: {
+  command: Command;
+  workspace: Workspace;
+}) {
+  if (c.type === "task.upsert") {
+    const board = w.boards.find((b) => b.id === c.task.boardId);
+    return (
+      <div className="suggestion-preview">
+        <h3>
+          {c.expectedRevision ? "Atualizar tarefa" : "Criar tarefa"}:{" "}
+          {c.task.title}
+        </h3>
+        <p>
+          {board?.title} ·{" "}
+          {board?.columns.find((col) => col.id === c.task.columnId)?.title}
+        </p>
+        {c.task.dueDate && (
+          <p>
+            Prazo:{" "}
+            {format(new Date(c.task.dueDate + "T12:00:00"), "dd/MM/yyyy")}
+          </p>
+        )}
+        {c.task.notes && <p>{c.task.notes}</p>}
+      </div>
+    );
+  }
+  if (c.type === "event.upsert")
+    return (
+      <div className="suggestion-preview">
+        <h3>
+          {c.expectedRevision ? "Atualizar compromisso" : "Reservar horário"}:{" "}
+          {c.event.title}
+        </h3>
+        <p>
+          {c.event.allDay
+            ? `${c.event.start} até ${c.event.end} (fim exclusivo)`
+            : `${new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: w.preferences.timezone }).format(new Date(c.event.start))} – ${formatTime(c.event.end, w.preferences)}`}
+        </p>
+        {!!c.event.attendees?.length && (
+          <p>Convites serão enviados para: {c.event.attendees.join(", ")}.</p>
+        )}
+      </div>
+    );
+  if (c.type === "task.delete" || c.type === "event.delete") {
+    const item = (c.type === "task.delete" ? w.tasks : w.events).find(
+      (i) => i.id === c.id,
+    );
+    return (
+      <div className="suggestion-preview">
+        <h3>
+          Excluir {c.type === "task.delete" ? "tarefa" : "compromisso"}:{" "}
+          {item?.title ?? "item selecionado"}
+        </h3>
+        <p>A exclusão também será enviada ao Google.</p>
+      </div>
+    );
+  }
+  return <p>Revise esta alteração antes de aprovar.</p>;
 }
 function SettingsPage({
   w,

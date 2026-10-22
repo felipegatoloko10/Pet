@@ -79,6 +79,68 @@ test("API não entrega dados sem sessão", async ({ request }) => {
   });
   expect(mutation.status()).toBe(401);
 });
+test("aprovação da IA mostra ação compreensível e exige clique", async ({
+  page,
+}) => {
+  let w = emptyWorkspace();
+  w.revision = 1;
+  w.boards = [newBoard("private-board-id", "Minha rotina")];
+  let approved = false;
+  const command = {
+    type: "task.upsert" as const,
+    task: {
+      id: "private-task-id",
+      boardId: "private-board-id",
+      columnId: "private-board-id:todo",
+      title: "Organizar os documentos",
+      notes: "Separar por assunto",
+      dueDate: "2030-01-20",
+      scheduledStart: null,
+      scheduledEnd: null,
+      priority: "normal" as const,
+    },
+    expectedRevision: 0,
+  };
+  await page.route("**/api/v1/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    let data: unknown = {
+      workspace: w,
+      user: {
+        id: "approval-fixture",
+        name: "Teste",
+        email: "test@example.invalid",
+      },
+    };
+    if (path.endsWith("/health")) data = { configured: false };
+    if (path.endsWith("/chat"))
+      data = {
+        text: "Podemos começar por esta tarefa.",
+        suggestions: [
+          { approvalId: "12345678-1234-4234-8234-123456789abc", command },
+        ],
+      };
+    if (path.endsWith("/approvals")) {
+      approved = true;
+      w = applyCommand(w, command, crypto.randomUUID());
+    }
+    await route.fulfill({ json: data });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Conversa", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Sugira como encaixar minhas tarefas" })
+    .click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Criar tarefa: Organizar os documentos",
+    }),
+  ).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("private-board-id");
+  await expect(page.locator("body")).not.toContainText("expectedRevision");
+  expect(approved).toBe(false);
+  await page.getByRole("button", { name: "Aprovar esta alteração" }).click();
+  await expect.poll(() => approved).toBe(true);
+});
 test("fila offline e shell sobrevivem à recarga, depois sincronizam uma vez", async ({
   page,
   context,

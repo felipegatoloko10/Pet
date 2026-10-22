@@ -17,8 +17,8 @@
 
 ## Evidências
 
-- 36 testes unitários/simulados: domínio, Google, offline, criptografia e ferramentas de IA.
-- 4 testes de navegador: painel, celular, acesso sem sessão e recarga offline com sincronização única.
+- 37 testes unitários/simulados: domínio, Google, offline, criptografia, rotina configurável e ferramentas de IA.
+- 5 testes de navegador: painel, celular, acesso sem sessão, recarga offline com sincronização única e aprovação de sugestões da IA.
 - Verificação real da API com duas contas artificiais na branch de desenvolvimento Neon: sessões, isolamento, idempotência, conflitos, aprovação e propriedade das assinaturas push. As contas são removidas ao terminar.
 - 50 verificações WPF legadas preservadas e passando.
 - Compilação web, frontend desktop e instalador Windows pelo GitHub Actions. O fluxo de publicação é bloqueado se a verificação do código/navegador falhar.

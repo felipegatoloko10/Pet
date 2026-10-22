@@ -1,67 +1,48 @@
-# Pet · Pingo
+# Pingo 2.0
 
-Um pet para a área de trabalho do Windows que ajuda a organizar o dia: tarefas, agenda, resumo pela manhã e lembretes de compromissos.
+Um pequeno companheiro para organizar tarefas, agenda e rotina. Beta não comercial por convite, com espaços individuais e até 10 convidados.
 
-## Funcionalidades
+## Aplicativos
 
-- Pet animado, arrastável, com balões e comandos em português.
-- Painel com tarefas, agenda e histórico de avisos.
-- Tarefas e compromissos locais, com persistência no computador.
-- Resumo diário às 08:00 e lembretes 30 minutos antes, configuráveis.
-- Voz opcional e inicialização com o Windows, ambas ativadas nos ajustes.
-- Integração com cabeçalhos do Gmail, agenda principal do Google Agenda e tarefas do Google Tasks.
-- Login Google por OAuth com PKCE; autorização local protegida por Windows DPAPI.
+- `apps/web`: Next.js 16, Better Auth e API `/api/v1`.
+- `apps/desktop`: Tauri 2, Windows, avatar transparente e painel compartilhado.
+- `packages/core`: contratos, revisões, Kanban, reconciliação e rotina.
+- `packages/ui`: React, painel responsivo, pet SVG animado e cache offline.
+- `workers/scheduler`: cron Cloudflare + índice D1, sem consultar Neon em minutos vazios.
+- `drizzle`: migrações PostgreSQL. Projeto Neon exclusivo do Pingo.
+- `legacy/wpf`: protótipo original preservado; referência Git `legacy/wpf-v1`.
 
-A integração Google usa o botão **Entrar com Google**, sem importação de arquivos pelo usuário. O mantenedor configura o cliente OAuth Desktop uma única vez ao gerar a distribuição. O repositório não contém um cliente registrado: compilar sem essa configuração gera uma versão local com o login informado como pendente. Veja a [configuração para o mantenedor](GOOGLE-LOGIN.md).
+## Rodar
 
-As funções locais funcionam sem conectar o Google. O computador precisa estar ligado e o aplicativo aberto para emitir os avisos.
+Node 24 e npm. Instale com `npm ci`. Copie `.env.example` para `apps/web/.env.local` e configure as variáveis necessárias. Nunca adicione credenciais ao Git.
 
-## Executar
-
-Requer Windows e SDK .NET 8 para compilar. Não há dependências NuGet externas.
-
-```powershell
-./scripts/Publish-Pingo.ps1
-& '.\Pingo\Pingo.exe'
+```sh
+npm run db:migrate
+npm run invite -- pessoa@gmail.com
+npm run dev
 ```
 
-Também é possível executar **Compilar Pingo.cmd** e depois **Abrir Pingo.cmd**. A versão compilada depende do .NET 8 Desktop Runtime.
+O painel oferece uma demonstração local identificada, sem autenticação ou acesso ao Google. Dados reais exigem convite, OAuth e nova autorização Workspace. Veja [ativação](docs/ACTIVATION.md) e [validação](docs/VALIDATION.md).
 
-Para gerar o pacote com login habilitado, configure o cliente do aplicativo e use `./scripts/Publish-Pingo.ps1 -RequireGoogleLogin`. O workflow manual **Gerar Pingo com login Google** também pode gerar o pacote a partir do secret de Actions `PINGO_GOOGLE_OAUTH_JSON`.
-
-Veja o [guia completo](LEIA-ME.md) para configurar a conta Google e os avisos.
-
-## Comandos do pet
-
-```text
-meu dia
-tarefa pagar a conta de luz
-agendar dentista amanhã às 15h
-agendar reunião 23/10/2026 às 09:30
+```sh
+npm run check
+npm test
+npm run build
+npm run check -w @pingo/scheduler
 ```
 
-Os comandos de agenda abrem um formulário para revisar antes de salvar. Esta versão reconhece comandos específicos; não possui um modelo de conversa geral conectado.
+## Windows
 
-## Verificação
+Para compilar localmente: Rust estável, ferramentas C++ do Visual Studio e WebView2. Defina `VITE_API_URL` em `apps/desktop/.env.local` e execute `npm run desktop -- build`. O workflow `Pingo 2 — validar e empacotar` gera um instalador NSIS nos artefatos. Tags `v2.*` publicam uma pré-release com o instalador. O instalador do beta não possui assinatura comercial.
 
-```powershell
-dotnet run --project Pingo.Tests/Pingo.Tests.csproj -c Release
-./scripts/Test-GooglePackaging.ps1
-& '.\Pingo\Pingo.exe' --verify-ui '.\.verification'
-```
+## Princípios
 
-Os testes cobrem horários e deduplicação de lembretes, persistência, integração Google simulada, paginação, renovação da autorização e callback OAuth. A verificação WPF gera imagens das telas e testa proteção DPAPI e operações locais. Os testes não acessam uma conta Google real.
+As credenciais de IA são individuais e criptografadas com AES-256-GCM e AAD por usuário/provedor. A sessão desktop fica no Gerenciador de Credenciais do Windows; o cache usa SQLite. A web usa IndexedDB separado por conta. O backend deriva a conta da sessão; não aceita um `userId` do cliente para acessar dados.
 
-O fluxo de login também é testado sem importação manual, incluindo reconexão após desconectar, compatibilidade com autorizações antigas e isolamento entre clientes OAuth diferentes.
+O servidor é a referência compartilhada. Alterações offline mantêm identificadores persistentes de operação. Conflitos exigem revisão. Criações com resultado incerto no Google são reconciliadas antes de qualquer repetição. Google Tasks não guarda colunas intermediárias nem horário de prazo; esses dados pertencem ao Pingo.
 
-O teste de empacotamento usa uma identidade fictícia em artefatos de verificação separados e confere que alternar para uma compilação sem Google remove o recurso anterior, inclusive em compilações incrementais.
+Gmail é consultado por cabeçalhos; o corpo só é lido ou enviado à IA quando solicitado. O produto não envia e-mails. Exclusões, convites e sugestões da IA pedem confirmação.
 
-## Estrutura
+As animações são locais. Som e voz começam desligados. Notificações em nuvem são de melhor esforço e dependem das cotas e permissões do dispositivo.
 
-| Diretório | Conteúdo |
-| --- | --- |
-| `Pingo.App` | Aplicativo WPF, pet, painel e integração com Windows |
-| `Pingo.Core` | Rotina, persistência, comandos e cliente Google |
-| `Pingo.Tests` | Testes executáveis, sem frameworks externos |
-
-Credenciais, tokens, dados pessoais, binários e imagens de verificação não são versionados. O Pingo é um aplicativo independente; ele não modifica o pet do Codex.
+Não há aplicativo móvel nativo, quadros compartilhados, Drive, Docs ou cobrança nesta versão. As integrações reais precisam de homologação Google antes de abrir o beta a convidados.

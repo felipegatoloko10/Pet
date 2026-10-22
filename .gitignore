@@ -12,3 +12,17 @@ dist/
 *.enc
 *.tmp
 **/GoogleOAuth.local.json
+
+node_modules/
+.next/
+.vercel/
+.env*
+!.env.example
+**/target/
+*.tsbuildinfo
+playwright-report/
+test-results/
+.wrangler/
+
+.neon*.env
+.dev.vars*

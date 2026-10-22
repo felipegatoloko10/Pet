@@ -1,0 +1,3 @@
+/* No private API responses are cached here; offline state is account-scoped in IndexedDB. */
+self.addEventListener('push',event=>{if(!event.data)return;const n=event.data.json();event.waitUntil(self.registration.showNotification(n.title,{body:n.body,icon:'/icon.svg',tag:n.id,renotify:false,silent:!!n.silent,data:{id:n.id,url:'/'}}));});
+self.addEventListener('notificationclick',event=>{event.notification.close();event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(windows=>{const existing=windows.find(w=>new URL(w.url).origin===self.location.origin);return existing?existing.focus():clients.openWindow('/');}));});

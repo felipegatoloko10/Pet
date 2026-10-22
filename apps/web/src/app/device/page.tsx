@@ -1,0 +1,81 @@
+"use client";
+import { useEffect, useState } from "react";
+export default function Device() {
+  const [code, setCode] = useState("");
+  const [status, setStatus] = useState("");
+  const [logged, setLogged] = useState(false);
+  useEffect(() => {
+    setCode(new URLSearchParams(location.search).get("user_code") ?? "");
+    void fetch("/api/auth/get-session")
+      .then((r) => r.json())
+      .then((s) => setLogged(!!s?.user));
+  }, []);
+  async function approve(allow: boolean) {
+    const r = await fetch(`/api/auth/device/${allow ? "approve" : "deny"}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userCode: code }),
+    });
+    setStatus(
+      r.ok
+        ? allow
+          ? "Computador autorizado. Você pode voltar ao Pingo."
+          : "Autorização recusada."
+        : "Código inválido ou expirado.",
+    );
+  }
+  return (
+    <main className="welcome">
+      <div className="welcome-brand">pingo</div>
+      <div
+        className="panel editor-form"
+        style={{ maxWidth: 440, margin: "10vh auto" }}
+      >
+        <h1>Seu Pingo no PC</h1>
+        <p>
+          Autorize apenas se você iniciou o login no aplicativo Pingo deste
+          computador.
+        </p>
+        <label>
+          Código exibido no aplicativo
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+          />
+        </label>
+        {logged ? (
+          <>
+            <button
+              className="button primary"
+              onClick={() => void approve(true)}
+            >
+              Autorizar meu computador
+            </button>
+            <button className="button" onClick={() => void approve(false)}>
+              Recusar
+            </button>
+          </>
+        ) : (
+          <button
+            className="button primary"
+            onClick={async () => {
+              const r = await fetch("/api/auth/sign-in/social", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  provider: "google",
+                  callbackURL: location.href,
+                }),
+              });
+              const data = await r.json();
+              if (data.url) location.assign(data.url);
+            }}
+          >
+            Entrar com Google para continuar
+          </button>
+        )}
+        <p role="status">{status}</p>
+      </div>
+    </main>
+  );
+}

@@ -1,0 +1,14 @@
+{
+  "identifier": "desktop",
+  "description": "Permissões locais das duas janelas do Pingo.",
+  "windows": ["main", "pet"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "opener:allow-open-url",
+    "sql:default",
+    "sql:allow-execute",
+    "sql:allow-select",
+    "notification:default"
+  ]
+}

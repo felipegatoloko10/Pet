@@ -2,6 +2,8 @@
 
 Um pequeno companheiro para organizar tarefas, agenda e rotina. Beta não comercial por convite, com espaços individuais e até 10 convidados.
 
+[Abrir demonstração web](https://pingo-gilt.vercel.app)
+
 ## Aplicativos
 
 - `apps/web`: Next.js 16, Better Auth e API `/api/v1`.

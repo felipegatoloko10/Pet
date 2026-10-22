@@ -3,7 +3,7 @@
 // Runtime types generated with workerd@1.20261019.1 2026-10-22 nodejs_compat
 interface __BaseEnv_Env {
 	DB: D1Database;
-	BACKEND_URL: "https://pingo-feh-team.vercel.app";
+	BACKEND_URL: "https://pingo-gilt.vercel.app";
 	SCHEDULER_SECRET: string;
 }
 declare namespace Cloudflare {

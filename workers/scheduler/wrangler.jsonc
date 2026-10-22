@@ -4,5 +4,5 @@
  "triggers":{"crons":["* * * * *"]},
  "observability":{"enabled":true,"head_sampling_rate":0.1},
  "d1_databases":[{"binding":"DB","database_name":"pingo-jobs","database_id":"00000000-0000-0000-0000-000000000000","migrations_dir":"migrations"}],
- "vars":{"BACKEND_URL":"https://pingo-feh-team.vercel.app"}
+ "vars":{"BACKEND_URL":"https://pingo-gilt.vercel.app"}
 }

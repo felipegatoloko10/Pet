@@ -6,6 +6,8 @@
 2. Configure a tela de consentimento em teste, com os usuários convidados autorizados. A autorização Workspace é separada do login e poderá expirar periodicamente no modo teste.
 3. Crie um cliente OAuth **Web**. Cadastre os redirects `https://SEU_DOMINIO/api/auth/callback/google` e `https://SEU_DOMINIO/api/v1/google/callback`. Use os mesmos caminhos em localhost para desenvolvimento, em um cliente separado.
 4. Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BETTER_AUTH_URL` e um `BETTER_AUTH_SECRET` aleatório no backend.
+
+Neste ambiente, a URL pública é `https://pingo-gilt.vercel.app`. Cadastre `https://pingo-gilt.vercel.app/api/auth/callback/google` e `https://pingo-gilt.vercel.app/api/v1/google/callback`. O alias automático de equipe exige autenticação Vercel e não deve ser usado pelo aplicativo.
 5. Gere `CREDENTIAL_ENCRYPTION_KEY` com 32 bytes aleatórios em base64. Guarde um backup privado: perder essa chave torna as credenciais salvas ilegíveis.
 6. Autorize os convites com `npm run invite -- email`. A ferramenta limita a lista a 10 endereços e não envia e-mails.
 

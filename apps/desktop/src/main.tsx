@@ -17,7 +17,7 @@ import {
 import "@pingo/ui/styles.css";
 import "./pet.css";
 const base =
-  import.meta.env.VITE_API_URL ?? "https://pingo-feh-team.vercel.app";
+  import.meta.env.VITE_API_URL ?? "https://pingo-gilt.vercel.app";
 const api = new Api(base);
 const platform = {
   api,

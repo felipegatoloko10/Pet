@@ -5,7 +5,14 @@
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
-    "opener:allow-open-url",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://pingo-gilt.vercel.app/**" },
+        { "url": "https://accounts.google.com/**" },
+        { "url": "https://mail.google.com/**" }
+      ]
+    },
     "sql:default",
     "sql:allow-execute",
     "sql:allow-select",

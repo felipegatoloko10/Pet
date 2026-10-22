@@ -493,6 +493,7 @@ async function pullCalendar(
         attendees: g.attendees?.map((a) => a.email),
         revision: (old?.revision ?? 0) + 1,
         syncState: "synced",
+        deleted:false,
       };
       if (old) Object.assign(old, e);
       else current.events.push(e);

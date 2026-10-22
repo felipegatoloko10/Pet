@@ -3,8 +3,15 @@ import { and, eq, lt } from "drizzle-orm";
 import { DomainError } from "@pingo/core";
 import { db } from "./db";
 import { oauthStates, credentials } from "./schema";
-import { getCredential, saveCredential, mutateWorkspace } from "./workspace";
+import {
+  getCredential,
+  saveCredential,
+  mutateWorkspace,
+  readWorkspace,
+} from "./workspace";
 export const SCOPES = [
+  "openid",
+  "email",
   "https://www.googleapis.com/auth/tasks",
   "https://www.googleapis.com/auth/calendar.events",
   "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
@@ -84,9 +91,31 @@ export async function finishGoogle(userId: string, url: URL) {
     grant_type: "authorization_code",
     redirect_uri: redirect(),
   });
+  const identity = await new GoogleClient(token.access_token).request<{
+    sub: string;
+    email: string;
+    email_verified: boolean;
+  }>("https://openidconnect.googleapis.com/v1/userinfo");
+  if (!identity.email_verified)
+    throw new DomainError(
+      "identity",
+      "Escolha uma conta Google com e-mail verificado.",
+    );
+  const prior = await readWorkspace(userId);
+  if (prior.connection.subject && prior.connection.subject !== identity.sub)
+    throw new DomainError(
+      "identity",
+      "Este espaço está vinculado a outra conta Google. Escolha a conta originalmente conectada para preservar a sincronização.",
+      409,
+    );
   await saveCredential(userId, "google", token);
   await mutateWorkspace(userId, (w) => {
-    w.connection = { connected: true, scopes: token.scope.split(" ") };
+    w.connection = {
+      connected: true,
+      scopes: (token.scope ?? "").split(" "),
+      subject: identity.sub,
+      email: identity.email,
+    };
     w.cursor = {};
     w.revision++;
   });
@@ -187,7 +216,12 @@ export async function disconnectGoogle(userId: string) {
     .delete(credentials)
     .where(and(eq(credentials.userId, userId), eq(credentials.kind, "google")));
   await mutateWorkspace(userId, (w) => {
-    w.connection = { connected: false, scopes: [] };
+    w.connection = {
+      connected: false,
+      scopes: [],
+      subject: w.connection.subject,
+      email: w.connection.email,
+    };
     w.revision++;
   });
 }

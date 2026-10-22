@@ -21,7 +21,11 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run check -w @pingo/scheduler
+      - run: npx playwright install --with-deps chromium
+      - name: Verificar painel no navegador
+        run: npx playwright test
   windows:
+    needs: verify
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

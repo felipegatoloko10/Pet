@@ -54,6 +54,18 @@ function notice(w: Workspace, id: string, title: string, body: string) {
     });
   w.notices = w.notices.slice(0, 200);
 }
+function syncLinkedTask(w: Workspace, e: CalendarEvent) {
+  if (!e.taskId) return;
+  const t = w.tasks.find((t) => t.id === e.taskId);
+  if (!t) return;
+  const start = e.deleted ? null : e.start,
+    end = e.deleted ? null : e.end;
+  if (t.scheduledStart !== start || t.scheduledEnd !== end) {
+    t.scheduledStart = start;
+    t.scheduledEnd = end;
+    t.revision++;
+  }
+}
 async function deliverJob(userId: string, client: GoogleClient, job: SyncJob) {
   const w = await readWorkspace(userId);
   const t = w.tasks.find((t) => t.id === job.entityId);
@@ -254,104 +266,129 @@ export async function syncGoogle(userId: string) {
   if (!current.connection.connected) return current;
   try {
     const client = new GoogleClient(await googleToken(userId));
-    await pushOutbox(userId, client);
-    if (current.connection.scopes.some((s) => s.endsWith("/tasks"))) {
-      const lists = await client.pages<{ id: string; title: string }>(
-        `${tasksBase}/users/@me/lists?maxResults=100`,
-        "items",
-      );
-      for (const list of lists) {
-        const cursor = current.cursor.tasks?.[list.id];
-        const since = new Date(Date.now() - 30000).toISOString();
-        const items = await client.pages<GTask>(
-          `${taskUrl(list.id)}?maxResults=100&showCompleted=true&showHidden=true&showDeleted=true${cursor ? `&updatedMin=${encodeURIComponent(cursor)}` : ""}`,
+    const errors: string[] = [];
+    const attempt = async (label: string, fn: () => Promise<void>) => {
+      try {
+        await fn();
+      } catch (e) {
+        errors.push(
+          `${label}: ${e instanceof GoogleError ? e.message : "Atualização temporariamente indisponível."}`,
+        );
+      }
+    };
+    await attempt("Envio", () => pushOutbox(userId, client));
+    if (current.connection.scopes.some((s) => s.endsWith("/tasks")))
+      await attempt("Tasks", async () => {
+        const lists = await client.pages<{ id: string; title: string }>(
+          `${tasksBase}/users/@me/lists?maxResults=100`,
           "items",
         );
-        await mutateWorkspace(userId, (w) => {
-          let board = w.boards.find((b) => b.googleId === list.id);
-          if (!board) {
-            board = newBoard(crypto.randomUUID(), list.title, list.id);
-            w.boards.push(board);
-          } else board.title = list.title;
-          if (!w.preferences.defaultBoardId)
-            w.preferences.defaultBoardId = board.id;
-          for (const g of items) {
-            const localId = g.notes?.match(/\[Pingo:([^\]]+)\]/)?.[1];
-            const creating = localId
-              ? w.tasks.find(
-                  (t) =>
-                    t.id === localId && t.boardId === board.id && !t.googleId,
-                )
-              : undefined;
-            if (creating) {
-              creating.googleId = g.id;
-              creating.googleEtag = g.etag;
-              creating.googleUpdated = g.updated;
-            }
-            const old = w.tasks.find(
-              (t) => t.googleId === g.id && t.boardId === board.id,
-            );
-            if (old && g.updated && old.googleUpdated === g.updated) continue;
-            mergeGoogleTask(w, board, {
-              ...g,
-              notes: g.notes?.replace(/\n?\[Pingo:[^\]]+\]/g, ""),
-            });
-          }
-          w.cursor.tasks ??= {};
-          w.cursor.tasks[list.id] = since;
-          w.revision++;
-        });
-      }
-    }
-    if (current.connection.scopes.some((s) => s.endsWith("/calendar.events"))) {
-      const calendars = await client.pages<{
-        id: string;
-        summary: string;
-        accessRole: string;
-      }>(`${calendarBase}/users/me/calendarList?minAccessRole=writer`, "items");
-      await mutateWorkspace(userId, (w) => {
-        w.calendars = calendars.map((c) => ({ id: c.id, title: c.summary }));
-      });
-      for (const cal of calendars) {
-        await pullCalendar(userId, client, cal.id);
-        await pullOccurrences(userId, client, cal.id);
-        await ensureCalendarWatch(userId, client, cal.id);
-      }
-    }
-    if (current.connection.scopes.some((s) => s.endsWith("/gmail.readonly"))) {
-      const list = await client.request<{ messages?: { id: string }[] }>(
-        "https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&labelIds=UNREAD&maxResults=15",
-      );
-      const mail = await Promise.all(
-        (list.messages ?? []).map(async (m) => {
-          const data = await client.request<{
-            payload?: { headers?: { name: string; value: string }[] };
-          }>(
-            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+        for (const list of lists) {
+          const cursor = current.cursor.tasks?.[list.id];
+          const since = new Date(Date.now() - 30000).toISOString();
+          const items = await client.pages<GTask>(
+            `${taskUrl(list.id)}?maxResults=100&showCompleted=true&showHidden=true&showDeleted=true${cursor ? `&updatedMin=${encodeURIComponent(cursor)}` : ""}`,
+            "items",
           );
-          const h = (name: string) =>
-            data.payload?.headers?.find((h) => h.name.toLowerCase() === name)
-              ?.value ?? "";
-          return {
-            id: m.id,
-            from: h("from"),
-            subject: h("subject") || "(sem assunto)",
-            date: h("date"),
-            url: `https://mail.google.com/mail/u/0/#inbox/${m.id}`,
-          };
-        }),
-      );
-      await mutateWorkspace(userId, (w) => {
-        for (const m of mail)
-          if (w.cursor.gmail && !w.mail.some((x) => x.id === m.id))
-            notice(w, `mail:${m.id}`, "Novo e-mail", `${m.from}: ${m.subject}`);
-        w.mail = mail;
-        w.cursor.gmail = new Date().toISOString();
+          await mutateWorkspace(userId, (w) => {
+            let board = w.boards.find((b) => b.googleId === list.id);
+            if (!board) {
+              board = newBoard(crypto.randomUUID(), list.title, list.id);
+              w.boards.push(board);
+            } else board.title = list.title;
+            if (!w.preferences.defaultBoardId)
+              w.preferences.defaultBoardId = board.id;
+            for (const g of items) {
+              const localId = g.notes?.match(/\[Pingo:([^\]]+)\]/)?.[1];
+              const creating = localId
+                ? w.tasks.find(
+                    (t) =>
+                      t.id === localId && t.boardId === board.id && !t.googleId,
+                  )
+                : undefined;
+              if (creating) {
+                creating.googleId = g.id;
+                creating.googleEtag = g.etag;
+                creating.googleUpdated = g.updated;
+              }
+              const old = w.tasks.find(
+                (t) => t.googleId === g.id && t.boardId === board.id,
+              );
+              if (old && g.updated && old.googleUpdated === g.updated) continue;
+              mergeGoogleTask(w, board, {
+                ...g,
+                notes: g.notes?.replace(/\n?\[Pingo:[^\]]+\]/g, ""),
+              });
+            }
+            w.cursor.tasks ??= {};
+            w.cursor.tasks[list.id] = since;
+            w.revision++;
+          });
+        }
       });
-    }
+    if (current.connection.scopes.some((s) => s.endsWith("/calendar.events")))
+      await attempt("Agenda", async () => {
+        const calendars = current.connection.scopes.some((s) =>
+          s.endsWith("/calendar.calendarlist.readonly"),
+        )
+          ? await client.pages<{
+              id: string;
+              summary: string;
+              accessRole: string;
+            }>(
+              `${calendarBase}/users/me/calendarList?minAccessRole=writer`,
+              "items",
+            )
+          : [{ id: "primary", summary: "Principal", accessRole: "owner" }];
+        await mutateWorkspace(userId, (w) => {
+          w.calendars = calendars.map((c) => ({ id: c.id, title: c.summary }));
+        });
+        for (const cal of calendars) {
+          await pullCalendar(userId, client, cal.id);
+          await pullOccurrences(userId, client, cal.id);
+          await ensureCalendarWatch(userId, client, cal.id);
+        }
+      });
+    if (current.connection.scopes.some((s) => s.endsWith("/gmail.readonly")))
+      await attempt("Gmail", async () => {
+        const list = await client.request<{ messages?: { id: string }[] }>(
+          "https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&labelIds=UNREAD&maxResults=15",
+        );
+        const mail = await Promise.all(
+          (list.messages ?? []).map(async (m) => {
+            const data = await client.request<{
+              payload?: { headers?: { name: string; value: string }[] };
+            }>(
+              `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+            );
+            const h = (name: string) =>
+              data.payload?.headers?.find((h) => h.name.toLowerCase() === name)
+                ?.value ?? "";
+            return {
+              id: m.id,
+              from: h("from"),
+              subject: h("subject") || "(sem assunto)",
+              date: h("date"),
+              url: `https://mail.google.com/mail/?authuser=${encodeURIComponent(current.connection.email ?? "0")}#inbox/${m.id}`,
+            };
+          }),
+        );
+        await mutateWorkspace(userId, (w) => {
+          for (const m of mail)
+            if (w.cursor.gmail && !w.mail.some((x) => x.id === m.id))
+              notice(
+                w,
+                `mail:${m.id}`,
+                "Novo e-mail",
+                `${m.from}: ${m.subject}`,
+              );
+          w.mail = mail;
+          w.cursor.gmail = new Date().toISOString();
+        });
+      });
     await mutateWorkspace(userId, (w) => {
       w.connection.lastSync = new Date().toISOString();
-      w.connection.error = undefined;
+      w.connection.error = errors.length ? errors.join(" ") : undefined;
       w.revision++;
     });
   } catch (error) {
@@ -400,10 +437,19 @@ async function pullCalendar(
     throw err;
   }
   await mutateWorkspace(userId, (current) => {
-    if (reset)
-      current.events = current.events.filter(
-        (e) => e.calendarId !== calId || e.syncState !== "synced",
-      );
+    if (reset) {
+      const found = new Set(events.map((e) => e.id));
+      for (const e of current.events) {
+        if (
+          e.calendarId === calId &&
+          e.syncState === "synced" &&
+          !found.has(e.googleId ?? "")
+        ) {
+          e.deleted = true;
+          e.revision++;
+        }
+      }
+    }
     for (const g of events) {
       const old = current.events.find(
         (e) => e.googleId === g.id && e.calendarId === calId,
@@ -415,11 +461,12 @@ async function pullCalendar(
         }
         continue;
       }
-      if (old?.googleEtag === g.etag) continue;
+      if (old && old.googleEtag === g.etag && !old.deleted) continue;
       if (g.status === "cancelled") {
         if (old) {
           old.deleted = true;
           old.revision++;
+          syncLinkedTask(current, old);
         }
         continue;
       }
@@ -449,6 +496,7 @@ async function pullCalendar(
       };
       if (old) Object.assign(old, e);
       else current.events.push(e);
+      syncLinkedTask(current, e);
     }
     current.cursor.calendar ??= {};
     if (nextToken) current.cursor.calendar[calId] = nextToken;

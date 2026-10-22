@@ -47,7 +47,11 @@ try {
       JSON.stringify(w),
     ]);
   }
-  const {auth}=await import('../apps/web/src/server/auth');const context=await auth().$context;const stored=await context.adapter.findOne<{expiresAt:Date,userId:string}>({model:'session',where:[{field:'token',value:tokenA}]});const localSession=await auth().api.getSession({headers:new Headers({Authorization:`Bearer ${tokenA}`})});console.log({localSessionVerified:localSession?.user.id===alice,stored:!!stored,expires:stored?.expiresAt,now:new Date()});
+  const { auth } = await import("../apps/web/src/server/auth");
+  const localSession = await auth().api.getSession({
+    headers: new Headers({ Authorization: `Bearer ${tokenA}` }),
+  });
+  check(localSession?.user.id === alice);
   const op = {
     operationId: crypto.randomUUID(),
     command: {
@@ -66,13 +70,43 @@ try {
       },
     },
   };
-  const first=await call(tokenA,"operations",op);if(first.status!==200){const data=await first.json();console.log({status:first.status,error:data.error,code:data.code});}check(first.status===200);
+  const first = await call(tokenA, "operations", op);
+  if (first.status !== 200) {
+    const data = await first.json();
+    console.log({ status: first.status, error: data.error, code: data.code });
+  }
+  check(first.status === 200);
   check((await call(tokenA, "operations", op)).status === 200);
   const a = await (await call(tokenA, "workspace")).json();
   check(a.workspace.tasks.length === 1);
   const b = await (await call(tokenB, "workspace")).json();
   check(b.workspace.tasks.length === 0);
   check(b.user.id === bob);
+  const push = {
+    endpoint: "https://fcm.googleapis.com/fcm/send/pingo-test-fixture",
+    keys: { p256dh: "fake-test-key", auth: "fake-auth" },
+  };
+  check((await call(tokenA, "push", push)).status === 200);
+  check((await call(tokenB, "push", push)).status === 200);
+  const owned = await pool.query(
+    "SELECT user_id FROM push_subscriptions WHERE user_id=ANY($1::text[])",
+    [[alice, bob]],
+  );
+  check(owned.rows.length === 1 && owned.rows[0].user_id === bob);
+  const remove = await fetch(`${base}/api/v1/push`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${tokenA}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ endpoint: push.endpoint }),
+  });
+  check(remove.status === 200);
+  const remaining = await pool.query(
+    "SELECT user_id FROM push_subscriptions WHERE user_id=$1",
+    [bob],
+  );
+  check(remaining.rowCount === 1);
   check(!("outbox" in b.workspace));
   check(!("cursor" in b.workspace));
   check(

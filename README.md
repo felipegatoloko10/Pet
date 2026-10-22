@@ -22,7 +22,7 @@ npm run invite -- pessoa@gmail.com
 npm run dev
 ```
 
-O painel oferece uma demonstração local identificada, sem autenticação ou acesso ao Google. Dados reais exigem convite, OAuth e nova autorização Workspace. Veja [ativação](docs/ACTIVATION.md) e [validação](docs/VALIDATION.md).
+O painel oferece uma demonstração local identificada, sem autenticação ou acesso ao Google. Dados reais exigem convite, OAuth e nova autorização Workspace. Veja o [estado da entrega](docs/STATUS.md), a [ativação](docs/ACTIVATION.md) e a [validação](docs/VALIDATION.md).
 
 ```sh
 npm run check

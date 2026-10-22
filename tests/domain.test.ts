@@ -9,6 +9,8 @@ import {
   petState,
   operationSchema,
   zonedParts,
+  localNotices,
+  eventOnDate,
 } from "../packages/core/src/index";
 const seed = () => {
   const w = emptyWorkspace();
@@ -206,6 +208,60 @@ describe("reconciliação Google", () => {
   });
 });
 describe("rotina e fuso", () => {
+  it("eventos de dia inteiro usam fim exclusivo e compromissos seguem o fuso", () => {
+    const base = {
+      id: "e",
+      title: "Viagem",
+      calendarId: "primary",
+      revision: 1,
+      syncState: "synced" as const,
+    };
+    expect(
+      eventOnDate(
+        { ...base, start: "2026-10-24", end: "2026-10-26", allDay: true },
+        "2026-10-25",
+        "America/Sao_Paulo",
+      ),
+    ).toBe(true);
+    expect(
+      eventOnDate(
+        { ...base, start: "2026-10-24", end: "2026-10-26", allDay: true },
+        "2026-10-26",
+        "America/Sao_Paulo",
+      ),
+    ).toBe(false);
+    expect(
+      eventOnDate(
+        {
+          ...base,
+          start: "2026-10-23T01:00:00Z",
+          end: "2026-10-23T02:00:00Z",
+          allDay: false,
+        },
+        "2026-10-22",
+        "America/Sao_Paulo",
+      ),
+    ).toBe(true);
+  });
+  it("lembrete offline compartilha ID com a nuvem e respeita silêncio", () => {
+    const w = emptyWorkspace();
+    w.events = [
+      {
+        id: "e",
+        title: "Consulta",
+        calendarId: "primary",
+        revision: 1,
+        syncState: "synced",
+        start: "2026-10-23T11:00:00Z",
+        end: "2026-10-23T12:00:00Z",
+        allDay: false,
+      },
+    ];
+    const notices = localNotices(w, "alice", new Date("2026-10-23T10:30:00Z"));
+    expect(notices).toHaveLength(1);
+    expect(notices[0].id).toBe("reminder:alice:e:2026-10-23T11:00:00Z");
+    expect(notices[0].silent).toBe(true);
+  });
   it("silêncio atravessa meia-noite", () => {
     expect(isQuiet(new Date("2026-10-23T02:00:00Z"), defaultPreferences)).toBe(
       true,

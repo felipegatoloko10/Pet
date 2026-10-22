@@ -47,6 +47,70 @@ beforeEach(() => {
   process.env.BETTER_AUTH_URL = "http://localhost:3000";
 });
 afterEach(() => vi.unstubAllGlobals());
+it("falha de Tasks não bloqueia os cabeçalhos Gmail", async () => {
+  memory.workspace!.outbox = [];
+  memory.workspace!.connection.scopes.push(
+    "https://www.googleapis.com/auth/gmail.readonly",
+  );
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string) => {
+      if (input.includes("tasks.googleapis.com"))
+        return new Response(null, { status: 403 });
+      if (input.includes("format=metadata"))
+        return Response.json({
+          payload: {
+            headers: [
+              { name: "From", value: "Teste" },
+              { name: "Subject", value: "Assunto" },
+            ],
+          },
+        });
+      return Response.json({ messages: [{ id: "message" }] });
+    }),
+  );
+  await syncGoogle("alice");
+  expect(memory.workspace!.mail[0].subject).toBe("Assunto");
+  expect(memory.workspace!.connection.error).toContain("Tasks");
+});
+it("Calendar 410 refaz sincronização e preserva datas de dia inteiro", async () => {
+  memory.workspace!.outbox = [];
+  memory.workspace!.connection.scopes = [
+    "https://www.googleapis.com/auth/calendar.events",
+  ];
+  memory.workspace!.cursor.calendar = { primary: "expired" };
+  let resets = 0;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string) => {
+      if (input.includes("syncToken=expired")) {
+        resets++;
+        return new Response(null, { status: 410 });
+      }
+      if (input.includes("singleEvents=true"))
+        return Response.json({ items: [] });
+      return Response.json({
+        items: [
+          {
+            id: "all-day",
+            summary: "Viagem",
+            start: { date: "2026-10-24" },
+            end: { date: "2026-10-26" },
+          },
+        ],
+        nextSyncToken: "fresh",
+      });
+    }),
+  );
+  await syncGoogle("alice");
+  expect(resets).toBe(1);
+  expect(memory.workspace!.cursor.calendar?.primary).toBe("fresh");
+  expect(memory.workspace!.events[0]).toMatchObject({
+    allDay: true,
+    start: "2026-10-24",
+    end: "2026-10-26",
+  });
+});
 it("timeout depois de criar é reconciliado, sem segundo POST", async () => {
   let remote = false;
   let creates = 0;

@@ -242,11 +242,26 @@ async function handler(r: Request) {
         )
       )
         throw new DomainError("endpoint", "Serviço de push não autorizado.");
-      const id = digest(`${user.id}:${input.endpoint}`);
+      const id = digest(input.endpoint);
       await db()
         .insert(subscriptions)
         .values({ id, userId: user.id, data: input })
-        .onConflictDoUpdate({ target: subscriptions.id, set: { data: input } });
+        .onConflictDoUpdate({
+          target: subscriptions.id,
+          set: { data: input, userId: user.id },
+        });
+      return Response.json({ ok: true });
+    }
+    if (path === "push" && r.method === "DELETE") {
+      const { endpoint } = z.object({ endpoint: z.url() }).parse(await body(r));
+      await db()
+        .delete(subscriptions)
+        .where(
+          and(
+            eq(subscriptions.id, digest(endpoint)),
+            eq(subscriptions.userId, user.id),
+          ),
+        );
       return Response.json({ ok: true });
     }
     return Response.json({ error: "Rota não encontrada." }, { status: 404 });

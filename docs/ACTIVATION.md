@@ -19,7 +19,7 @@ Projeto Neon dedicado: `Pingo` (`billowing-surf-70575883`). Branch de desenvolvi
 
 Vercel: projeto `pingo`, espaço `feh-team`, plano Hobby; raiz do projeto `apps/web`, arquivos externos da monorepo habilitados. O beta é pessoal e não comercial. Não habilite serviços pagos para contornar limites.
 
-Configure segredos por ambiente. Não reutilize a branch de desenvolvimento em produção. Não publique `.env.local` nem exportações de dados. O Neon deve respeitar a cota gratuita; verifique suspensão automática e consumo no console antes de ativar a rotina. Nesta conta, a API recusou alterar o intervalo de suspensão: essa configuração precisa ser conferida no console.
+Configure segredos por ambiente. Não reutilize a branch de desenvolvimento em produção. Não publique `.env.local` nem exportações de dados. Monitore o consumo para respeitar a cota gratuita. A conta não permite alterar o intervalo de suspensão pela API; o endpoint de produção foi observado em estado `idle` após inatividade.
 
 ## Cloudflare
 

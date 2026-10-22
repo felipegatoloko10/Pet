@@ -129,6 +129,11 @@ export type SyncJob = {
   sentAt?: string;
 };
 export type Workspace = {
+  conversation?: {
+    role: "user" | "assistant";
+    text: string;
+    suggestions?: { approvalId: string; command: Command }[];
+  }[];
   revision: number;
   boards: Board[];
   tasks: Task[];
@@ -139,6 +144,8 @@ export type Workspace = {
   outbox: SyncJob[];
   calendars: { id: string; title: string }[];
   connection: {
+    subject?: string;
+    email?: string;
     connected: boolean;
     scopes: string[];
     lastSync?: string;
@@ -196,7 +203,13 @@ export const taskInput = z.object({
   scheduledStart: datetime.nullable().default(null),
   scheduledEnd: datetime.nullable().default(null),
   priority: z.enum(["low", "normal", "high"]).default("normal"),
-  sourceUrl: z.url().optional(),
+  sourceUrl: z
+    .url()
+    .refine((v) => {
+      const u = new URL(v);
+      return u.protocol === "https:" && u.hostname === "mail.google.com";
+    }, "Use um link HTTPS do Gmail.")
+    .optional(),
   importId: id.optional(),
 });
 export const eventInput = z
@@ -452,6 +465,16 @@ export function applyCommand(
         deleted: false,
         error: undefined,
       };
+      if (
+        e.taskId &&
+        w.events.some(
+          (x) => x.taskId === e.taskId && x.id !== e.id && !x.deleted,
+        )
+      )
+        throw new DomainError(
+          "reserved",
+          "Esta tarefa já tem um horário reservado. Edite o compromisso existente.",
+        );
       w.events = w.events.filter((x) => x.id !== e.id).concat(e);
       if (e.taskId) {
         const t = w.tasks.find((t) => t.id === e.taskId)!;
@@ -470,6 +493,14 @@ export function applyCommand(
       e.deleted = true;
       e.revision++;
       e.syncState = "pending";
+      if (e.taskId) {
+        const t = w.tasks.find((t) => t.id === e.taskId);
+        if (t) {
+          t.scheduledStart = null;
+          t.scheduledEnd = null;
+          t.revision++;
+        }
+      }
       enqueue("event", e.id, "delete");
       break;
     }

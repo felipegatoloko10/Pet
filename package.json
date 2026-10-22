@@ -15,7 +15,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "desktop": "npm run tauri -w @pingo/desktop",
-    "invite": "tsx scripts/invite.ts"
+    "invite": "tsx scripts/invite.ts",
+    "test:browser": "playwright test",
+    "test:backend": "tsx scripts/verify-backend.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "latest",

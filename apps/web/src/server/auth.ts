@@ -8,7 +8,7 @@ let instance: ReturnType<typeof createAuth> | undefined;
 function createAuth() {
   return betterAuth({
     appName: "Pingo",
-    logger:{disabled:true},
+    logger: { disabled: true },
     baseURL: process.env.BETTER_AUTH_URL,
     secret: process.env.BETTER_AUTH_SECRET,
     database: drizzleAdapter(db(), { provider: "pg", schema }),
@@ -61,6 +61,7 @@ export function auth() {
   return instance ?? (instance = createAuth());
 }
 export async function requireUser(request: Request) {
+  if(!request.headers.has('authorization')&&!request.headers.get('cookie')?.includes('session_token='))throw new APIError('UNAUTHORIZED',{message:'Entre no Pingo para continuar.'});
   const session = await auth().api.getSession({ headers: request.headers });
   if (!session)
     throw new APIError("UNAUTHORIZED", {

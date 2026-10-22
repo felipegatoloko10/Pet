@@ -27,6 +27,19 @@ const platform = {
   storage: sqliteStorage,
   login: deviceLogin,
   logout: async () => {
+    try {
+      await fetch(`${base}/api/auth/sign-out`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${api.token}`,
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+        signal: AbortSignal.timeout(10000),
+      });
+    } catch {
+      /* Offline logout still removes the local credential. */
+    }
     api.token = undefined;
     await invoke("save_session", { token: "" });
     await emit("session-changed");

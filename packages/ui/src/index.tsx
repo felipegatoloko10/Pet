@@ -151,9 +151,19 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     setClient(next);
     localStorage.setItem("pingo:user", JSON.stringify(u));
     await next.init();
+    if (!demo && next.workspace.revision === 0)
+      await next.command({
+        type: "preferences.update",
+        preferences: {
+          ...next.workspace.preferences,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        },
+      });
   }
   useEffect(() => {
     let active = true;
+    const page = new URLSearchParams(location.search).get("page");
+    if (nav.some((n) => n.id === page)) setScreen(page as Screen);
     if (!platform.api && "serviceWorker" in navigator)
       void navigator.serviceWorker.register("/sw.js").catch(() => {});
     api
@@ -267,6 +277,22 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     }
   }
   async function logout() {
+    if (!platform.api && "serviceWorker" in navigator) {
+      const registration = await navigator.serviceWorker.getRegistration();
+      const subscription = await registration?.pushManager.getSubscription();
+      if (subscription) {
+        if (!client?.demo)
+          await api
+            .request("push", {
+              method: "DELETE",
+              body: JSON.stringify({ endpoint: subscription.endpoint }),
+            })
+            .catch(() => {});
+        await subscription.unsubscribe();
+      }
+      const notices = await registration?.getNotifications();
+      notices?.forEach((n) => n.close());
+    }
     await client?.storage.clear();
     localStorage.removeItem("pingo:user");
     if (platform.logout) await platform.logout();
@@ -569,6 +595,9 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
                       : "Tudo no seu ritmo. ♡"
                   }
                   focus={focus}
+                  activity={
+                    client.syncing ? "think" : toast ? "celebrate" : undefined
+                  }
                 />
                 <div className="hero-decor">✦</div>
               </section>
@@ -826,7 +855,12 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
           onClose={() => setTaskEditor(null)}
           onSchedule={(t) => {
             setTaskEditor(null);
-            setEventEditor({ title: t.title, taskId: t.id });
+            setEventEditor(
+              w.events.find((e) => e.taskId === t.id && !e.deleted) ?? {
+                title: t.title,
+                taskId: t.id,
+              },
+            );
           }}
         />
       )}
@@ -1820,7 +1854,7 @@ function Conversation({
       text: string;
       suggestions?: { approvalId: string; command: Command }[];
     }[]
-  >([]);
+  >(client.workspace.conversation ?? []);
   const [busy, setBusy] = useState(false);
   const [mailId, setMailId] = useState("");
   async function send(value: string) {
@@ -2009,6 +2043,9 @@ function SettingsPage({
     fingerprint: string;
   } | null>(null);
   const [destination, setDestination] = useState(p.defaultBoardId);
+  const [migrationCalendar, setMigrationCalendar] = useState(
+    p.defaultCalendarId,
+  );
   async function run(fn: () => Promise<void>) {
     try {
       await fn();
@@ -2388,7 +2425,14 @@ function SettingsPage({
               Receba avisos neste navegador mesmo com o painel fechado. A
               entrega depende da conexão e do dispositivo.
             </p>
-            <button className="button" onClick={() => void run(push)}>
+            <button
+              className="button"
+              onClick={() =>
+                client.api.base
+                  ? void openExternal(`${client.api.base}/?page=settings`)
+                  : void run(push)
+              }
+            >
               <Bell size={16} /> Ativar notificações
             </button>
           </section>
@@ -2421,6 +2465,12 @@ function SettingsPage({
                       {String(t.title ?? t.Title ?? "Sem título")}
                     </li>
                   ))}
+                  {migration.events.slice(0, 5).map((e, i) => (
+                    <li key={`event-${i}`}>
+                      {String(e.title ?? e.Title ?? "Compromisso")} ·{" "}
+                      {String(e.start ?? e.Start ?? "")}
+                    </li>
+                  ))}
                 </ul>
                 <label>
                   Quadro de destino
@@ -2435,12 +2485,37 @@ function SettingsPage({
                     ))}
                   </select>
                 </label>
+                <label>
+                  Calendário de destino
+                  <select
+                    value={migrationCalendar}
+                    onChange={(e) => setMigrationCalendar(e.target.value)}
+                  >
+                    <option value="primary">Principal</option>
+                    {w.calendars.map((c) => (
+                      <option value={c.id} key={c.id}>
+                        {c.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <button
                   className="button"
                   disabled={!destination}
                   onClick={() =>
                     void run(async () => {
-                      await importLegacy(migration, w, destination, act);
+                      await importLegacy(
+                        migration,
+                        {
+                          ...w,
+                          preferences: {
+                            ...w.preferences,
+                            defaultCalendarId: migrationCalendar,
+                          },
+                        },
+                        destination,
+                        act,
+                      );
                       setMigration(null);
                       onToast(
                         "Importação concluída. A sincronização pode continuar em segundo plano.",
@@ -2486,8 +2561,8 @@ async function importLegacy(
 ) {
   const b = w.boards.find((b) => b.id === boardId)!;
   for (const [i, t] of data.tasks.entries()) {
-    const source = String(t.id ?? t.Id ?? i);
-    const importId = `legacy:${data.fingerprint}:task:${source}`;
+    const source = String(t.id ?? t.Id ?? data.fingerprint + ":" + i);
+    const importId = `legacy:wpf:task:${source}`;
     if (w.tasks.some((t) => t.importId === importId)) continue;
     const done = Boolean(
       t.Done ??
@@ -2519,7 +2594,7 @@ async function importLegacy(
     });
   }
   for (const [i, e] of data.events.entries()) {
-    const importId = `legacy:${data.fingerprint}:event:${String(e.id ?? e.Id ?? i)}`;
+    const importId = `legacy:wpf:event:${String(e.id ?? e.Id ?? data.fingerprint + ":" + i)}`;
     if (w.events.some((e) => e.importId === importId)) continue;
     const start = String(
       e.start ?? e.Start ?? e.startTime ?? e.StartTime ?? "",
@@ -2533,9 +2608,15 @@ async function importLegacy(
       event: {
         id: crypto.randomUUID(),
         title: String(e.title ?? e.Title ?? "Compromisso importado"),
-        start: new Date(start).toISOString(),
-        end: new Date(end).toISOString(),
-        allDay: false,
+        start:
+          (e.AllDay ?? e.allDay)
+            ? start.slice(0, 10)
+            : new Date(start).toISOString(),
+        end:
+          (e.AllDay ?? e.allDay)
+            ? end.slice(0, 10)
+            : new Date(end).toISOString(),
+        allDay: Boolean(e.AllDay ?? e.allDay),
         calendarId: w.preferences.defaultCalendarId,
         importId,
       },

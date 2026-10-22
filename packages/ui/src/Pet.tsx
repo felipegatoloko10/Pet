@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, useRef, type CSSProperties } from "react";
 import { petState, type PetState, type Preferences } from "@pingo/core";
 export function Pet({
   preferences: p,
@@ -18,6 +18,7 @@ export function Pet({
 }) {
   const [state, setState] = useState<PetState>("idle");
   const [visible, setVisible] = useState(true);
+  const previous = useRef<PetState>("idle");
   useEffect(() => {
     const onVisibility = () => setVisible(!document.hidden);
     document.addEventListener("visibilitychange", onVisibility);
@@ -26,10 +27,9 @@ export function Pet({
   useEffect(() => {
     if (!visible) return;
     let wakeTimer: ReturnType<typeof setTimeout> | undefined;
-    let previous: PetState = "idle";
     const tick = () => {
       const next = petState(new Date(), p, focus);
-      if (previous === "sleep" && next !== "sleep") {
+      if (previous.current === "sleep" && next !== "sleep") {
         setState("wake");
         wakeTimer = setTimeout(() => setState(next), 1800);
       } else if (next === "sleep" || next === "focus") setState(next);
@@ -49,7 +49,7 @@ export function Pet({
               : choices[Math.floor(Math.random() * choices.length)]),
         );
       }
-      previous = next;
+      previous.current = next;
     };
     tick();
     const timer = setInterval(tick, 6000);

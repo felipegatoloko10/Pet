@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+data/
+credentials*.json
+client_secret*.json
+*.user
+
+# Publicação local e artefatos de verificação (não são fontes)
+Pingo/
+.verification/
+*.enc
+*.tmp

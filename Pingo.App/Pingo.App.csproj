@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><Nullable>enable</Nullable>
+    <AssemblyName>Pingo</AssemblyName><RootNamespace>Pingo.Desktop</RootNamespace>
+    <ApplicationIcon>Assets/Pingo.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Pingo.Core/Pingo.Core.csproj" /></ItemGroup>
+</Project>

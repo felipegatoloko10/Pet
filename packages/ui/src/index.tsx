@@ -414,7 +414,10 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
               key={n.id}
               aria-label={n.label}
               className={screen === n.id ? "nav-item selected" : "nav-item"}
-              onClick={() => setScreen(n.id)}
+              onClick={() => {
+                setToast("");
+                setScreen(n.id);
+              }}
             >
               <n.icon size={19} />
               <span>{n.label}</span>

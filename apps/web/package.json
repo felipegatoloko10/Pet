@@ -12,6 +12,18 @@
     "@pingo/ui": "*",
     "next": "16.4.2",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "better-auth": "1.7.12",
+    "drizzle-orm": "^0.45.0",
+    "pg": "^8.16.0",
+    "@vercel/functions": "latest",
+    "ai": "7.0.149",
+    "@ai-sdk/openai": "latest",
+    "@ai-sdk/google": "latest",
+    "@ai-sdk/anthropic": "latest",
+    "zod": "^4.0.0",
+    "web-push": "^3.6.7",
+    "date-fns": "^4.1.0",
+    "@date-fns/tz": "^1.4.0"
   }
 }

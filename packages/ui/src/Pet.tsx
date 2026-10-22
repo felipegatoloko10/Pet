@@ -7,12 +7,14 @@ export function Pet({
   focus = false,
   interactive = true,
   onClick,
+  activity,
 }: {
   preferences: Preferences;
   message?: string;
   focus?: boolean;
   interactive?: boolean;
   onClick?: () => void;
+  activity?: PetState;
 }) {
   const [state, setState] = useState<PetState>("idle");
   const [visible, setVisible] = useState(true);
@@ -41,9 +43,10 @@ export function Pet({
           "yawn",
         ];
         setState(
-          message
-            ? "speak"
-            : choices[Math.floor(Math.random() * choices.length)],
+          activity ??
+            (message
+              ? "speak"
+              : choices[Math.floor(Math.random() * choices.length)]),
         );
       }
       previous = next;
@@ -54,7 +57,7 @@ export function Pet({
       clearInterval(timer);
       if (wakeTimer) clearTimeout(wakeTimer);
     };
-  }, [p, focus, visible, message]);
+  }, [p, focus, visible, message, activity]);
   function affection() {
     setState("affection");
     setTimeout(() => setState("idle"), 2200);

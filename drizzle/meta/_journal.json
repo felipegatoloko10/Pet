@@ -8,6 +8,13 @@
       "when": 1792699197509,
       "tag": "0000_high_jubilee",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792701094815,
+      "tag": "0001_lean_loki",
+      "breakpoints": true
     }
   ]
 }

@@ -149,7 +149,7 @@ export type Workspace = {
     calendar?: Record<string, string>;
     gmail?: string;
   };
-  proactive: { date: string; count: number };
+  proactive: { date: string; count: number; lastAt?: string };
 };
 export function emptyWorkspace(
   timezone = defaultPreferences.timezone,
@@ -237,12 +237,12 @@ export const preferenceInput = z.object({
       return false;
     }
   }),
-  summaryTime: z.string().regex(/^\d{2}:\d{2}$/),
+  summaryTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   reminderMinutes: z.number().int().min(0).max(1440),
-  quietStart: z.string().regex(/^\d{2}:\d{2}$/),
-  quietEnd: z.string().regex(/^\d{2}:\d{2}$/),
-  sleepStart: z.string().regex(/^\d{2}:\d{2}$/),
-  wakeTime: z.string().regex(/^\d{2}:\d{2}$/),
+  quietStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  quietEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  sleepStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  wakeTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   voice: z.boolean(),
   snore: z.boolean(),
   reducedMotion: z.boolean(),
@@ -571,12 +571,56 @@ export function isQuiet(date: Date, p: Preferences) {
 }
 export function dailySummary(w: Workspace, now = new Date()) {
   const today = zonedParts(now, w.preferences.timezone).date;
-  const events = w.events.filter(
-    (e) => !e.deleted && e.start.slice(0, 10) === today,
+  const events = w.events.filter((e) =>
+    eventOnDate(e, today, w.preferences.timezone),
   );
   const pending = w.tasks.filter((t) => !t.deleted && !t.completed);
   const overdue = pending.filter((t) => t.dueDate && t.dueDate < today);
   return `Você tem ${events.length} compromisso(s), ${pending.filter((t) => t.dueDate === today).length} tarefa(s) para hoje e ${overdue.length} atrasada(s). Vamos cuidar de uma coisa por vez?`;
+}
+export function eventOnDate(e: CalendarEvent, date: string, timezone: string) {
+  if (e.deleted || e.recurrence) return false;
+  if (e.allDay) return e.start <= date && e.end > date;
+  return (
+    zonedParts(new Date(e.start), timezone).date <= date &&
+    zonedParts(new Date(Date.parse(e.end) - 1), timezone).date >= date
+  );
+}
+export function localNotices(
+  w: Workspace,
+  userId: string,
+  now = new Date(),
+): Notice[] {
+  const { date, time } = zonedParts(now, w.preferences.timezone);
+  const result: Notice[] = [];
+  if (time >= w.preferences.summaryTime)
+    result.push({
+      id: `summary:${date}`,
+      title: "Seu dia com Pingo",
+      body: dailySummary(w, now),
+      read: false,
+      createdAt: now.toISOString(),
+      silent: isQuiet(now, w.preferences),
+    });
+  for (const e of w.events) {
+    const delta = Date.parse(e.start) - +now;
+    if (
+      !e.deleted &&
+      !e.allDay &&
+      !e.recurrence &&
+      delta >= 0 &&
+      delta <= w.preferences.reminderMinutes * 60000
+    )
+      result.push({
+        id: `reminder:${userId}:${e.id}:${e.start}`,
+        title: e.title,
+        body: `${e.title} começa em ${Math.round(delta / 60000)} minutos.`,
+        read: false,
+        createdAt: now.toISOString(),
+        silent: isQuiet(now, w.preferences),
+      });
+  }
+  return result;
 }
 export type PetState =
   | "idle"

@@ -8,6 +8,7 @@ let instance: ReturnType<typeof createAuth> | undefined;
 function createAuth() {
   return betterAuth({
     appName: "Pingo",
+    logger:{disabled:true},
     baseURL: process.env.BETTER_AUTH_URL,
     secret: process.env.BETTER_AUTH_SECRET,
     database: drizzleAdapter(db(), { provider: "pg", schema }),

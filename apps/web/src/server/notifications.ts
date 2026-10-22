@@ -7,6 +7,7 @@ import { db } from "./db";
 import { subscriptions } from "./schema";
 import { mutateWorkspace, readWorkspace } from "./workspace";
 import { syncGoogle } from "./sync";
+import { maybeProactive } from "./ai";
 export type Job = {
   id: string;
   userId: string;
@@ -117,6 +118,7 @@ export async function processJob(job: Job) {
     w.notices = w.notices.slice(0, 200);
     w.revision++;
   });
+  if (job.kind === "routine") await maybeProactive(job.userId);
   const w = await readWorkspace(job.userId);
   await sendPush(job.userId, w);
   return jobsFor(job.userId, w);

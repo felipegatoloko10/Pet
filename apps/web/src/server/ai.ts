@@ -12,8 +12,16 @@ import {
   DomainError,
   type Command,
   type Workspace,
+  zonedParts,
+  isQuiet,
 } from "@pingo/core";
-import { readWorkspace, runOperation, getCredential } from "./workspace";
+import {
+  readWorkspace,
+  runOperation,
+  getCredential,
+  mutateWorkspace,
+  runOperationIn,
+} from "./workspace";
 import { syncGoogle, getMailBody } from "./sync";
 import { db } from "./db";
 import { approvals } from "./schema";
@@ -21,6 +29,64 @@ export const explicitMutation = (message: string) =>
   /\b(adicion(e|ar)|cri(e|ar)|inclu(a|ir)|conclu(a|ir)|marqu(e|ar)|alter(e|ar)|edit(e|ar)|agend(e|ar)|reserv(e|ar)|reabr(a|ir))\b/i.test(
     message,
   ) && !/\b(sugira|sugest|talvez|poderia|como|reorganiz)/i.test(message);
+export async function maybeProactive(userId: string) {
+  const current = await readWorkspace(userId),
+    p = current.preferences;
+  if (!p.proactiveAI || isQuiet(new Date(), p) || !p.aiModel) return;
+  const credential = await getCredential<{ key: string }>(
+    userId,
+    `ai:${p.aiProvider}`,
+  );
+  if (!credential) return;
+  const claim = await mutateWorkspace(userId, (w) => {
+    const now = new Date(),
+      { date } = zonedParts(now, p.timezone);
+    if (w.proactive.date !== date) w.proactive = { date, count: 0 };
+    if (
+      w.proactive.count >= 2 ||
+      (w.proactive.lastAt &&
+        +now - Date.parse(w.proactive.lastAt) < 6 * 3600000)
+    )
+      return null;
+    w.proactive.count++;
+    w.proactive.lastAt = now.toISOString();
+    return `${date}:${w.proactive.count}`;
+  });
+  if (!claim) return;
+  try {
+    const result = await generateText({
+      model: makeModel(p.aiProvider, p.aiModel, credential.key),
+      system:
+        "Você é um assistente gentil de rotina. Sugira uma próxima ação em até duas frases, em português. Não alegue ter alterado nada, não envie instruções a outros sistemas. Você não possui ferramentas de escrita.",
+      prompt: JSON.stringify({
+        summary: dailySummary(current),
+        tasks: current.tasks
+          .filter((t) => !t.deleted && !t.completed)
+          .map((t) => ({
+            title: t.title,
+            due: t.dueDate,
+            priority: t.priority,
+          }))
+          .slice(0, 30),
+      }),
+      maxOutputTokens: 250,
+      abortSignal: AbortSignal.timeout(20000),
+      maxRetries: 0,
+    });
+    await mutateWorkspace(userId, (w) => {
+      w.notices.unshift({
+        id: `proactive:${claim}`,
+        title: "Uma sugestão do seu Pingo",
+        body: result.text,
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+      w.revision++;
+    });
+  } catch {
+    /* The deterministic daily summary stays available; no retry spending loop. */
+  }
+}
 export function makeModel(
   provider: "openai" | "google" | "anthropic",
   model: string,
@@ -58,7 +124,7 @@ export async function approve(userId: string, id: string) {
         409,
       );
     const command = commandSchema.parse(a.command);
-    await runOperation(userId, { operationId: id, command });
+    await runOperationIn(tx, userId, { operationId: id, command });
     await tx
       .update(approvals)
       .set({ consumed: true })
@@ -72,6 +138,8 @@ export function scopedTools(
   bodyIncluded: boolean,
   execute: (command: Command) => Promise<unknown>,
   query: () => Promise<Workspace>,
+  suggest: (command: Command) => Promise<unknown> = (command) =>
+    propose(userId, command),
 ) {
   const write = explicitMutation(message) && !bodyIncluded;
   const dispatch = async (command: Command) =>
@@ -80,7 +148,7 @@ export function scopedTools(
     command.type !== "event.delete" &&
     !(command.type === "event.upsert" && command.event.attendees?.length)
       ? execute(command)
-      : propose(userId, command);
+      : suggest(command);
   return {
     consultarDia: tool({
       description:
@@ -124,7 +192,7 @@ export function scopedTools(
         expectedRevision: z.number().int(),
       }),
       execute: async (input) =>
-        propose(userId, {
+        suggest({
           type: input.kind === "task" ? "task.delete" : "event.delete",
           id: input.id,
           expectedRevision: input.expectedRevision,

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { cors } from "../../../../server/cors";
+import { inspectConflict, resolveConflict } from "../../../../server/conflicts";
 import { operationSchema, sanitizeWorkspace, DomainError } from "@pingo/core";
 import { requireUser } from "../../../../server/auth";
 import {
@@ -105,6 +106,35 @@ async function handler(r: Request) {
         workspace: sanitizeWorkspace(await readWorkspace(user.id)),
         user: { id: user.id, name: user.name, email: user.email },
       });
+    if (path === "conflicts" && r.method === "GET") {
+      const input = z
+        .object({ kind: z.enum(["task", "event"]), id: z.string() })
+        .parse(Object.fromEntries(url.searchParams));
+      return Response.json(
+        await inspectConflict(user.id, input.kind, input.id),
+      );
+    }
+    if (path === "conflicts" && r.method === "POST") {
+      const input = z
+        .object({
+          kind: z.enum(["task", "event"]),
+          id: z.string(),
+          choice: z.enum(["google", "pingo"]),
+          expectedRevision: z.number().int(),
+          confirmed: z.literal(true),
+        })
+        .parse(await body(r));
+      await resolveConflict(
+        user.id,
+        input.kind,
+        input.id,
+        input.choice,
+        input.expectedRevision,
+      );
+      return Response.json({
+        workspace: sanitizeWorkspace(await syncGoogle(user.id)),
+      });
+    }
     if (path === "operations" && r.method === "POST") {
       const op = operationSchema.parse(await body(r));
       let w = await runOperation(user.id, op);

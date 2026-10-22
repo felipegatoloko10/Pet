@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { format, addDays, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { TZDate } from "@date-fns/tz";
 import {
   defaultPreferences,
   dailySummary,
@@ -45,6 +46,7 @@ import {
   type Command,
   newBoard,
   emptyWorkspace,
+  eventOnDate,
 } from "@pingo/core";
 import {
   Api,
@@ -64,6 +66,7 @@ type Platform = {
   logout?: () => Promise<void>;
   storage?: (userId: string) => Promise<Storage>;
   openExternal?: (url: string) => Promise<void>;
+  onWorkspace?: (w: Workspace, userId: string) => void;
 };
 const nav = [
   { id: "day", label: "Meu dia", icon: Sun },
@@ -131,6 +134,10 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     null,
   );
   const [noticesOpen, setNoticesOpen] = useState(false);
+  const [conflict, setConflict] = useState<{
+    kind: "task" | "event";
+    id: string;
+  } | null>(null);
   const [focus, setFocus] = useState(false);
   const [toast, setToast] = useState("");
   async function attach(u: User, demo = false) {
@@ -147,6 +154,8 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   }
   useEffect(() => {
     let active = true;
+    if (!platform.api && "serviceWorker" in navigator)
+      void navigator.serviceWorker.register("/sw.js").catch(() => {});
     api
       .request<{ configured: boolean }>("health")
       .then((r) => {
@@ -174,7 +183,15 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
       active = false;
     };
   }, []);
-  useEffect(() => client?.subscribe(() => render((n) => n + 1)), [client]);
+  useEffect(
+    () =>
+      client?.subscribe(() => {
+        render((n) => n + 1);
+        if (user && user.id !== "demo")
+          platform.onWorkspace?.(client.workspace, user.id);
+      }),
+    [client, user],
+  );
   useEffect(() => {
     if (!client) return;
     const onNetwork = () => {
@@ -334,6 +351,14 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   const pending = tasks.filter((t) => !t.completed);
   const completed = tasks.filter((t) => t.completed);
   const visibleError = error || client.error;
+  const googleConflicts = [
+    ...w.tasks
+      .filter((t) => t.syncState === "conflict")
+      .map((t) => ({ kind: "task" as const, id: t.id })),
+    ...w.events
+      .filter((e) => e.syncState === "conflict")
+      .map((e) => ({ kind: "event" as const, id: e.id })),
+  ];
   const openExternal = async (url: string) => {
     if (platform.openExternal) await platform.openExternal(url);
     else window.open(url, "_blank", "noopener,noreferrer");
@@ -361,6 +386,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
           {nav.map((n) => (
             <button
               key={n.id}
+              aria-label={n.label}
               className={screen === n.id ? "nav-item selected" : "nav-item"}
               onClick={() => setScreen(n.id)}
             >
@@ -480,6 +506,20 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
               </button>
             </div>
           )}
+          {googleConflicts.length > 0 && (
+            <div className="conflict-banner">
+              <strong>
+                {googleConflicts.length} item(ns) precisam de revisão com o
+                Google.
+              </strong>
+              <button
+                className="button"
+                onClick={() => setConflict(googleConflicts[0])}
+              >
+                Comparar versões
+              </button>
+            </div>
+          )}
           {screen === "day" && (
             <>
               <div className="page-heading">
@@ -554,7 +594,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
                         w.events.filter(
                           (e) =>
                             !e.deleted &&
-                            eventDay(e, prefs) === today &&
+                            eventOnDate(e, today, prefs.timezone) &&
                             !e.recurrence,
                         ).length
                       }
@@ -644,7 +684,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
                       (e) =>
                         !e.deleted &&
                         !e.recurrence &&
-                        eventDay(e, prefs) === today,
+                        eventOnDate(e, today, prefs.timezone),
                     )
                     .sort((a, b) => a.start.localeCompare(b.start))
                     .slice(0, 4)
@@ -669,7 +709,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
                       </button>
                     ))}
                   {!w.events.some(
-                    (e) => !e.deleted && eventDay(e, prefs) === today,
+                    (e) => !e.deleted && eventOnDate(e, today, prefs.timezone),
                   ) && (
                     <Empty
                       title="Um pouco de espaço livre"
@@ -771,6 +811,13 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
           </footer>
         </main>
       </div>
+      {conflict && (
+        <ConflictDialog
+          client={client}
+          item={conflict}
+          onClose={() => setConflict(null)}
+        />
+      )}
       {taskEditor && (
         <TaskEditor
           initial={taskEditor}
@@ -837,6 +884,108 @@ function Empty({ title, text }: { title: string; text: string }) {
       <strong>{title}</strong>
       <p>{text}</p>
     </div>
+  );
+}
+function ConflictDialog({
+  client,
+  item,
+  onClose,
+}: {
+  client: PingoClient;
+  item: { kind: "task" | "event"; id: string };
+  onClose: () => void;
+}) {
+  const [data, setData] = useState<{
+    local: Task | CalendarEvent;
+    remote: Record<string, unknown> | null;
+  }>();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    void client.api
+      .request<{
+        local: Task | CalendarEvent;
+        remote: Record<string, unknown> | null;
+      }>(`conflicts?kind=${item.kind}&id=${encodeURIComponent(item.id)}`)
+      .then(setData)
+      .catch((e) => setError(e.message));
+  }, [item.id, item.kind, client]);
+  async function choose(choice: "google" | "pingo") {
+    if (!data) return;
+    if (
+      !confirm(
+        choice === "google"
+          ? "Usar a versão Google e descartar a alteração pendente do Pingo? Se não houver item no Google, a cópia local será removida."
+          : "Você revisou o Google e quer enviar a versão do Pingo? Se a criação anterior não foi confirmada, confira no Google antes de reenviar.",
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      await client.api.post("conflicts", {
+        ...item,
+        choice,
+        expectedRevision: data.local.revision,
+        confirmed: true,
+      });
+      await client.refresh();
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Dialog title="Vamos revisar com cuidado" onClose={onClose}>
+      {data ? (
+        <div className="editor-form">
+          <div className="form-grid">
+            <section>
+              <h3>No Pingo</h3>
+              <p>{data.local.title}</p>
+              <small>
+                {"notes" in data.local ? data.local.notes : data.local.start}
+              </small>
+            </section>
+            <section>
+              <h3>No Google</h3>
+              <p>
+                {String(
+                  data.remote?.title ??
+                    data.remote?.summary ??
+                    "Nenhuma correspondência encontrada",
+                )}
+              </p>
+              <small>
+                {String(data.remote?.notes ?? data.remote?.status ?? "")}
+              </small>
+            </section>
+          </div>
+          <p className="muted">
+            Sua escolha será aplicada somente a este item. Nenhuma versão será
+            substituída sem esta confirmação.
+          </p>
+          <button
+            disabled={busy}
+            className="button"
+            onClick={() => void choose("google")}
+          >
+            Usar versão Google
+          </button>
+          <button
+            disabled={busy}
+            className="button primary"
+            onClick={() => void choose("pingo")}
+          >
+            Revisei no Google. Enviar versão Pingo
+          </button>
+        </div>
+      ) : (
+        <p>Consultando o Google…</p>
+      )}
+      {error && <p className="error">{error}</p>}
+    </Dialog>
   );
 }
 const formatTime = (date: string, p: Preferences) =>
@@ -1415,7 +1564,7 @@ function Agenda({
                   (e) =>
                     !e.deleted &&
                     !e.recurrence &&
-                    eventDay(e, w.preferences) === key,
+                    eventOnDate(e, key, w.preferences.timezone),
                 )
                 .sort((a, b) => a.start.localeCompare(b.start))
                 .map((e) => (
@@ -1469,8 +1618,27 @@ function EventEditor({
     value?.length === 16
       ? value
       : value
-        ? format(new Date(value), "yyyy-MM-dd'T'HH:mm")
-        : format(new Date(), "yyyy-MM-dd'T'HH:mm");
+        ? format(
+            new TZDate(value, w.preferences.timezone),
+            "yyyy-MM-dd'T'HH:mm",
+          )
+        : format(TZDate.tz(w.preferences.timezone), "yyyy-MM-dd'T'HH:mm");
+  const fromLocal = (value: string) => {
+    const parts = value.split(/[-T:]/).map(Number);
+    const date = TZDate.tz(
+      w.preferences.timezone,
+      parts[0],
+      parts[1] - 1,
+      parts[2],
+      parts[3],
+      parts[4],
+    );
+    if (format(date, "yyyy-MM-dd'T'HH:mm") !== value)
+      throw new Error(
+        "Esse horário não existe no fuso escolhido por causa de uma mudança de horário.",
+      );
+    return date.toISOString();
+  };
   const [e, setE] = useState({
     id: initial.id ?? crypto.randomUUID(),
     title: initial.title ?? "",
@@ -1506,8 +1674,8 @@ function EventEditor({
         type: "event.upsert",
         event: {
           ...e,
-          start: e.allDay ? e.start : new Date(e.start).toISOString(),
-          end: e.allDay ? e.end : new Date(e.end).toISOString(),
+          start: e.allDay ? e.start : fromLocal(e.start),
+          end: e.allDay ? e.end : fromLocal(e.end),
           attendees,
         },
         expectedRevision: initial.revision ?? 0,
@@ -1632,8 +1800,7 @@ function EventEditor({
           </button>
         </footer>
         <small className="muted">
-          O formulário usa o fuso do dispositivo:{" "}
-          {Intl.DateTimeFormat().resolvedOptions().timeZone}.
+          Fuso deste compromisso: {w.preferences.timezone}.
         </small>
       </form>
     </Dialog>
@@ -1871,8 +2038,10 @@ function SettingsPage({
     if (file.size > 5000000) throw new Error("Arquivo maior que 5 MB.");
     const text = await file.text();
     const data = JSON.parse(text);
-    const tasks = data.tasks ?? data.Tasks ?? [];
+    const tasks = data.Todos ?? data.todos ?? data.tasks ?? data.Tasks ?? [];
     const events =
+      data.Events ??
+      data.events ??
       data.appointments ??
       data.Appointments ??
       data.calendarEvents ??
@@ -2321,7 +2490,12 @@ async function importLegacy(
     const importId = `legacy:${data.fingerprint}:task:${source}`;
     if (w.tasks.some((t) => t.importId === importId)) continue;
     const done = Boolean(
-      t.isCompleted ?? t.IsCompleted ?? t.completed ?? false,
+      t.Done ??
+      t.done ??
+      t.isCompleted ??
+      t.IsCompleted ??
+      t.completed ??
+      false,
     );
     await act({
       type: "task.upsert",
@@ -2334,8 +2508,8 @@ async function importLegacy(
         title: String(t.title ?? t.Title ?? "Tarefa importada"),
         notes: String(t.notes ?? t.Notes ?? ""),
         dueDate:
-          typeof (t.dueDate ?? t.DueDate) === "string"
-            ? String(t.dueDate ?? t.DueDate).slice(0, 10)
+          typeof (t.Due ?? t.due ?? t.dueDate ?? t.DueDate) === "string"
+            ? String(t.Due ?? t.due ?? t.dueDate ?? t.DueDate).slice(0, 10)
             : null,
         scheduledStart: null,
         scheduledEnd: null,

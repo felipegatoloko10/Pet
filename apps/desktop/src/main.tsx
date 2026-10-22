@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useDesktopPet } from "./pet-service";
 import Database from "@tauri-apps/plugin-sql";
 import { PingoApp, Pet, Api, type Storage } from "@pingo/ui";
 import {
@@ -20,6 +21,9 @@ const base =
 const api = new Api(base);
 const platform = {
   api,
+  onWorkspace: (workspace: Workspace, userId: string) => {
+    void emit("workspace-updated", { workspace, userId });
+  },
   storage: sqliteStorage,
   login: deviceLogin,
   logout: async () => {
@@ -103,135 +107,12 @@ async function deviceLogin() {
   throw new Error("O código expirou. Inicie o login novamente.");
 }
 function PetWindow() {
-  const [w, setW] = useState<Workspace>(emptyWorkspace());
-  const [bubble, setBubble] = useState("");
-  const [state, setState] = useState<"idle" | "think" | "celebrate">("idle");
-  useEffect(() => {
-    let active = true;
-    let busy = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let sound: AudioContext | undefined;
-    const deviceId =
-      localStorage.getItem("pingo:device") ?? crypto.randomUUID();
-    localStorage.setItem("pingo:device", deviceId);
-    async function show(n: Notice, workspace: Workspace) {
-      if (!active) return;
-      setBubble(n.body);
-      clearTimeout(timer);
-      timer = setTimeout(() => setBubble(""), 18000);
-      if (
-        !n.silent &&
-        !isQuiet(new Date(), workspace.preferences) &&
-        workspace.preferences.voice &&
-        "speechSynthesis" in window
-      ) {
-        const utterance = new SpeechSynthesisUtterance(n.body);
-        utterance.lang = "pt-BR";
-        speechSynthesis.speak(utterance);
-      }
-    }
-    const tick = async () => {
-      if (busy || document.hidden) return;
-      busy = true;
-      try {
-        api.token = await invoke<string>("read_session");
-        if (!api.token) {
-          setBubble("Abra meu painel para entrar.");
-          return;
-        }
-        const { workspace, user } = await api.request<{
-          workspace: Workspace;
-          user: { id: string };
-        }>("workspace");
-        const next = { ...emptyWorkspace(), ...workspace };
-        const storage = await sqliteStorage(user.id);
-        await storage.set("pet-cache", JSON.stringify(next));
-        localStorage.setItem("pingo:pet-user", user.id);
-        setW(next);
-        for (const n of next.notices.filter((n) => !n.read && !n.deliveredBy)) {
-          const r = await api.post<{ claimed: boolean }>(
-            "notifications/claim",
-            { id: n.id, deviceId },
-          );
-          if (r.claimed) await show(n, next);
-        }
-        const localId = (z: string) => `local-reminder:${z}`;
-        for (const e of next.events.filter((e) => !e.deleted && !e.allDay)) {
-          const delta = Date.parse(e.start) - Date.now();
-          const id = localId(e.id + ":" + e.start);
-          if (
-            delta >= 0 &&
-            delta <= next.preferences.reminderMinutes * 60000 &&
-            !(await storage.get(id))
-          ) {
-            await storage.set(id, "1");
-            await show(
-              {
-                id,
-                title: e.title,
-                body: `${e.title} começa em ${Math.round(delta / 60000)} minutos.`,
-                read: false,
-                createdAt: new Date().toISOString(),
-                silent: isQuiet(new Date(), next.preferences),
-              },
-              next,
-            );
-          }
-        }
-      } catch {
-        const userId = localStorage.getItem("pingo:pet-user");
-        if (userId) {
-          const storage = await sqliteStorage(userId);
-          const cache = await storage.get("pet-cache");
-          if (cache) {
-            const cached = JSON.parse(cache) as Workspace;
-            setW(cached);
-            for (const e of cached.events.filter(
-              (e) => !e.deleted && !e.allDay,
-            )) {
-              const delta = Date.parse(e.start) - Date.now();
-              const id = `local-reminder:${e.id}:${e.start}`;
-              if (
-                delta >= 0 &&
-                delta <= cached.preferences.reminderMinutes * 60000 &&
-                !(await storage.get(id))
-              ) {
-                await storage.set(id, "1");
-                await show(
-                  {
-                    id,
-                    title: e.title,
-                    body: `Lembrete offline: ${e.title} começa em ${Math.round(delta / 60000)} minutos.`,
-                    read: false,
-                    createdAt: new Date().toISOString(),
-                    silent: isQuiet(new Date(), cached.preferences),
-                  },
-                  cached,
-                );
-              }
-            }
-          }
-        }
-      } finally {
-        busy = false;
-      }
-    };
-    void tick();
-    const poll = setInterval(() => void tick(), 30000);
-    const onVisibility = () => {
-      if (!document.hidden) void tick();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    const unlisten = listen("session-changed", () => void tick());
-    return () => {
-      active = false;
-      clearInterval(poll);
-      clearTimeout(timer);
-      document.removeEventListener("visibilitychange", onVisibility);
-      void unlisten.then((fn) => fn());
-      sound?.close();
-    };
-  }, []);
+  const {
+    workspace: w,
+    bubble,
+    setBubble,
+    activity,
+  } = useDesktopPet(api, sqliteStorage);
   useEffect(() => {
     if (
       !w.preferences.snore ||
@@ -271,6 +152,7 @@ function PetWindow() {
         ⠿
       </div>
       <Pet
+        activity={activity}
         preferences={w.preferences}
         message={bubble}
         onClick={() => {

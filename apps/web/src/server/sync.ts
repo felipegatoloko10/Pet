@@ -8,6 +8,11 @@ import {
 } from "@pingo/core";
 import { GoogleClient, GoogleError, googleToken } from "./google";
 import { mutateWorkspace, readWorkspace } from "./workspace";
+import { and, eq, gt } from "drizzle-orm";
+import { randomBytes } from "node:crypto";
+import { db } from "./db";
+import { channels } from "./schema";
+import { digest } from "./crypto";
 type GTask = {
   id: string;
   title?: string;
@@ -167,7 +172,7 @@ async function deliverJob(userId: string, client: GoogleClient, job: SyncJob) {
       }
       i.syncState = "synced";
       i.error = undefined;
-      i.revision++;
+      // Provider acknowledgement changes transport metadata, not the user's revision.
       current.outbox = current.outbox.filter((j) => j.id !== job.id);
       notice(
         current,
@@ -217,6 +222,12 @@ async function pushOutbox(userId: string, client: GoogleClient) {
       const j = w.outbox.find(
         (j) =>
           Date.parse(j.nextAttemptAt) <= Date.now() &&
+          (j.kind === "event" ||
+            w.boards.some(
+              (b) =>
+                b.googleId &&
+                b.id === w.tasks.find((t) => t.id === j.entityId)?.boardId,
+            )) &&
           (!j.sentAt || Date.now() - Date.parse(j.sentAt) > 60000) &&
           !(
             (j.kind === "task" ? w.tasks : w.events).find(
@@ -265,10 +276,22 @@ export async function syncGoogle(userId: string) {
           if (!w.preferences.defaultBoardId)
             w.preferences.defaultBoardId = board.id;
           for (const g of items) {
+            const localId = g.notes?.match(/\[Pingo:([^\]]+)\]/)?.[1];
+            const creating = localId
+              ? w.tasks.find(
+                  (t) =>
+                    t.id === localId && t.boardId === board.id && !t.googleId,
+                )
+              : undefined;
+            if (creating) {
+              creating.googleId = g.id;
+              creating.googleEtag = g.etag;
+              creating.googleUpdated = g.updated;
+            }
             const old = w.tasks.find(
               (t) => t.googleId === g.id && t.boardId === board.id,
             );
-            if (old?.googleUpdated === g.updated) continue;
+            if (old && g.updated && old.googleUpdated === g.updated) continue;
             mergeGoogleTask(w, board, {
               ...g,
               notes: g.notes?.replace(/\n?\[Pingo:[^\]]+\]/g, ""),
@@ -291,6 +314,8 @@ export async function syncGoogle(userId: string) {
       });
       for (const cal of calendars) {
         await pullCalendar(userId, client, cal.id);
+        await pullOccurrences(userId, client, cal.id);
+        await ensureCalendarWatch(userId, client, cal.id);
       }
     }
     if (current.connection.scopes.some((s) => s.endsWith("/gmail.readonly"))) {
@@ -403,7 +428,9 @@ async function pullCalendar(
         ...old,
         id:
           old?.id ??
-          g.extendedProperties?.private?.pingoId ??
+          (g.recurringEventId
+            ? undefined
+            : g.extendedProperties?.private?.pingoId) ??
           crypto.randomUUID(),
         title: g.summary ?? "Sem título",
         start: g.start.dateTime ?? g.start.date!,
@@ -427,6 +454,113 @@ async function pullCalendar(
     if (nextToken) current.cursor.calendar[calId] = nextToken;
     current.revision++;
   });
+}
+async function pullOccurrences(
+  userId: string,
+  client: GoogleClient,
+  calendarId: string,
+) {
+  const start = new Date(Date.now() - 30 * 86400000).toISOString(),
+    end = new Date(Date.now() + 90 * 86400000).toISOString();
+  const expanded = await client.pages<GEvent>(
+    `${eventUrl(calendarId)}?singleEvents=true&showDeleted=true&maxResults=250&timeMin=${encodeURIComponent(start)}&timeMax=${encodeURIComponent(end)}`,
+    "items",
+  );
+  await mutateWorkspace(userId, (w) => {
+    const seen = new Set(expanded.map((e) => e.id));
+    for (const e of w.events) {
+      if (
+        e.calendarId === calendarId &&
+        e.recurringEventId &&
+        e.start >= start &&
+        e.start < end &&
+        !seen.has(e.googleId ?? "") &&
+        !w.outbox.some((j) => j.entityId === e.id)
+      ) {
+        e.deleted = true;
+        e.revision++;
+      }
+    }
+    for (const g of expanded) {
+      if (!g.recurringEventId) continue;
+      const old = w.events.find(
+        (e) => e.calendarId === calendarId && e.googleId === g.id,
+      );
+      if (old && w.outbox.some((j) => j.entityId === old.id)) continue;
+      if (g.status === "cancelled") {
+        if (old) old.deleted = true;
+        continue;
+      }
+      if (!g.start || !g.end) continue;
+      const item: CalendarEvent = {
+        ...old,
+        id: old?.id ?? crypto.randomUUID(),
+        title: g.summary ?? "Sem título",
+        start: g.start.dateTime ?? g.start.date!,
+        end: g.end.dateTime ?? g.end.date!,
+        allDay: !!g.start.date,
+        calendarId,
+        googleId: g.id,
+        googleEtag: g.etag,
+        recurringEventId: g.recurringEventId,
+        originalStartTime:
+          g.originalStartTime?.dateTime ?? g.originalStartTime?.date,
+        attendees: g.attendees?.map((a) => a.email),
+        revision:
+          old && old.googleEtag === g.etag
+            ? old.revision
+            : (old?.revision ?? 0) + 1,
+        syncState: "synced",
+        deleted: false,
+      };
+      if (old) Object.assign(old, item);
+      else w.events.push(item);
+    }
+  });
+}
+async function ensureCalendarWatch(
+  userId: string,
+  client: GoogleClient,
+  calendarId: string,
+) {
+  const base = process.env.BETTER_AUTH_URL;
+  if (!base?.startsWith("https://")) return;
+  const existing = await db()
+    .select()
+    .from(channels)
+    .where(
+      and(
+        eq(channels.userId, userId),
+        eq(channels.calendarId, calendarId),
+        gt(channels.expiresAt, new Date(Date.now() + 12 * 3600000)),
+      ),
+    );
+  if (existing.length) return;
+  const id = crypto.randomUUID(),
+    token = randomBytes(32).toString("base64url");
+  const response = await client.request<{
+    resourceId: string;
+    expiration: string;
+  }>(`${eventUrl(calendarId)}/watch`, {
+    method: "POST",
+    body: JSON.stringify({
+      id,
+      type: "web_hook",
+      address: `${base}/api/v1/google/calendar-hook`,
+      token,
+      expiration: String(Date.now() + 48 * 3600000),
+    }),
+  });
+  await db()
+    .insert(channels)
+    .values({
+      id,
+      userId,
+      calendarId,
+      resourceId: response.resourceId,
+      tokenHash: digest(token),
+      expiresAt: new Date(Number(response.expiration)),
+    });
 }
 export async function getMailBody(userId: string, id: string) {
   const w = await readWorkspace(userId);

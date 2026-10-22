@@ -10,6 +10,12 @@
   },
   "dependencies": {
     "@pingo/core": "*",
-    "@pingo/ui": "*"
+    "@pingo/ui": "*",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "@tauri-apps/api": "2.12.4",
+    "@tauri-apps/plugin-opener": "latest",
+    "@tauri-apps/plugin-sql": "latest",
+    "@tauri-apps/plugin-notification": "latest"
   }
 }

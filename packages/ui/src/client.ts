@@ -87,10 +87,22 @@ export class PingoClient {
     this.listeners.forEach((fn) => fn());
   }
   async persist() {
-    await this.storage.set("workspace", JSON.stringify(this.workspace));
-    await this.storage.set("pending", JSON.stringify(this.pending));
+    // A single IndexedDB/SQLite write commits the optimistic view and queue together.
+    await this.storage.set(
+      "snapshot",
+      JSON.stringify({ workspace: this.workspace, pending: this.pending }),
+    );
   }
   async init() {
+    const snapshot = await this.storage.get("snapshot");
+    if (snapshot) {
+      const saved = JSON.parse(snapshot);
+      this.workspace = { ...emptyWorkspace(), ...saved.workspace };
+      this.pending = saved.pending;
+      this.emit();
+      await this.refresh();
+      return;
+    }
     const cached = await this.storage.get("workspace");
     const queue = await this.storage.get("pending");
     if (cached) this.workspace = { ...emptyWorkspace(), ...JSON.parse(cached) };

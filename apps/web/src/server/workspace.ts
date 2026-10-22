@@ -39,51 +39,55 @@ export async function mutateWorkspace<T>(
   });
 }
 export async function runOperation(userId: string, operation: Operation) {
-  return db().transaction(async (tx) => {
-    await tx
-      .insert(workspaces)
-      .values({ userId, data: emptyWorkspace() })
-      .onConflictDoNothing();
-    const [row] = await tx
-      .select()
-      .from(workspaces)
-      .where(eq(workspaces.userId, userId))
-      .for("update");
-    const hash = digest(JSON.stringify(operation.command));
-    const [prior] = await tx
-      .select()
-      .from(operations)
-      .where(
-        and(
-          eq(operations.userId, userId),
-          eq(operations.operationId, operation.operationId),
-        ),
-      );
-    if (prior) {
-      if (prior.digest !== hash)
-        throw new DomainError(
-          "idempotency",
-          "Identificador já usado para outra alteração.",
-          409,
-        );
-      return row.data;
-    }
-    const next = applyCommand(
-      row.data,
-      operation.command,
-      operation.operationId,
+  return db().transaction((tx) => runOperationIn(tx, userId, operation));
+}
+type Transaction = Parameters<
+  Parameters<ReturnType<typeof db>["transaction"]>[0]
+>[0];
+export async function runOperationIn(
+  tx: Transaction,
+  userId: string,
+  operation: Operation,
+) {
+  await tx
+    .insert(workspaces)
+    .values({ userId, data: emptyWorkspace() })
+    .onConflictDoNothing();
+  const [row] = await tx
+    .select()
+    .from(workspaces)
+    .where(eq(workspaces.userId, userId))
+    .for("update");
+  const hash = digest(JSON.stringify(operation.command));
+  const [prior] = await tx
+    .select()
+    .from(operations)
+    .where(
+      and(
+        eq(operations.userId, userId),
+        eq(operations.operationId, operation.operationId),
+      ),
     );
-    if (next.tasks.length > 10000 || next.events.length > 10000)
-      throw new DomainError("quota", "Limite do beta atingido.", 429);
-    await tx
-      .insert(operations)
-      .values({ userId, operationId: operation.operationId, digest: hash });
-    await tx
-      .update(workspaces)
-      .set({ data: next, updatedAt: new Date() })
-      .where(eq(workspaces.userId, userId));
-    return next;
-  });
+  if (prior) {
+    if (prior.digest !== hash)
+      throw new DomainError(
+        "idempotency",
+        "Identificador já usado para outra alteração.",
+        409,
+      );
+    return row.data;
+  }
+  const next = applyCommand(row.data, operation.command, operation.operationId);
+  if (next.tasks.length > 10000 || next.events.length > 10000)
+    throw new DomainError("quota", "Limite do beta atingido.", 429);
+  await tx
+    .insert(operations)
+    .values({ userId, operationId: operation.operationId, digest: hash });
+  await tx
+    .update(workspaces)
+    .set({ data: next, updatedAt: new Date() })
+    .where(eq(workspaces.userId, userId));
+  return next;
 }
 export async function saveCredential(
   userId: string,

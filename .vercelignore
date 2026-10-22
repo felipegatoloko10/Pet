@@ -1,0 +1,16 @@
+**/node_modules
+**/.next
+**/dist
+**/target
+**/.vercel
+.git
+.verification
+test-results
+playwright-report
+.neon*.env
+**/.env*
+!.env.example
+**/.dev.vars*
+**/GoogleOAuth.local.json
+**/*.enc
+legacy

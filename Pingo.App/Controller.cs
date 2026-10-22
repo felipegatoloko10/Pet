@@ -50,7 +50,8 @@ public sealed class Controller : IDisposable
     public Controller(string dataFolder)
     {
         store = new(dataFolder); State = store.Load();
-        Google = new(http, new WindowsSecrets(Path.Combine(dataFolder, "google.enc")));
+        Google = new(http, new WindowsSecrets(Path.Combine(dataFolder, "google.enc")), GoogleLogin.LoadApplicationConfiguration());
+        if (!Google.Configured) Status = "O login Google ainda não foi habilitado nesta versão. Suas tarefas e sua agenda locais já estão disponíveis.";
         Pet = new(this);
         tray = new() { Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Information, Text = "Pingo · seu companheiro", Visible = true };
         var menu = new System.Windows.Forms.ContextMenuStrip();

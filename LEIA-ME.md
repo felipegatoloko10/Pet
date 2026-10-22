@@ -17,20 +17,14 @@ O Pingo é um aplicativo próprio para Windows, inspirado na ideia de um pet de 
 
 ## Conectar sua conta Google
 
-O aplicativo não vem com uma credencial de desenvolvedor Google nem com acesso à sua conta. Essas etapas são necessárias apenas para conectar as funções Google. As tarefas e a agenda locais funcionam sem elas.
+1. No Pingo, abra **Ajustes → Sua conta Google** ou a página **E-mails**.
+2. Clique em **Entrar com Google**.
+3. Escolha sua conta no navegador e autorize as permissões solicitadas.
+4. Volte ao Pingo e confira a sincronização. Você não precisa importar arquivos nem compartilhar sua senha com o aplicativo.
 
-1. No [Google Cloud Console](https://console.cloud.google.com/), crie ou selecione um projeto pessoal.
-2. Em **APIs e serviços → Biblioteca**, ative **Gmail API**, **Google Calendar API** e **Tasks API**.
-3. Configure o **Google Auth Platform** (nome do aplicativo, e-mail de suporte e público). Para uma conta Gmail pessoal, escolha público externo e adicione seu próprio e-mail em **Usuários de teste**. Em contas corporativas, a organização pode exigir aprovação do administrador.
-4. Em **Acesso a dados**, adicione os escopos:
-   - `https://www.googleapis.com/auth/gmail.metadata`
-   - `https://www.googleapis.com/auth/calendar.events`
-   - `https://www.googleapis.com/auth/tasks`
-5. Em **Clientes**, crie um cliente OAuth do tipo **Aplicativo para computador / Desktop app**. Baixe seu arquivo JSON.
-6. No Pingo, abra **Ajustes → Sua conta Google → Importar JSON** e selecione esse arquivo.
-7. Clique em **Entrar com Google**, conclua o login no navegador e conceda as permissões. Volte ao Pingo e confira a sincronização. Você não precisa compartilhar a senha nem o JSON nesta conversa.
+Se aparecer **“O login Google ainda não foi habilitado nesta versão”**, a distribuição ainda não contém o cliente OAuth registrado do aplicativo. O mantenedor precisa preparar essa configuração uma única vez, seguindo [GOOGLE-LOGIN.md](GOOGLE-LOGIN.md), e gerar a versão com login integrado. O código publicado não inclui uma credencial Google real. Enquanto isso, as tarefas e a agenda locais continuam funcionando.
 
-O Google pode mostrar aviso de aplicativo não verificado em projetos pessoais de teste. Confira que está usando o projeto criado por você. Em modo de teste, a autorização pode expirar após sete dias e exigir novo login. [Documentação oficial de OAuth para desktop](https://developers.google.com/identity/protocols/oauth2/native-app).
+O Google pode mostrar avisos em projetos pessoais de teste e exigir novo login após sete dias. Contas corporativas podem depender da autorização do administrador. [Documentação oficial de OAuth para desktop](https://developers.google.com/identity/protocols/oauth2/native-app).
 
 Depois da conexão:
 
@@ -76,7 +70,7 @@ O Pingo não inicia automaticamente até você marcar essa opção e salvar as p
 A máquina precisa do **.NET 8 Desktop Runtime** para executar a versão pronta e do **SDK .NET 8** para compilar. O computador em que esta versão foi criada já possui ambos. Não há pacotes externos para baixar.
 
 ```powershell
-dotnet publish Pingo.App/Pingo.App.csproj -c Release -o Pingo --self-contained false
+./scripts/Publish-Pingo.ps1
 dotnet run --project Pingo.Tests/Pingo.Tests.csproj -c Release
 & '.\Pingo\Pingo.exe' --verify-ui '.\.verification'
 ```

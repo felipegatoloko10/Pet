@@ -1,0 +1,31 @@
+name: Gerar Pingo com login Google
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Testar
+        run: dotnet run --project Pingo.Tests/Pingo.Tests.csproj -c Release
+      - name: Verificar pacotes com e sem cliente integrado
+        shell: pwsh
+        run: ./scripts/Test-GooglePackaging.ps1
+      - name: Gerar aplicativo com configuracao integrada
+        shell: pwsh
+        env:
+          PINGO_GOOGLE_OAUTH_JSON: ${{ secrets.PINGO_GOOGLE_OAUTH_JSON }}
+        run: ./scripts/Publish-Pingo.ps1 -RequireGoogleLogin -OutputDirectory ./dist/Pingo
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pingo-Windows
+          path: dist/Pingo/
+          if-no-files-found: error

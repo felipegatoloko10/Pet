@@ -24,15 +24,27 @@ public sealed class GoogleCredentials
 }
 public sealed record GoogleSnapshot(List<Appointment>? Events, List<Todo>? Tasks, List<Mail>? Mail, int? Unread, string? Email, List<string> Errors);
 
-public sealed class GoogleClient(HttpClient http, ISecretStore secrets)
+public sealed class GoogleClient
 {
-    private GoogleCredentials? credentials = Load(secrets);
+    private readonly HttpClient http;
+    private readonly ISecretStore secrets;
+    private readonly GoogleOAuthConfiguration? applicationConfiguration;
+    private GoogleCredentials? credentials;
     private readonly SemaphoreSlim tokenLock = new(1, 1);
     private readonly Dictionary<string, Mail> mailCache = new();
     private sealed class EventConflictException : Exception;
     private const string TokenUrl = "https://oauth2.googleapis.com/token";
     public bool Connected => credentials is { RefreshToken.Length: > 0 } || credentials is { AccessToken.Length: > 0 };
     public bool Configured => credentials is { ClientId.Length: > 0 };
+    public GoogleClient(HttpClient http, ISecretStore secrets, GoogleOAuthConfiguration? applicationConfiguration = null)
+    {
+        this.http = http; this.secrets = secrets; this.applicationConfiguration = applicationConfiguration;
+        var saved = Load(secrets);
+        // A new app registration must not reuse refresh tokens issued to a different OAuth client.
+        credentials = applicationConfiguration is null ? saved : saved?.ClientId == applicationConfiguration.ClientId
+            ? new GoogleCredentials { ClientId = applicationConfiguration.ClientId, ClientSecret = applicationConfiguration.ClientSecret, AccessToken = saved.AccessToken, RefreshToken = saved.RefreshToken, Expires = saved.Expires }
+            : applicationConfiguration.CreateCredentials();
+    }
     private static GoogleCredentials? Load(ISecretStore store)
     {
         var json = store.Read();
@@ -40,19 +52,18 @@ public sealed class GoogleClient(HttpClient http, ISecretStore secrets)
     }
     public void ImportCredentials(string json)
     {
-        using var doc = JsonDocument.Parse(json);
-        if (!doc.RootElement.TryGetProperty("installed", out var installed))
-            throw new InvalidDataException("Escolha uma credencial OAuth do tipo Aplicativo para computador (Desktop), em JSON.");
-        var id = installed.GetProperty("client_id").GetString() ?? "";
-        if (!id.EndsWith(".apps.googleusercontent.com", StringComparison.Ordinal)) throw new InvalidDataException("Client ID Google inválido.");
-        credentials = new() { ClientId = id, ClientSecret = installed.TryGetProperty("client_secret", out var s) ? s.GetString() ?? "" : "" };
+        var configuration = GoogleOAuthConfiguration.Parse(json);
+        if (applicationConfiguration is not null && configuration.ClientId != applicationConfiguration.ClientId)
+            throw new InvalidOperationException("Esta versão já tem um cliente Google integrado. Use Entrar com Google.");
+        credentials = configuration.CreateCredentials();
         mailCache.Clear();
         Save();
     }
     private void Save() => secrets.Write(JsonSerializer.Serialize(credentials));
     public async Task ConnectAsync(Action<string> openBrowser, CancellationToken cancellation = default)
     {
-        if (credentials is null) throw new InvalidOperationException("Importe primeiro o JSON de credenciais Google.");
+        if (!Configured) throw new InvalidOperationException("O login Google ainda não foi habilitado nesta versão do Pingo. É necessário configurar o cliente OAuth do aplicativo uma única vez.");
+        var current = credentials!;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         timeout.CancelAfter(TimeSpan.FromMinutes(3));
         var ct = timeout.Token;
@@ -69,7 +80,7 @@ public sealed class GoogleClient(HttpClient http, ISecretStore secrets)
             string scopes = string.Join(' ', "https://www.googleapis.com/auth/gmail.metadata", "https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/tasks");
             string auth = "https://accounts.google.com/o/oauth2/v2/auth?" + Query(new()
             {
-                ["client_id"] = credentials.ClientId, ["redirect_uri"] = redirect, ["response_type"] = "code",
+                ["client_id"] = current.ClientId, ["redirect_uri"] = redirect, ["response_type"] = "code",
                 ["scope"] = scopes, ["access_type"] = "offline", ["prompt"] = "consent", ["state"] = state,
                 ["code_challenge"] = challenge, ["code_challenge_method"] = "S256"
             });
@@ -93,8 +104,8 @@ public sealed class GoogleClient(HttpClient http, ISecretStore secrets)
                 if (values.ContainsKey("error")) throw new InvalidOperationException("O login foi cancelado ou as permissões não foram concedidas.");
                 code = values.GetValueOrDefault("code") ?? throw new InvalidDataException("O Google não devolveu o código de autorização.");
             }
-            var fields = new Dictionary<string, string> { ["code"] = code, ["client_id"] = credentials.ClientId, ["redirect_uri"] = redirect, ["grant_type"] = "authorization_code", ["code_verifier"] = verifier };
-            if (credentials.ClientSecret.Length > 0) fields["client_secret"] = credentials.ClientSecret;
+            var fields = new Dictionary<string, string> { ["code"] = code, ["client_id"] = current.ClientId, ["redirect_uri"] = redirect, ["grant_type"] = "authorization_code", ["code_verifier"] = verifier };
+            if (current.ClientSecret.Length > 0) fields["client_secret"] = current.ClientSecret;
             await ExchangeAsync(fields, ct);
         }
         finally { listener.Stop(); }
@@ -243,6 +254,13 @@ public sealed class GoogleClient(HttpClient http, ISecretStore secrets)
     {
         using var doc = await SendAsync("https://tasks.googleapis.com/tasks/v1/lists/" + Uri.EscapeDataString(task.ListId!) + "/tasks/" + Uri.EscapeDataString(task.Id), ct, HttpMethod.Patch, new { status = "completed" });
     }
-    public void Disconnect() { credentials = null; mailCache.Clear(); secrets.Clear(); }
+    public void Disconnect()
+    {
+        var client = applicationConfiguration ?? (credentials is null ? null : new GoogleOAuthConfiguration(credentials.ClientId, credentials.ClientSecret));
+        secrets.Clear(); credentials = client?.CreateCredentials(); mailCache.Clear();
+        // Legacy installations have no compiled client yet. Preserve only the app identity,
+        // so removing manual import does not make a later sign-in impossible after disconnect.
+        if (applicationConfiguration is null && credentials is not null) Save();
+    }
     private static string Text(JsonElement e, string key, string fallback = "") => e.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? fallback : fallback;
 }

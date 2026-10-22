@@ -4,6 +4,19 @@
     <UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><Nullable>enable</Nullable>
     <AssemblyName>Pingo</AssemblyName><RootNamespace>Pingo.Desktop</RootNamespace>
     <ApplicationIcon>Assets/Pingo.ico</ApplicationIcon>
+    <PingoGoogleOAuthFile Condition="'$(PingoGoogleOAuthFile)' == '' and Exists('$(MSBuildProjectDirectory)/GoogleOAuth.local.json')">$(MSBuildProjectDirectory)/GoogleOAuth.local.json</PingoGoogleOAuthFile>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../Pingo.Core/Pingo.Core.csproj" /></ItemGroup>
+  <!-- Changing the resource list alone can leave an incremental compilation up-to-date.
+       Stamp the mode into generated source so removing OAuth also rebuilds the assembly. -->
+  <ItemGroup>
+    <AssemblyMetadata Include="PingoGoogleLogin" Value="Unconfigured" Condition="'$(PingoGoogleOAuthFile)' == ''" />
+    <AssemblyMetadata Include="PingoGoogleLogin" Value="Configured" Condition="'$(PingoGoogleOAuthFile)' != ''" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(PingoGoogleOAuthFile)' != ''">
+    <EmbeddedResource Include="$(PingoGoogleOAuthFile)" LogicalName="Pingo.GoogleOAuth.json" />
+  </ItemGroup>
+  <Target Name="ValidateGoogleOAuthFile" BeforeTargets="PrepareForBuild" Condition="'$(PingoGoogleOAuthFile)' != ''">
+    <Error Condition="!Exists('$(PingoGoogleOAuthFile)')" Text="O arquivo OAuth do aplicativo configurado em PingoGoogleOAuthFile não foi encontrado." />
+  </Target>
 </Project>

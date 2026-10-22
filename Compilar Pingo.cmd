@@ -1,6 +1,6 @@
 @echo off
 cd /d "%~dp0"
-dotnet publish "Pingo.App\Pingo.App.csproj" -c Release -o "Pingo" --self-contained false
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\Publish-Pingo.ps1"
 if errorlevel 1 (
   echo Nao foi possivel compilar. Verifique se o SDK .NET 8 esta instalado.
   pause

@@ -7,6 +7,8 @@ client_secret*.json
 
 # Publicação local e artefatos de verificação (não são fontes)
 Pingo/
+dist/
 .verification/
 *.enc
 *.tmp
+**/GoogleOAuth.local.json

@@ -56,13 +56,14 @@ await google.CompleteTaskAsync(snapshot.Tasks!.Single());
 Check(handler.Completed, "Concluir tarefa Google usa PATCH de status");
 handler.TasksForbidden = true; var partial = await google.SyncAsync(now);
 Check(partial.Tasks is null && partial.Events?.Count == 2 && partial.Mail?.Count == 1 && partial.Errors.Single().StartsWith("Tarefas:"), "Falha no Tasks não interrompe Agenda e Gmail");
-google.Disconnect(); Check(!google.Connected && secrets.Json is null, "Desconexão remove autorização local");
+google.Disconnect(); Check(!google.Connected && JsonSerializer.Deserialize<GoogleCredentials>(secrets.Json!) is { AccessToken.Length: 0, RefreshToken.Length: 0 }, "Desconexao remove tokens de usuario da autorizacao local");
 handler.TasksForbidden = false;
 var authSecrets = new MemorySecrets();
-var authGoogle = new GoogleClient(new HttpClient(handler), authSecrets);
-authGoogle.ImportCredentials("""{"installed":{"client_id":"test.apps.googleusercontent.com","client_secret":"desktop-client-secret"}}""");
+var appConfiguration = GoogleOAuthConfiguration.Parse("""{"installed":{"client_id":"test.apps.googleusercontent.com","client_secret":"desktop-client-secret"}}""");
+var authGoogle = new GoogleClient(new HttpClient(handler), authSecrets, appConfiguration);
+Check(authGoogle.Configured && !authGoogle.Connected && authSecrets.Json is null, "Cliente integrado habilita o botao sem importar JSON ou criar autorizacao falsa");
 Task? browserCallback = null; string? challenge = null;
-await authGoogle.ConnectAsync(url =>
+Action<string> authorizeInBrowser = url =>
 {
     var query = GoogleClient.ParseQuery(url);
     challenge = query["code_challenge"];
@@ -75,17 +76,48 @@ await authGoogle.ConnectAsync(url =>
         using var correct = await callbackHttp.GetAsync(query["redirect_uri"] + "?code=auth-code&state=" + Uri.EscapeDataString(query["state"]));
         Check(correct.IsSuccessStatusCode, "Callback OAuth válido conclui a autorização local");
     });
-});
+};
+await authGoogle.ConnectAsync(authorizeInBrowser);
 await browserCallback!;
 Check(authGoogle.Connected && authSecrets.Json!.Contains("test-refresh"), "Autorização persiste o refresh token no armazenamento protegido");
 var exchanged = GoogleClient.ParseQuery(handler.TokenBody!);
 Check(GoogleClient.Base64Url(System.Security.Cryptography.SHA256.HashData(Encoding.ASCII.GetBytes(exchanged["code_verifier"]))) == challenge, "Verificador enviado ao token endpoint corresponde ao desafio PKCE");
-Check(exchanged["client_secret"] == "desktop-client-secret" && exchanged["grant_type"] == "authorization_code", "Troca de código usa a credencial Desktop importada");
+Check(exchanged["client_secret"] == "desktop-client-secret" && exchanged["grant_type"] == "authorization_code" && exchanged["client_id"] == appConfiguration.ClientId, "Troca de codigo usa a configuracao Desktop integrada");
 var expiredSecrets = new MemorySecrets { Json = JsonSerializer.Serialize(new GoogleCredentials { ClientId = "test.apps.googleusercontent.com", RefreshToken = "old-refresh", Expires = DateTimeOffset.UtcNow.AddHours(-1) }) };
 var expiredGoogle = new GoogleClient(new HttpClient(handler), expiredSecrets);
 await expiredGoogle.SyncAsync(now);
 Check(GoogleClient.ParseQuery(handler.TokenBody!)["grant_type"] == "refresh_token", "Sincronização renova token expirado sem novo login");
 Check(handler.Urls.Count(u => u.Contains("/messages/mail1?")) == 2, "Cabeçalhos de mensagens já conhecidas são reutilizados entre sincronizações");
+authGoogle.Disconnect();
+Check(authGoogle.Configured && !authGoogle.Connected && authSecrets.Json is null, "Desconectar apaga tokens, mas conserva o cliente integrado para novo login");
+await authGoogle.ConnectAsync(authorizeInBrowser); await browserCallback!;
+Check(authGoogle.Connected, "Usuario pode reconectar pelo mesmo botao sem importar arquivo");
+var restoredGoogle = new GoogleClient(new HttpClient(handler), authSecrets, appConfiguration);
+Check(restoredGoogle.Connected, "Reiniciar preserva autorizacao vinculada ao mesmo cliente integrado");
+var changedGoogle = new GoogleClient(new HttpClient(handler), authSecrets, new("different.apps.googleusercontent.com", "different-secret"));
+Check(changedGoogle.Configured && !changedGoogle.Connected, "Troca de projeto nao reaproveita tokens emitidos para outro cliente OAuth");
+var legacyGoogle = new GoogleClient(new HttpClient(handler), authSecrets);
+Check(legacyGoogle.Configured && legacyGoogle.Connected, "Conexoes existentes continuam funcionando sem configuracao integrada");
+legacyGoogle.Disconnect();
+var restartedLegacy = new GoogleClient(new HttpClient(handler), authSecrets);
+Check(restartedLegacy.Configured && !restartedLegacy.Connected, "Instalacao antiga mantem apenas a identidade do aplicativo e permite novo login apos desconectar e reiniciar");
+var unconfigured = new GoogleClient(new HttpClient(handler), new MemorySecrets());
+bool browserOpened = false, unavailable = false;
+try { await unconfigured.ConnectAsync(_ => browserOpened = true); } catch (InvalidOperationException ex) { unavailable = ex.Message.Contains("ainda não foi habilitado"); }
+Check(!browserOpened && unavailable && !unconfigured.Configured, "Sem cliente real, nao abre login quebrado e informa a configuracao pendente");
+Check(GoogleOAuthConfiguration.Parse("""{"client_id":"valid-client.apps.googleusercontent.com"}""").ClientSecret == "", "Configuracao Desktop aceita identificador publico sem segredo opcional");
+string[] invalidConfigurations = [
+    "{", "null", "[]", "{}", """{"client_id":""}""", """{"client_id":"https://attacker.example"}""",
+    """{"web":{"client_id":"test.apps.googleusercontent.com"}}""", """{"installed":null}""",
+    """{"client_id":"test.apps.googleusercontent.com","client_secret":123}""",
+    """{"client_id":"test.apps.googleusercontent.com","access_token":"user-token"}""",
+    """{"refresh_token":"user-token","installed":{"client_id":"test.apps.googleusercontent.com"}}""",
+    """{"installed":{"client_id":"test.apps.googleusercontent.com","RefreshToken":"user-token"}}"""
+];
+Check(invalidConfigurations.All(json => { try { GoogleOAuthConfiguration.Parse(json); return false; } catch (InvalidDataException) { return true; } }), "Configuracao rejeita JSON invalido, clientes Web, identificadores invalidos e tokens de usuario");
+var importedGoogle = new GoogleClient(new HttpClient(handler), new MemorySecrets());
+importedGoogle.ImportCredentials("""{"installed":{"client_id":"legacy.apps.googleusercontent.com"}}""");
+Check(importedGoogle.Configured && !importedGoogle.Connected, "Leitura da configuracao legada continua compativel");
 Console.WriteLine($"\n{passed} verificações passaram.");
 
 sealed class MemorySecrets : ISecretStore

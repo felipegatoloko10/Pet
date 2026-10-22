@@ -149,7 +149,17 @@ public partial class MainWindow : Window
     }
     private void ConnectCard()
     {
-        var stack = Stack(); stack.Children.Add(Text("Vamos conectar sua rotina?", 16, bold: true)); AddSpace(stack, 8); stack.Children.Add(Text("Uma conexão Google reúne Gmail, Agenda e Tasks. O login acontece no seu navegador.", 13, "#8B8197")); var button = Action("Configurar minha conta", () => { ContentPanel.Tag = null; SelectPage("Ajustes"); }, true); button.HorizontalAlignment = HorizontalAlignment.Left; button.Margin = new Thickness(0, 16, 0, 0); stack.Children.Add(button); ContentPanel.Children.Add(Card(stack));
+        var stack = Stack(); stack.Children.Add(Text("Vamos conectar sua rotina?", 16, bold: true)); AddSpace(stack, 8);
+        stack.Children.Add(Text(c.Google.Configured ? "Entre com sua conta e autorize Gmail, Agenda e Tasks no navegador. Depois, volte para o Pingo." : GoogleLogin.MissingConfiguration, 13, "#8B8197"));
+        var button = GoogleSignInButton(); button.HorizontalAlignment = HorizontalAlignment.Left; button.Margin = new Thickness(0, 16, 0, 0); stack.Children.Add(button); ContentPanel.Children.Add(Card(stack));
+    }
+    private Button GoogleSignInButton()
+    {
+        var button = AsyncAction(c.Google.Connected ? "Reconectar Google" : "Entrar com Google", async () => { await c.ConnectAsync(); ContentPanel.Tag = null; Refresh(); }, true);
+        button.IsEnabled = c.Google.Configured && c.CanChangeAccount;
+        button.ToolTip = c.Google.Configured ? "Entrar pelo navegador oficial do Google" : GoogleLogin.MissingConfiguration;
+        ToolTipService.SetShowOnDisabled(button, true);
+        return button;
     }
     private void SettingsPage()
     {
@@ -168,19 +178,9 @@ public partial class MainWindow : Window
             settings.BriefingTime = time.Text; settings.ReminderMinutes = lead.SelectedItem is int n ? n : 30; settings.Voice = voice.IsChecked == true; settings.MailAlerts = mail.IsChecked == true; settings.Paused = pause.IsChecked == true; c.Save(); validation.Foreground = Color("#3A9876"); validation.Text = "Preferências salvas.";
         }, true); save.HorizontalAlignment = HorizontalAlignment.Left; save.Margin = new Thickness(0, 12, 0, 0); routine.Children.Add(save); ContentPanel.Children.Add(Card(routine));
         var google = Stack(); google.Children.Add(Text("Sua conta Google", 18, bold: true)); AddSpace(google, 10);
-        google.Children.Add(Text(c.Google.Connected ? "Conectado. A autorização está protegida pelo seu usuário do Windows." : "Para conectar este aplicativo pessoal, importe a credencial OAuth do seu projeto Google. Não é a senha da sua conta.", 13, "#8B8197")); AddSpace(google, 14);
-        google.Children.Add(Text("1. Ative Gmail API, Google Calendar API e Tasks API no Google Cloud.\n2. Configure o Google Auth Platform e adicione seu e-mail como usuário de teste.\n3. Crie um cliente OAuth do tipo “Aplicativo para computador” e baixe o JSON.\n4. Importe o JSON abaixo e entre com sua conta Google.", 12, "#8B8197")); AddSpace(google, 15);
+        google.Children.Add(Text(c.Google.Connected ? "Conectado. A autorização está protegida pelo seu usuário do Windows." : c.Google.Configured ? "Clique em Entrar com Google, escolha sua conta e autorize o acesso. Você não precisa importar arquivos nem informar sua senha ao Pingo." : GoogleLogin.MissingConfiguration, 13, "#8B8197")); AddSpace(google, 14);
         var row = new WrapPanel();
-        row.Children.Add(Action("Guia de conexão ↗", () => Controller.OpenUrl("https://developers.google.com/workspace/calendar/api/quickstart/dotnet")));
-        row.Children.Add(Action("Importar JSON", () =>
-        {
-            if (!c.CanChangeAccount) { c.UpdateStatus("Espere a atualização ou o login terminar."); return; }
-            var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "Credenciais Google (*.json)|*.json", Title = "Escolha a credencial OAuth Desktop do Google" };
-            if (dialog.ShowDialog(this) == true)
-                try { if (c.Google.Connected) c.Disconnect(); c.Google.ImportCredentials(System.IO.File.ReadAllText(dialog.FileName)); c.UpdateStatus("Credencial importada. Clique em Entrar com Google."); ContentPanel.Tag = null; Refresh(); }
-                catch (Exception ex) { c.UpdateStatus("Não consegui importar. " + Controller.Friendly(ex)); }
-        }));
-        var connect = AsyncAction(c.Google.Connected ? "Reconectar Google" : "Entrar com Google", async () => { await c.ConnectAsync(); ContentPanel.Tag = null; Refresh(); }, true); connect.IsEnabled = c.Google.Configured; row.Children.Add(connect); google.Children.Add(row); AddSpace(google, 10);
+        row.Children.Add(GoogleSignInButton()); google.Children.Add(row); AddSpace(google, 10);
         if (c.Google.Connected) { var disconnect = Action("Desconectar deste computador", () => { c.Disconnect(); ContentPanel.Tag = null; Refresh(); }); disconnect.HorizontalAlignment = HorizontalAlignment.Left; google.Children.Add(disconnect); }
         AddSpace(google, 12); google.Children.Add(Text("Leitura dos cabeçalhos do Gmail; leitura e criação de eventos; leitura e conclusão de tarefas. Desconectar remove a autorização local. Você também pode revogar o acesso nas configurações da sua conta Google.", 11, "#9B92A5")); ContentPanel.Children.Add(Card(google));
         ContentPanel.Children.Add(Text("O pet precisa estar aberto, com o computador ligado e sem suspensão. Ao retomar, ele verifica os compromissos que ainda não começaram. Você pode ativar a inicialização com o Windows acima.", 12, "#92889E"));

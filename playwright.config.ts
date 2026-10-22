@@ -5,6 +5,7 @@ export default defineConfig({
   use: {
     baseURL: process.env.PINGO_TEST_URL ?? "http://127.0.0.1:3210",
     ...devices["Desktop Chrome"],
+    channel: process.env.CI ? "chrome" : undefined,
   },
   webServer: process.env.PINGO_TEST_URL
     ? undefined

@@ -50,6 +50,7 @@ export function useDesktopPet(
       const storage = await storageFor(userId);
       const sessionHash = await petSessionHash(token);
       if (!live || api.token !== token) return;
+      if (cachedUser === userId && cached && cached.revision > w.revision) return;
       cached = w;
       cachedUser = userId;
       setWorkspace(w);

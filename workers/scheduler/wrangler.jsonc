@@ -1,6 +1,7 @@
 {
  "$schema":"../../node_modules/wrangler/config-schema.json",
- "name":"pingo-scheduler","main":"src/index.ts","compatibility_date":"2026-10-22","compatibility_flags":["nodejs_compat"],
+ "name":"pingo-scheduler","main":"src/index.ts","compatibility_date":"2026-10-23","compatibility_flags":["nodejs_compat"],
+ "upload_source_maps":true,"secrets":{"required":["SCHEDULER_SECRET"]},
  "triggers":{"crons":["* * * * *"]},
  "observability":{"enabled":true,"head_sampling_rate":0.1},
  "d1_databases":[{"binding":"DB","database_name":"pingo-jobs","database_id":"00000000-0000-0000-0000-000000000000","migrations_dir":"migrations"}],

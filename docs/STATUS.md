@@ -1,5 +1,11 @@
 # Estado da entrega
 
+## Agendador em nuvem — preparação para ativação
+
+O protocolo 2 está preparado com índice D1 por revisão, proteção contra confirmações antigas, lease e repetição, status autenticado, expansão de recorrências em segundo plano e deduplicação de push por assinatura. A base tem 69 testes unitários/simulados, além de 15 verificações no runtime Workers/D1 local com backend simulado.
+
+A produção ainda depende de autenticar a Cloudflare, criar o D1 exclusivo, configurar o Worker e publicar `SCHEDULER_URL` no backend. A conexão MCP foi observada expirada e o Wrangler sem sessão. É necessário conferir o cron real e um lembrete de teste antes de considerar o agendador ativo. Nenhum plano pago foi ativado.
+
 ## Avatar 2.2
 
 Avatar recortado com transparência de documento e WebView, barra de conversa, 24 estados vetoriais animados, redimensionamento persistente, passagem do cursor no espaço vazio e revisão de propostas na sessão correspondente do painel. A conversa usa a API existente, com identificadores persistentes para retentar respostas incertas sem duplicar operações, sem compartilhar a fila offline do painel.

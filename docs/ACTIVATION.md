@@ -39,7 +39,15 @@ npx wrangler secret put SCHEDULER_SECRET --config workers/scheduler/wrangler.jso
 npm run deploy -w @pingo/scheduler
 ```
 
-Defina `BACKEND_URL` no Worker, `SCHEDULER_URL` no backend e o mesmo `SCHEDULER_SECRET` forte em ambos. O cron roda por minuto, mas só consulta o índice D1. Trabalhos possuem lease e repetição; conteúdo de tarefas e e-mails não fica no D1.
+Defina `BACKEND_URL` no Worker, `SCHEDULER_URL` no backend e o mesmo `SCHEDULER_SECRET` forte (32 caracteres ou mais) em ambos. Preserve o segredo já configurado na Vercel se houver cópia privada; caso contrário, substitua apenas esse segredo em ambos os serviços. Nunca coloque seu valor na linha de comando, no Git ou em logs. Reimplante o backend depois de alterar suas variáveis.
+
+O protocolo privado do agendador é a versão 2. Publique este backend e este Worker juntos. A migração `0002_index_versions.sql` adiciona proteção contra índices antigos e um registro mínimo da última execução. `/health` é público e não consulta o banco; `/status` exige o segredo e retorna apenas contagens e a última execução. O cron roda por minuto e usa apenas D1 em minutos vazios. O backend republica o índice canônico antes de confirmar um trabalho; uma execução antiga não pode apagar nem adiar um índice substituído.
+
+Depois de ativar, publique os índices das contas já existentes usando o backend e suas contas autenticadas (o botão de sincronização faz isso), ou uma ferramenta administrativa restrita às contas do beta. Verifique o avanço de `lastRun.last_run_at` e processe um lembrete de teste antes de considerar a infraestrutura ativa. Autorização do Google e permissão de notificações continuam necessárias.
+
+O backend atualiza as ocorrências recorrentes das próximas 48 horas durante a rotina; os lembretes revalidam o horário e ignoram compromissos alterados ou excluídos. Push usa um registro privado de tentativas por assinatura, evitando repetir entregas já confirmadas. Não reproduz avisos com mais de 30 minutos quando o serviço é ativado. Conteúdo de tarefas e e-mails não fica no D1.
+
+Validação local, sem conta Cloudflare ou chamadas Google/IA: `npm run test:scheduler`. O teste usa Workers/D1 locais e backend simulado, incluindo revisão antiga, substituição durante execução, repetição após falha e minuto vazio. Os arquivos de teste ficam em `.verification/`, nunca em recursos remotos. Isso não comprova a ativação do cron em produção.
 
 ## Push e IA
 

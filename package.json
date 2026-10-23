@@ -17,7 +17,8 @@
     "desktop": "npm run tauri -w @pingo/desktop",
     "invite": "tsx scripts/invite.ts",
     "test:browser": "playwright test",
-    "test:backend": "tsx scripts/verify-backend.ts"
+    "test:backend": "tsx scripts/verify-backend.ts",
+    "test:scheduler": "node scripts/verify-scheduler.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "latest",

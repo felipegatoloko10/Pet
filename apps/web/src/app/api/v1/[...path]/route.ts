@@ -79,7 +79,8 @@ async function handler(r: Request) {
           entityId: z.string().optional(),
         })
         .parse(await body(r));
-      return Response.json({ jobs: await processJob(job) });
+      await processJob(job);
+      return Response.json({ indexed: true });
     }
     if (path === "google/calendar-hook" && r.method === "POST") {
       const id = r.headers.get("x-goog-channel-id") ?? "";
@@ -98,7 +99,7 @@ async function handler(r: Request) {
       )
         return new Response(null, { status: 403 });
       if (r.headers.get("x-goog-resource-state") !== "sync")
-        await syncGoogle(channel.userId);
+        await indexJobs(channel.userId, await syncGoogle(channel.userId));
       return new Response(null, { status: 204 });
     }
     if (
@@ -185,7 +186,7 @@ async function handler(r: Request) {
       return Response.json({ url: await beginGoogle(user.id) });
     if (path === "google/callback" && r.method === "GET") {
       await finishGoogle(user.id, url);
-      await syncGoogle(user.id);
+      await indexJobs(user.id, await syncGoogle(user.id));
       return Response.redirect(`${process.env.BETTER_AUTH_URL}/?connected=1`);
     }
     if (path === "google/disconnect" && r.method === "POST") {

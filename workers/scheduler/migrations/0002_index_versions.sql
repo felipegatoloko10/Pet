@@ -1,0 +1,2 @@
+CREATE TABLE job_indexes(user_id TEXT PRIMARY KEY,revision INTEGER NOT NULL,generation TEXT NOT NULL);
+CREATE TABLE dispatcher_state(id INTEGER PRIMARY KEY CHECK(id=1),last_run_at INTEGER NOT NULL,claimed INTEGER NOT NULL,completed INTEGER NOT NULL,retried INTEGER NOT NULL);

@@ -230,6 +230,7 @@ export type Workspace = {
     error?: string;
   };
   cursor: {
+    push?: Record<string, Record<string, { lease: string; until: number; sent?: boolean }>>;
     tasks?: Record<string, string>;
     calendar?: Record<string, string>;
     gmail?: string;

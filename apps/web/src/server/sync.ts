@@ -579,6 +579,7 @@ async function pullOccurrences(
       if (old) Object.assign(old, item);
       else w.events.push(item);
     }
+    w.revision++;
   });
 }
 async function ensureCalendarWatch(

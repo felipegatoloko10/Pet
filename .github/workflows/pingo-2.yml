@@ -24,6 +24,8 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run check -w @pingo/scheduler
+      - name: Verificar cron e fila no runtime Workers/D1 local
+        run: npm run test:scheduler
       - name: Verificar painel no navegador
         run: npx playwright test
   windows:

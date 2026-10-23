@@ -344,22 +344,40 @@ export function Pet({
                 </g>
               )}
             </g>
-            <path
-              className="pet-arm-left"
-              d="M64 143 Q47 164 66 163"
-              fill="none"
-              stroke="var(--pet-color)"
-              strokeWidth="17"
-              strokeLinecap="round"
-            />
-            <path
-              className="pet-arm-right"
-              d="M156 143 Q173 164 154 163"
-              fill="none"
-              stroke="var(--pet-color)"
-              strokeWidth="17"
-              strokeLinecap="round"
-            />
+            <g className="pet-arm-left">
+              <path
+                d="M64 143 Q43 162 66 172"
+                fill="none"
+                stroke="var(--pet-color)"
+                strokeWidth="17"
+                strokeLinecap="round"
+              />
+              <circle
+                className="pet-paw-pad"
+                cx="66"
+                cy="172"
+                r="4.5"
+                fill="var(--pet-accent)"
+                opacity=".75"
+              />
+            </g>
+            <g className="pet-arm-right">
+              <path
+                d="M156 143 Q178 162 154 172"
+                fill="none"
+                stroke="var(--pet-color)"
+                strokeWidth="17"
+                strokeLinecap="round"
+              />
+              <circle
+                className="pet-paw-pad"
+                cx="154"
+                cy="172"
+                r="4.5"
+                fill="var(--pet-accent)"
+                opacity=".75"
+              />
+            </g>
           </g>
           {state === "sleep" && (
             <text className="zzz" x="169" y="39" fill="#597866" fontSize="24">

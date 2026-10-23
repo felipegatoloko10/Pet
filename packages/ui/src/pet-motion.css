@@ -28,10 +28,10 @@
   animation: pingo-stretch 3s ease-in-out infinite;
 }
 .pet.pet-stretch .pet-arm-left {
-  transform: rotate(150deg);
+  transform: rotate(150deg) scaleY(1.35);
 }
 .pet.pet-stretch .pet-arm-right {
-  transform: rotate(-150deg);
+  transform: rotate(-150deg) scaleY(1.35);
 }
 .pet.pet-stretch .eyes {
   transform: scaleY(0.5);
@@ -158,10 +158,10 @@
 @keyframes pingo-wave {
   0%,
   100% {
-    transform: rotate(-135deg);
+    transform: rotate(-120deg) scaleY(1.25);
   }
   50% {
-    transform: rotate(-175deg);
+    transform: rotate(-165deg) scaleY(1.25);
   }
 }
 @keyframes pingo-stretch {
@@ -208,10 +208,10 @@
 @keyframes pingo-groom {
   0%,
   100% {
-    transform: rotate(-65deg);
+    transform: rotate(65deg) scaleY(1.1);
   }
   50% {
-    transform: rotate(-110deg) translateY(-3px);
+    transform: rotate(115deg) scaleY(1.1);
   }
 }
 @keyframes pingo-lick {

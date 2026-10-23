@@ -19,6 +19,7 @@ public class NotificationCoordinatorTest {
         c = RuntimeEnvironment.getApplication();
         NotificationCoordinator.clear(c);
         NotificationCoordinator.prefs(c).edit().putString("userId", "alice").putBoolean("enabled", true).commit();
+        PingoDatabase.get(c).clear("alice");
     }
     JSONObject message(String user, String id) throws Exception {
         return new JSONObject().put("userId", user).put("noticeId", id).put("title", "Teste").put("body", "Em breve").put("expiresAt", System.currentTimeMillis() + 600000);
@@ -38,13 +39,14 @@ public class NotificationCoordinatorTest {
         NotificationCoordinator.deliver(c, message("alice", "reminder:4"));
         assertEquals(0, c.getSystemService(NotificationManager.class).getActiveNotifications().length);
     }
-    @Test public void snapshotAndQueueAreAnAtomicAccountScopedValue() {
+    @Test public void snapshotAndQueueAreAnAtomicAccountScopedValue() throws Exception {
         PingoDatabase db = PingoDatabase.get(c);
-        db.write("alice", "snapshot", "{\"workspace\":{},\"pending\":[1]}");
-        db.write("bob", "snapshot", "{\"workspace\":{},\"pending\":[2]}");
-        db.clear("bob");
-        assertTrue(db.read("alice", "snapshot").contains("[1]"));
-        assertNull(db.read("bob", "snapshot"));
+        JSONObject op=new JSONObject().put("operationId","once").put("command",new JSONObject().put("type","pet.care").put("action","pet"));
+        JSONObject snapshot=new JSONObject().put("workspace",new JSONObject()).put("pending",new JSONArray().put(new JSONObject().put("operation",op)));
+        db.write("alice","snapshot",snapshot.toString());db.write("bob","snapshot",snapshot.toString());db.clear("bob");
+        assertEquals(1,new JSONObject(db.read("alice","snapshot")).getJSONArray("pending").length());assertNull(db.read("bob","snapshot"));
+        db.acknowledge("alice","once",new JSONObject());db.write("alice","snapshot",snapshot.toString());
+        assertEquals("Uma cópia antiga não pode ressuscitar uma operação confirmada.",0,new JSONObject(db.read("alice","snapshot")).getJSONArray("pending").length());
     }
     @Test public void editedReminderReplacesTheOldAlarmIndex() throws Exception {
         long now = System.currentTimeMillis();
@@ -54,5 +56,36 @@ public class NotificationCoordinatorTest {
         NotificationCoordinator.replace(c, "alice", config, new JSONArray());
         NotificationCoordinator.fireLocal(c, "old");
         assertEquals(0, c.getSystemService(NotificationManager.class).getActiveNotifications().length);
+    }
+    JSONObject timedTask() throws Exception {
+        String start=TaskActions.iso(System.currentTimeMillis()-60000),end=TaskActions.iso(System.currentTimeMillis()+1800000);
+        JSONObject t=new JSONObject().put("id","task").put("boardId","b").put("columnId","todo").put("title","Teste").put("revision",1).put("completed",false).put("scheduledStart",start).put("scheduledEnd",end);
+        JSONArray cols=new JSONArray().put(new JSONObject().put("id","todo").put("kind","todo")).put(new JSONObject().put("id","active").put("kind","active")).put(new JSONObject().put("id","done").put("kind","done"));
+        JSONObject w=new JSONObject().put("tasks",new JSONArray().put(t)).put("boards",new JSONArray().put(new JSONObject().put("id","b").put("columns",cols))).put("preferences",new JSONObject().put("taskCheckIns",true));
+        PingoDatabase.get(c).write("alice","snapshot",new JSONObject().put("workspace",w).put("pending",new JSONArray()).toString());
+        return message("alice","task:phase").put("taskId","task").put("phase","start").put("scheduleKey",start+"|"+end).put("taskRevision",1).put("operationId",java.util.UUID.randomUUID().toString());
+    }
+    @Test public void taskNoticeOffersThreeActionsAndRejectsOldSchedule() throws Exception {
+        JSONObject n=timedTask();NotificationCoordinator.deliver(c,n);
+        android.service.notification.StatusBarNotification[] visible=c.getSystemService(NotificationManager.class).getActiveNotifications();
+        assertEquals(1,visible.length);assertEquals(3,visible[0].getNotification().actions.length);assertEquals("Comecei",visible[0].getNotification().actions[0].title.toString());
+        NotificationCoordinator.deliver(c,new JSONObject(n.toString()).put("noticeId","old").put("scheduleKey","old"));
+        assertEquals(1,c.getSystemService(NotificationManager.class).getActiveNotifications().length);
+    }
+    @Test public void offlineNotificationActionSharesQueueAndPreservesPlannedTime() throws Exception {
+        JSONObject n=timedTask();String before=new JSONObject(PingoDatabase.get(c).read("alice","snapshot")).getJSONObject("workspace").getJSONArray("tasks").getJSONObject(0).getString("scheduledStart");
+        try{androidx.work.WorkManager.initialize(c,new androidx.work.Configuration.Builder().build());}catch(IllegalStateException ignored){}
+        TaskActions.enqueue(c,n,"start");
+        JSONObject snapshot=new JSONObject(PingoDatabase.get(c).read("alice","snapshot")), t=snapshot.getJSONObject("workspace").getJSONArray("tasks").getJSONObject(0);
+        assertEquals("active",t.getString("columnId"));assertEquals(before,t.getString("scheduledStart"));assertEquals(1,snapshot.getJSONArray("pending").length());assertEquals(n.getString("operationId"),snapshot.getJSONArray("pending").getJSONObject(0).getJSONObject("operation").getString("operationId"));
+        assertTrue(t.has("actualStartedAt"));
+    }
+    @Test public void completingOfflineRejectsLatePushForTheSameTask() throws Exception {
+        JSONObject n=timedTask().put("phase","end");
+        try{androidx.work.WorkManager.initialize(c,new androidx.work.Configuration.Builder().build());}catch(IllegalStateException ignored){}
+        TaskActions.enqueue(c,n,"complete");
+        NotificationCoordinator.deliver(c,new JSONObject(n.toString()).put("noticeId","late"));
+        assertEquals(0,c.getSystemService(NotificationManager.class).getActiveNotifications().length);
+        assertEquals(1,PingoDatabase.get(c).pending("alice").length());
     }
 }

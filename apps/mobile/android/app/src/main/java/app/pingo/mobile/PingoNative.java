@@ -59,6 +59,10 @@ public final class PingoNative extends Plugin {
     @PluginMethod public void clearCache(PluginCall call) {
         try { PingoDatabase.get(getContext()).clear(user(call)); call.resolve(); } catch (Exception ignored) { fail(call); }
     }
+    @PluginMethod public void flushOperations(PluginCall call) {
+        try {String u=user(call);String snapshot=OperationWorker.flush(getContext(),u);call.resolve(new JSObject().put("snapshot",snapshot==null?JSONObject.NULL:snapshot));}catch(Exception ignored){try{String snapshot=PingoDatabase.get(getContext()).read(user(call),"snapshot");call.resolve(new JSObject().put("snapshot",snapshot==null?JSONObject.NULL:snapshot));}catch(Exception e){fail(call);}}
+    }
+    @PluginMethod public void discardOperations(PluginCall call) {try{PingoDatabase.get(getContext()).discardPending(user(call));call.resolve();}catch(Exception ignored){fail(call);}}
     @PluginMethod public void syncReminders(PluginCall call) {
         try {
             String u = user(call);
@@ -128,7 +132,7 @@ public final class PingoNative extends Plugin {
     private JSObject notice(Intent intent) {
         JSObject result = new JSObject();
         if (intent != null && "pingo.NOTICE".equals(intent.getAction())) {
-            result.put("noticeId", intent.getStringExtra("noticeId")); result.put("eventId", intent.getStringExtra("eventId")); intent.setAction(null);
+                result.put("noticeId", intent.getStringExtra("noticeId")); result.put("eventId", intent.getStringExtra("eventId")); result.put("taskId",intent.getStringExtra("taskId")); intent.setAction(null);
         }
         return result;
     }

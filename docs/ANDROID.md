@@ -1,4 +1,4 @@
-# Pingo Android 2.3 beta
+# Pingo Android 2.4 beta
 
 Aplicativo `app.pingo.mobile`, Android 7 (API 24) ou superior. A interface React fica incorporada ao APK com Capacitor 8; o app utiliza as mesmas contas, dados e API do site e do Windows.
 
@@ -25,6 +25,10 @@ Firebase Messaging recebe mensagens de dados. Um coordenador Android único trat
 Vercel usa OIDC e Workload Identity Federation no Google: somente o projeto Pingo em produção na equipe configurada pode assumir a conta de serviço. A permissão é exclusivamente `cloudmessaging.messages.create`. Não há chave privada Google no backend. `FIREBASE_FEDERATION_CONFIG` contém projeto, conta de serviço e audience do provedor WIF. Firebase não hospeda autenticação nem dados do Pingo, e Analytics permanece desligado.
 
 Título e antecedência aparecem no lembrete, sem descrições, e-mails ou conversas. Há opção de ocultar detalhes na tela bloqueada. A entrega é de melhor esforço. Uma edição em outro dispositivo só atualiza o alarme local quando chega ao celular.
+
+Na 2.4, tarefas com horário oferecem **Comecei**, **Concluir**, **Lembrar em 10/15 min** e **Alterar status**. São ações locais sem IA e sem conclusão automática. Ações offline ficam na mesma fila SQLite da interface, enviadas pelo trabalho nativo. Ajustes permite desligar o acompanhamento. A migração preserva cache e operações anteriores. Consulte [o comportamento detalhado](REVISION-2.4.md).
+
+Antes de publicar a pré-release 2.4, é necessário instalar seu APK assinado sobre a 2.3 e homologar esses botões em aparelho físico, incluindo ação sem internet e confirmação em Tasks e Agenda. Emulador não substitui esse teste.
 
 ## Compilar
 

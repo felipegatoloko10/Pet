@@ -9,6 +9,8 @@ import {
 } from "@pingo/core";
 export type User = { id: string; name: string; email: string };
 export type Storage = {
+  nativeFlush?: () => Promise<{ workspace?: Workspace; pending: Pending[] }>;
+  discardPending?: () => Promise<void>;
   get: (key: string) => Promise<string | null>;
   set: (key: string, value: string) => Promise<void>;
   clear: () => Promise<void>;
@@ -167,6 +169,16 @@ export class PingoClient {
     this.syncing = true;
     this.emit();
     try {
+      if (this.storage.nativeFlush) {
+        const result = await this.storage.nativeFlush();
+        this.pending = result.pending;
+        if (result.workspace)
+          this.workspace = normalizeWorkspace(result.workspace);
+        this.error =
+          this.pending.find((p) => p.error)?.error ??
+          (this.pending.length ? "Alterações guardadas para sincronizar." : "");
+        return;
+      }
       while (this.pending.length && !this.pending[0].error) {
         const entry = this.pending[0];
         try {
@@ -232,6 +244,7 @@ export class PingoClient {
     }
   }
   async discardConflict() {
+    await this.storage.discardPending?.();
     this.pending = [];
     await this.persist();
     await this.refresh();

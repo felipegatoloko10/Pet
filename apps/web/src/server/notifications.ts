@@ -11,10 +11,11 @@ import { maybeProactive } from "./ai";
 import { digest } from "./crypto";
 import { androidSubscription } from "./mobile";
 import { sendAndroidPush } from "./fcm";
+import { taskAlarms, taskAlarmNotice, taskScheduleKey } from "@pingo/core";
 export type Job = {
   id: string;
   userId: string;
-  kind: "routine" | "reminder";
+  kind: "routine" | "reminder" | "checkin";
   dueAt: number;
   entityId?: string;
 };
@@ -44,6 +45,13 @@ export function jobsFor(userId: string, w: Workspace): Job[] {
     !w.notices.some((n) => n.id === `summary:${date}`);
   const nextRoutine = (w.cursor.routineLastAt ?? now - 15 * 60000) + 15 * 60000;
   return [
+    ...taskAlarms(w, userId, now).map((a) => ({
+      id: a.id,
+      userId,
+      kind: "checkin" as const,
+      entityId: a.taskId,
+      dueAt: Math.max(now, a.dueAt),
+    })),
     {
       id: `routine:${userId}`,
       userId,
@@ -131,6 +139,17 @@ export async function processJob(job: Job) {
     const { date, time } = zonedParts(now, w.preferences.timezone);
     const event = w.events.find((e) => e.id === job.entityId && !e.deleted);
     const summaryId = `summary:${date}`;
+    if (job.kind === "checkin") {
+      const alarm = taskAlarms(w, job.userId, +now).find(
+        (a) => a.id === job.id && a.dueAt <= +now && a.expiresAt > +now,
+      );
+      if (alarm) {
+        const n = taskAlarmNotice(alarm, now);
+        n.silent = isQuiet(now, w.preferences);
+        n.taskRevision = w.tasks.find((t) => t.id === alarm.taskId)?.revision;
+        w.notices.unshift(n);
+      }
+    }
     if (
       job.kind === "routine" &&
       time >= w.preferences.summaryTime &&
@@ -182,7 +201,9 @@ async function sendPush(userId: string, w: Workspace) {
     (n) =>
       !n.read &&
       !n.deliveredBy &&
+      (!n.expiresAt || n.expiresAt > Date.now()) &&
       Date.parse(n.createdAt) >= Date.now() - 1800000,
+    // Expired phase notices must not replay after network recovery.
   );
   if (!candidates.length) return;
   if (webConfigured)
@@ -199,6 +220,40 @@ async function sendPush(userId: string, w: Workspace) {
   for (const notice of candidates) {
     for (const sub of subs) {
       const android = androidSubscription(sub.data);
+      if (notice.taskId) {
+        const t = w.tasks.find((t) => t.id === notice.taskId);
+        if (
+          !android ||
+          ((sub.data as import("./mobile").AndroidSubscription).protocol ?? 1) <
+            2 ||
+          !t ||
+          t.completed ||
+          t.deleted ||
+          t.archivedAt ||
+          t.calendarSuppressed ||
+          taskScheduleKey(t) !== notice.scheduleKey ||
+          w.preferences.taskCheckIns === false
+        )
+          continue;
+        if (
+          ["end", "repeat"].includes(notice.phase ?? "") &&
+          t.checkIn?.endAnswered
+        )
+          continue;
+      }
+      if (
+        android &&
+        ((sub.data as import("./mobile").AndroidSubscription).protocol ?? 1) >=
+          2 &&
+        !notice.taskId &&
+        notice.id.startsWith("reminder:") &&
+        w.preferences.taskCheckIns !== false &&
+        w.events.some(
+          (e) =>
+            e.taskId && notice.id === `reminder:${userId}:${e.id}:${e.start}`,
+        )
+      )
+        continue;
       if (android ? !process.env.FIREBASE_FEDERATION_CONFIG : !webConfigured)
         continue;
       if (w.cursor.push?.[notice.id]?.[sub.id]?.sent) continue;

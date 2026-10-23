@@ -31,7 +31,7 @@ public final class TokenRegistrationWorker extends Worker {
         connection.setRequestMethod(method); connection.setConnectTimeout(10000); connection.setReadTimeout(10000); connection.setInstanceFollowRedirects(false);
         connection.setRequestProperty("Authorization", "Bearer " + token); connection.setRequestProperty("Content-Type", "application/json");
         connection.setDoOutput(true);
-        JSONObject data = new JSONObject(); data.put("installationId", installation); if (fcm != null) data.put("token", fcm);
+        JSONObject data = new JSONObject(); data.put("installationId", installation); if (fcm != null) { data.put("token", fcm); data.put("protocol",2); }
         try (java.io.OutputStream out = connection.getOutputStream()) { out.write(data.toString().getBytes(StandardCharsets.UTF_8)); }
         try { return connection.getResponseCode(); } finally { connection.disconnect(); }
     }

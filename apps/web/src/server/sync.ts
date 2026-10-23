@@ -14,7 +14,9 @@ import { randomBytes } from "node:crypto";
 import { db } from "./db";
 import { channels } from "./schema";
 import { digest } from "./crypto";
+import { reconcileTaskCalendars, localDay } from "@pingo/core";
 type GTask = {
+  completed?: string;
   id: string;
   title?: string;
   notes?: string;
@@ -25,6 +27,7 @@ type GTask = {
   etag?: string;
 };
 type GEvent = {
+  transparency?: string;
   id: string;
   summary?: string;
   start?: { date?: string; dateTime?: string };
@@ -34,7 +37,7 @@ type GEvent = {
   recurrence?: string[];
   recurringEventId?: string;
   originalStartTime?: { dateTime?: string; date?: string };
-  extendedProperties?: { private?: { pingoId?: string } };
+  extendedProperties?: { private?: { pingoId?: string; pingoTaskId?: string } };
   attendees?: { email: string }[];
 };
 const tasksBase = "https://tasks.googleapis.com/tasks/v1";
@@ -55,16 +58,76 @@ function notice(w: Workspace, id: string, title: string, body: string) {
     });
   w.notices = w.notices.slice(0, 200);
 }
-function syncLinkedTask(w: Workspace, e: CalendarEvent) {
+function syncLinkedTask(w: Workspace, e: CalendarEvent, prior?: CalendarEvent) {
   if (!e.taskId) return;
   const t = w.tasks.find((t) => t.id === e.taskId);
   if (!t) return;
+  if (e.deleted) {
+    if (!t.deleted) {
+      t.calendarSuppressed = true;
+      t.calendarRemoved = true;
+      t.timeMode = "none";
+      t.checkIn = undefined;
+    }
+  }
+  if (!e.deleted && t.syncState === "conflict") return;
   const start = e.deleted ? null : e.start,
     end = e.deleted ? null : e.end;
-  if (t.scheduledStart !== start || t.scheduledEnd !== end) {
-    t.scheduledStart = start;
-    t.scheduledEnd = end;
+  let title = e.title.replace(/^✓\s*/, "");
+  let due = e.deleted
+    ? t.dueDate
+    : e.allDay
+      ? e.start
+      : localDay(e.start, w.preferences.timezone);
+  if (prior && !e.deleted) {
+    const beforeTitle = prior.title.replace(/^✓\s*/, ""),
+      beforeDate = prior.allDay
+        ? prior.start
+        : localDay(prior.start, w.preferences.timezone);
+    const conflict =
+      (t.title !== beforeTitle && title !== beforeTitle && title !== t.title) ||
+      (t.dueDate !== beforeDate && due !== beforeDate && due !== t.dueDate);
+    if (conflict) {
+      t.syncState = "conflict";
+      e.syncState = "conflict";
+      t.error = e.error =
+        "A tarefa e o compromisso foram alterados no Google. Revise antes de sincronizar.";
+      return;
+    }
+    if (title === beforeTitle && t.title !== beforeTitle) title = t.title;
+    if (due === beforeDate && t.dueDate !== beforeDate) due = t.dueDate;
+  }
+  if (
+    t.scheduledStart !== (e.allDay ? null : start) ||
+    t.scheduledEnd !== (e.allDay ? null : end) ||
+    t.title !== title ||
+    t.dueDate !== due
+  ) {
+    t.scheduledStart = e.allDay ? null : start;
+    t.scheduledEnd = e.allDay ? null : end;
+    if (!e.deleted) {
+      t.title = title;
+      t.dueDate = due;
+      t.timeMode = e.allDay ? "none" : (t.timeMode ?? "range");
+    }
+    t.checkIn = undefined;
+    t.actualStartedAt = null;
     t.revision++;
+    if (
+      !e.deleted &&
+      !w.outbox.some((j) => j.kind === "task" && j.entityId === t.id)
+    ) {
+      t.syncState = "pending";
+      w.outbox.push({
+        id: crypto.randomUUID(),
+        kind: "task",
+        entityId: t.id,
+        action: "upsert",
+        state: "pending",
+        attempts: 0,
+        nextAttemptAt: new Date().toISOString(),
+      });
+    }
   }
 }
 async function deliverJob(userId: string, client: GoogleClient, job: SyncJob) {
@@ -160,7 +223,12 @@ async function deliverJob(userId: string, client: GoogleClient, job: SyncJob) {
             : { dateTime: e!.end, timeZone: w.preferences.timezone },
           recurrence: e!.recurrence,
           attendees: e!.attendees?.map((email) => ({ email })),
-          extendedProperties: { private: { pingoId: e!.id } },
+          extendedProperties: {
+            private: {
+              pingoId: e!.id,
+              ...(e!.taskId ? { pingoTaskId: e!.taskId } : {}),
+            },
+          },
         };
         result = await client.request<GEvent>(
           `${eventUrl(e!.calendarId, e!.googleId)}?sendUpdates=${e!.attendees?.length ? "all" : "none"}`,
@@ -186,17 +254,49 @@ async function deliverJob(userId: string, client: GoogleClient, job: SyncJob) {
       i.syncState = "synced";
       i.error = undefined;
       // Provider acknowledgement changes transport metadata, not the user's revision.
-      current.outbox = current.outbox.filter((j) => j.id !== job.id);
-      notice(
-        current,
-        `sync:${job.id}`,
-        job.kind === "task" ? "Google Tasks atualizado" : "Agenda atualizada",
-        job.action === "delete"
-          ? "Exclusão confirmada pelo Google."
-          : job.kind === "task"
-            ? `Confirmei “${i.title}” no Google Tasks.`
-            : `Confirmei “${i.title}” no Google Agenda.`,
+      current.outbox = current.outbox.filter(
+        (j) =>
+          !(
+            j.id === job.id &&
+            j.kind === job.kind &&
+            j.entityId === job.entityId
+          ),
       );
+      const task =
+        job.kind === "task"
+          ? current.tasks.find((t) => t.id === job.entityId)
+          : current.tasks.find((t) => t.id === (i as CalendarEvent).taskId);
+      const linked =
+        task && current.events.find((e) => e.taskId === task.id && !e.deleted);
+      if (
+        task &&
+        !task.deleted &&
+        task.syncState === "synced" &&
+        (!task.dueDate ||
+          task.calendarSuppressed ||
+          (linked?.syncState === "synced" &&
+            linked.title === `${task.completed ? "✓ " : ""}${task.title}`)) &&
+        !current.outbox.some(
+          (j) => j.entityId === task.id || j.entityId === linked?.id,
+        )
+      ) {
+        notice(
+          current,
+          `sync:task:${task.id}:${task.googleUpdated}:${linked?.googleEtag}`,
+          "Tarefa sincronizada",
+          `Já confirmei e sincronizei com o Google sua tarefa “${task.title}”.`,
+        );
+      } else if (!task || job.action === "delete")
+        notice(
+          current,
+          `sync:${job.id}`,
+          job.kind === "task" ? "Google Tasks atualizado" : "Agenda atualizada",
+          job.action === "delete"
+            ? "Exclusão confirmada pelo Google."
+            : job.kind === "task"
+              ? `Sua tarefa “${i.title}” está no Google Tasks. A agenda ainda está sendo sincronizada.`
+              : `Confirmei “${i.title}” no Google Agenda.`,
+        );
       current.revision++;
     });
   } catch (error) {
@@ -284,7 +384,12 @@ export async function syncGoogle(userId: string) {
           `${tasksBase}/users/@me/lists?maxResults=100`,
           "items",
         );
-        for (const list of lists) {
+        const fixed = current.boards.find(
+          (b) => b.id === current.preferences.defaultBoardId,
+        )?.googleId;
+        for (const list of lists.filter((l, index) =>
+          fixed ? l.id === fixed : index === 0,
+        )) {
           const cursor = current.cursor.tasks?.[list.id];
           const since = new Date(Date.now() - 30000).toISOString();
           const items = await client.pages<GTask>(
@@ -337,18 +442,43 @@ export async function syncGoogle(userId: string) {
               summary: string;
               accessRole: string;
             }>(
-              `${calendarBase}/users/me/calendarList?minAccessRole=writer`,
+              `${calendarBase}/users/me/calendarList?minAccessRole=reader`,
               "items",
             )
           : [{ id: "primary", summary: "Principal", accessRole: "owner" }];
         await mutateWorkspace(userId, (w) => {
-          w.calendars = calendars.map((c) => ({ id: c.id, title: c.summary }));
+          w.calendars = calendars.map((c) => ({
+            id: c.id,
+            title: c.summary,
+            readOnly: ![
+              "owner",
+              "writer",
+              "writerWithoutPrivateAccess",
+            ].includes(c.accessRole),
+            holiday: c.id.includes("holiday@"),
+          }));
+          if (!w.calendars.some((c) => c.holiday))
+            w.calendars.push({
+              id: "pt.brazilian#holiday@group.v.calendar.google.com",
+              title: "Feriados no Brasil",
+              readOnly: true,
+              holiday: true,
+              publicFallback: true,
+            });
         });
         for (const cal of calendars) {
           await pullCalendar(userId, client, cal.id);
           await pullOccurrences(userId, client, cal.id);
-          await ensureCalendarWatch(userId, client, cal.id);
+          try {
+            await ensureCalendarWatch(userId, client, cal.id);
+          } catch {
+            /* Read-only/public calendars remain available through periodic synchronization. */
+          }
         }
+        const fallback = (await readWorkspace(userId)).calendars.find(
+          (c) => c.publicFallback,
+        );
+        if (fallback) await pullOccurrences(userId, client, fallback.id);
       });
     if (current.connection.scopes.some((s) => s.endsWith("/gmail.readonly")))
       await attempt("Gmail", async () => {
@@ -395,10 +525,34 @@ export async function syncGoogle(userId: string) {
         });
       });
     await mutateWorkspace(userId, (w) => {
+      reconcileTaskCalendars(w, (kind, entityId, action) => {
+        if (
+          w.outbox.some(
+            (j) =>
+              j.kind === kind &&
+              j.entityId === entityId &&
+              j.state === "uncertain",
+          )
+        )
+          return;
+        w.outbox = w.outbox.filter(
+          (j) => !(j.kind === kind && j.entityId === entityId),
+        );
+        w.outbox.push({
+          id: crypto.randomUUID(),
+          kind,
+          entityId,
+          action,
+          state: "pending",
+          attempts: 0,
+          nextAttemptAt: new Date().toISOString(),
+        });
+      });
       w.connection.lastSync = new Date().toISOString();
       w.connection.error = errors.length ? errors.join(" ") : undefined;
       w.revision++;
     });
+    await attempt("Envio de vínculos", () => pushOutbox(userId, client));
   } catch (error) {
     await mutateWorkspace(userId, (w) => {
       w.connection.error =
@@ -455,6 +609,7 @@ async function pullCalendar(
         ) {
           e.deleted = true;
           e.revision++;
+          syncLinkedTask(current, e);
         }
       }
     }
@@ -499,13 +654,19 @@ async function pullCalendar(
         originalStartTime:
           g.originalStartTime?.dateTime ?? g.originalStartTime?.date,
         attendees: g.attendees?.map((a) => a.email),
+        taskId: old?.taskId ?? g.extendedProperties?.private?.pingoTaskId,
+        transparent:
+          g.transparency === "transparent" ||
+          current.calendars.some((c) => c.id === calId && c.holiday),
         revision: (old?.revision ?? 0) + 1,
         syncState: "synced",
         deleted: false,
       };
+      const prior = old ? structuredClone(old) : undefined;
       if (old) Object.assign(old, e);
       else current.events.push(e);
-      syncLinkedTask(current, e);
+      syncLinkedTask(current, e, prior);
+      if (old && e.syncState === "conflict") Object.assign(old, e);
     }
     current.cursor.calendar ??= {};
     if (nextToken) current.cursor.calendar[calId] = nextToken;
@@ -551,6 +712,7 @@ async function pullOccurrences(
         if (old) {
           old.deleted = true;
           old.revision++;
+          syncLinkedTask(w, old);
         }
         continue;
       }
@@ -569,6 +731,10 @@ async function pullOccurrences(
         originalStartTime:
           g.originalStartTime?.dateTime ?? g.originalStartTime?.date,
         attendees: g.attendees?.map((a) => a.email),
+        taskId: old?.taskId ?? g.extendedProperties?.private?.pingoTaskId,
+        transparent:
+          g.transparency === "transparent" ||
+          w.calendars.some((c) => c.id === calendarId && c.holiday),
         revision:
           old && old.googleEtag === g.etag
             ? old.revision
@@ -576,8 +742,12 @@ async function pullOccurrences(
         syncState: "synced",
         deleted: false,
       };
+      const changed = !old || old.googleEtag !== g.etag;
+      const prior = old ? structuredClone(old) : undefined;
       if (old) Object.assign(old, item);
       else w.events.push(item);
+      if (changed) syncLinkedTask(w, item, prior);
+      if (old && item.syncState === "conflict") Object.assign(old, item);
     }
     w.revision++;
   });

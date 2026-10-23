@@ -24,10 +24,12 @@ export function Calendar({
   w,
   client,
   onEdit,
+  onTaskEdit,
 }: {
   w: Workspace;
   client: PingoClient;
   onEdit: (e: Partial<CalendarEvent>) => void;
+  onTaskEdit?: (t: import("@pingo/core").Task) => void;
 }) {
   const today = zonedParts(new Date(), w.preferences.timezone).date;
   const [date, setDate] = useState(today),
@@ -90,13 +92,25 @@ export function Calendar({
   for (const e of extra)
     if (!merged.has(e.id) || merged.get(e.id)!.revision < e.revision)
       merged.set(e.id, e);
-  const events = [...merged.values()].filter(
-    (e) => !e.deleted && !e.recurrence,
-  );
+  const holidayKeys = new Set<string>();
+  const events = [...merged.values()].filter((e) => {
+    if (e.deleted || e.recurrence) return false;
+    if (!w.calendars.some((c) => c.id === e.calendarId && c.holiday))
+      return true;
+    const key = `${e.title.trim().toLocaleLowerCase("pt-BR")}:${e.allDay ? e.start : zonedParts(new Date(e.start), w.preferences.timezone).date}`;
+    if (holidayKeys.has(key)) return false;
+    holidayKeys.add(key);
+    return true;
+  });
   const onDay = (date: string) =>
     events
       .filter((e) => eventOnDate(e, date, w.preferences.timezone))
       .sort((a, b) => a.start.localeCompare(b.start));
+  const openEvent = (e: CalendarEvent) => {
+    const t = e.taskId && w.tasks.find((t) => t.id === e.taskId && !t.deleted);
+    if (t && onTaskEdit) onTaskEdit(t);
+    else onEdit(e);
+  };
   const change = (direction: number) =>
     setDate(
       key(
@@ -142,7 +156,7 @@ export function Calendar({
                   <button
                     className="month-event"
                     key={e.id}
-                    onClick={() => onEdit(e)}
+                    onClick={() => openEvent(e)}
                   >
                     {e.allDay
                       ? "Dia inteiro"
@@ -270,7 +284,7 @@ export function Calendar({
                 <button
                   className="calendar-event"
                   key={e.id}
-                  onClick={() => onEdit(e)}
+                  onClick={() => openEvent(e)}
                 >
                   <small>
                     {e.allDay

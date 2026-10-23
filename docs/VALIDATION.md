@@ -1,5 +1,15 @@
 # Verificação do Pingo 2
 
+## Revisão 2.4 — 23/10/2026
+
+- 102 testes unitários/simulados de domínio/backend e 18 testes de navegador passaram.
+- 15 verificações do agendador no runtime Workers/D1 local passaram.
+- Android: migração SQLite 1 → 2 preservando fila/cache, recibos contra reintrodução de operações e ações nativas de notificação.
+- Instrumentação Android 16: cinco testes passaram; um teste FCM de produção opt-in foi omitido nessa execução local. Comecei e Concluir funcionaram sem WebView, sem sessão de rede, preservando a agenda e a fila após reabrir SQLite.
+- Resta homologar os novos botões em telefone físico e a ligação Tasks/Agenda com Google real. A homologação física da 2.3 não conta como homologação da 2.4.
+
+Teste físico: crie uma tarefa com início e fim próximos; confirme um único cartão/evento; use Comecei com o app fechado; adie o aviso final; desligue a rede e conclua pelo aviso. Reabra, reconecte e confira o cartão concluído, Tasks concluída e evento com ✓. Teste também reagendamento e cancelamento dos avisos antigos.
+
 ## Android 2.3 — executado em 23/10/2026
 
 - 84 testes unitários/simulados: domínio, sincronização, cuidados, login e FCM.

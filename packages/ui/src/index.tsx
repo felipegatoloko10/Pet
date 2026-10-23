@@ -49,7 +49,9 @@ import {
   newBoard,
   emptyWorkspace,
   eventOnDate,
+  zonedDateTime,
 } from "@pingo/core";
+import { PingoMark } from "./PingoMark";
 import {
   Api,
   ApiError,
@@ -81,7 +83,11 @@ export type Platform = {
   speak?: (text: string) => () => void;
   onBack?: (handler: () => boolean) => () => void;
   onNotice?: (
-    handler: (value: { eventId?: string; noticeId?: string }) => void,
+    handler: (value: {
+      eventId?: string;
+      noticeId?: string;
+      taskId?: string;
+    }) => void,
   ) => () => void;
   api?: Api;
   login?: () => Promise<void>;
@@ -117,6 +123,7 @@ function Dialog({
     <dialog
       ref={ref}
       className="dialog"
+      aria-label={title}
       onCancel={onClose}
       onClick={(e) => {
         if (e.target === ref.current) onClose();
@@ -204,8 +211,14 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   );
   useEffect(() => {
     if (!client) return;
-    return platform.onNotice?.(({ eventId, noticeId }) => {
-      if (eventId) {
+    return platform.onNotice?.(({ eventId, noticeId, taskId }) => {
+      if (taskId) {
+        const t = client.workspace.tasks.find(
+          (t) => t.id === taskId && !t.deleted,
+        );
+        if (t) setTaskEditor(t);
+        else setScreen("day");
+      } else if (eventId) {
         const event = client?.workspace.events.find(
           (e) => e.id === eventId && !e.deleted,
         );
@@ -422,7 +435,10 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     return (
       <main className="welcome">
         <div className="welcome-brand">
-          <span className="logo-dot">p</span> pingo <small>BETA</small>
+          <span className="logo-dot pingo-face">
+            <PingoMark />
+          </span>{" "}
+          pingo <small>BETA</small>
         </div>
         <div className="welcome-content">
           <div>
@@ -510,7 +526,9 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
             setScreen("day");
           }}
         >
-          <span className="logo-dot">p</span>
+          <span className="logo-dot pingo-face">
+            <PingoMark />
+          </span>
           <span>
             pingo<small>SEU PEQUENO ASSISTENTE</small>
           </span>
@@ -670,7 +688,59 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
           )}
           {screen === "day" && (
             <>
-              <Board w={w} today={today} act={act} onEdit={setTaskEditor} />
+              <Board
+                w={w}
+                today={today}
+                act={act}
+                onEdit={setTaskEditor}
+                onEventEdit={setEventEditor}
+              />
+              {tasks
+                .filter((t) => t.calendarRemoved)
+                .map((t) => (
+                  <section className="panel" key={t.id}>
+                    <h3>
+                      O bloco de “{t.title}” foi excluído no Google Agenda.
+                    </h3>
+                    <p>
+                      A tarefa foi preservada. Deseja excluir também do Google
+                      Tasks?
+                    </p>
+                    <button
+                      className="button"
+                      onClick={() =>
+                        void act({
+                          type: "task.calendarDecision",
+                          id: t.id,
+                          removeTask: false,
+                          expectedRevision: t.revision,
+                          confirmed: true,
+                        })
+                      }
+                    >
+                      Manter tarefa
+                    </button>
+                    <button
+                      className="button danger"
+                      onClick={() => {
+                        if (
+                          confirm(
+                            "Excluir também esta tarefa do Pingo e do Google Tasks?",
+                          )
+                        )
+                          void act({
+                            type: "task.calendarDecision",
+                            id: t.id,
+                            removeTask: true,
+                            expectedRevision: t.revision,
+                            confirmed: true,
+                          });
+                      }}
+                    >
+                      Excluir tarefa
+                    </button>
+                  </section>
+                ))}
               <section className="day-hero">
                 <div>
                   <span className="pill">
@@ -817,6 +887,11 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
                     </span>
                   </div>
                   <div className="daily-mail-list">
+                    <p className="mail-help">
+                      Veja os e-mails recebidos hoje na sua caixa de entrada. As
+                      mensagens não podem ser abertas pelo Pingo, mas você pode
+                      transformá-las em tarefas pelo botão +.
+                    </p>
                     {w.mail
                       .filter(
                         (m) =>
@@ -837,6 +912,25 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
                               {m.isRead ? "Lido" : "Não lido"}
                             </small>
                           </div>
+                          <button
+                            className="icon-button"
+                            aria-label={`Criar tarefa do e-mail ${m.subject}`}
+                            title="Transformar em tarefa"
+                            onClick={() =>
+                              setTaskEditor({
+                                title: m.subject,
+                                notes: `E-mail de ${m.from}\nRecebido em ${new Date(m.date).toLocaleString("pt-BR", { timeZone: prefs.timezone })}`,
+                                sourceMail: {
+                                  id: m.id,
+                                  from: m.from,
+                                  receivedAt: m.date,
+                                },
+                                dueDate: today,
+                              })
+                            }
+                          >
+                            ＋
+                          </button>
                         </div>
                       ))}
                   </div>
@@ -862,7 +956,12 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
           )}
           {screen === "calendar" && (
             <Suspense fallback={<p role="status">Abrindo sua agenda…</p>}>
-              <Calendar w={w} client={client} onEdit={setEventEditor} />
+              <Calendar
+                w={w}
+                client={client}
+                onEdit={setEventEditor}
+                onTaskEdit={setTaskEditor}
+              />
             </Suspense>
           )}
           {screen === "pet" && (
@@ -1130,7 +1229,6 @@ function TaskRow({
       <button className="task-title" onClick={onEdit}>
         <strong>{t.title}</strong>
         <span>
-          {w.boards.find((b) => b.id === t.boardId)?.title}
           {t.dueDate && (
             <>
               {" "}
@@ -1180,12 +1278,46 @@ function TaskEditor({
     notes: initial.notes ?? "",
     boardId: first?.id ?? "",
     columnId: initial.columnId ?? first?.columns[0].id ?? "",
-    dueDate: initial.dueDate ?? null,
+    dueDate:
+      initial.dueDate ?? zonedParts(new Date(), w.preferences.timezone).date,
     scheduledStart: initial.scheduledStart ?? null,
     scheduledEnd: initial.scheduledEnd ?? null,
     priority: initial.priority ?? "normal",
   });
   const [busy, setBusy] = useState(false);
+  const [timeMode, setTimeMode] = useState<"none" | "point" | "range">(
+    initial.timeMode ?? (initial.scheduledStart ? "range" : "none"),
+  );
+  const clock = (s?: string | null) =>
+    s
+      ? new Intl.DateTimeFormat("en-GB", {
+          timeZone: w.preferences.timezone,
+          hour: "2-digit",
+          minute: "2-digit",
+          hourCycle: "h23",
+        }).format(new Date(s))
+      : "09:00";
+  const [startTime, setStartTime] = useState(clock(initial.scheduledStart)),
+    [endTime, setEndTime] = useState(clock(initial.scheduledEnd)),
+    [duration, setDuration] = useState(
+      initial.scheduledStart && initial.scheduledEnd
+        ? Math.max(
+            1,
+            Math.round(
+              (Date.parse(initial.scheduledEnd) -
+                Date.parse(initial.scheduledStart)) /
+                60000,
+            ),
+          )
+        : 30,
+    ),
+    [endDate, setEndDate] = useState(
+      initial.scheduledEnd
+        ? zonedParts(new Date(initial.scheduledEnd), w.preferences.timezone)
+            .date
+        : (initial.dueDate ??
+            zonedParts(new Date(), w.preferences.timezone).date),
+    );
   const [error, setError] = useState("");
   const board = w.boards.find((b) => b.id === t.boardId);
   async function submit(e: FormEvent) {
@@ -1194,7 +1326,29 @@ function TaskEditor({
     try {
       await act({
         type: "task.upsert",
-        task: t,
+        task: {
+          ...t,
+          timeMode,
+          scheduledStart:
+            timeMode === "none"
+              ? null
+              : zonedDateTime(t.dueDate!, startTime, w.preferences.timezone),
+          scheduledEnd:
+            timeMode === "none"
+              ? null
+              : timeMode === "point"
+                ? new Date(
+                    Date.parse(
+                      zonedDateTime(
+                        t.dueDate!,
+                        startTime,
+                        w.preferences.timezone,
+                      ),
+                    ) +
+                      duration * 60000,
+                  ).toISOString()
+                : zonedDateTime(endDate, endTime, w.preferences.timezone),
+        },
         expectedRevision: initial.revision ?? 0,
       });
       onClose();
@@ -1232,23 +1386,6 @@ function TaskEditor({
         </label>
         <div className="form-grid">
           <label>
-            Quadro
-            <select
-              disabled={!!initial.id}
-              value={t.boardId}
-              onChange={(e) => {
-                const b = w.boards.find((b) => b.id === e.target.value)!;
-                setT({ ...t, boardId: b.id, columnId: b.columns[0].id });
-              }}
-            >
-              {w.boards.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
             Etapa
             <select
               value={t.columnId}
@@ -1262,11 +1399,15 @@ function TaskEditor({
             </select>
           </label>
           <label>
-            Prazo
+            Dia da tarefa
             <input
               type="date"
+              required
               value={t.dueDate ?? ""}
-              onChange={(e) => setT({ ...t, dueDate: e.target.value || null })}
+              onChange={(e) => {
+                setT({ ...t, dueDate: e.target.value });
+                setEndDate(e.target.value || "");
+              }}
             />
           </label>
           <label>
@@ -1283,6 +1424,74 @@ function TaskEditor({
             </select>
           </label>
         </div>
+        <fieldset>
+          <legend>Horário e lembretes</legend>
+          <label>
+            Como quer organizar?
+            <select
+              aria-label="Tipo de horário"
+              value={timeMode}
+              onChange={(e) => setTimeMode(e.target.value as typeof timeMode)}
+            >
+              <option value="none">Sem horário · dia inteiro</option>
+              <option value="point">Horário único</option>
+              <option value="range">Início e fim</option>
+            </select>
+          </label>
+          {timeMode !== "none" && (
+            <div className="form-grid">
+              <label>
+                Começa às
+                <input
+                  required
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                />
+              </label>
+              {timeMode === "point" ? (
+                <label>
+                  Duração em minutos
+                  <input
+                    type="number"
+                    min={1}
+                    max={1440}
+                    required
+                    value={duration}
+                    onChange={(e) => setDuration(Number(e.target.value))}
+                  />
+                </label>
+              ) : (
+                <>
+                  <label>
+                    Dia do término
+                    <input
+                      type="date"
+                      min={t.dueDate ?? undefined}
+                      required
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Termina às
+                    <input
+                      required
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+          )}
+          <p>
+            {timeMode === "none"
+              ? "Aparece no resumo e na agenda, sem alerta por horário."
+              : "Você receberá lembretes conforme suas preferências. O horário será reservado no Google Agenda."}
+          </p>
+        </fieldset>
         {initial.error && <p className="error">{initial.error}</p>}
         {error && (
           <p className="error" role="alert">
@@ -1299,7 +1508,7 @@ function TaskEditor({
                 onClick={() => {
                   if (
                     confirm(
-                      "Excluir esta tarefa? Se conectada, ela também será excluída no Google Tasks.",
+                      "Excluir esta tarefa do Pingo, do Google Tasks e seu bloco vinculado no Google Agenda?",
                     )
                   )
                     void act({
@@ -1426,6 +1635,21 @@ function EventEditor({
       setBusy(false);
     }
   }
+  if (w.calendars.some((c) => c.id === initial.calendarId && c.readOnly))
+    return (
+      <Dialog
+        title="Compromisso de uma agenda somente leitura"
+        onClose={onClose}
+      >
+        <h3>{initial.title}</h3>
+        <p>
+          {initial.start} — {initial.end}
+        </p>
+        <p>
+          Este item é informativo. Alterações não são permitidas nesta agenda.
+        </p>
+      </Dialog>
+    );
   return (
     <Dialog
       title={initial.id ? "Seu compromisso" : "Um espaço na agenda"}
@@ -1449,7 +1673,7 @@ function EventEditor({
           >
             <option value="primary">Principal</option>
             {w.calendars
-              .filter((c) => c.id !== "primary")
+              .filter((c) => c.id !== "primary" && !c.readOnly)
               .map((c) => (
                 <option value={c.id} key={c.id}>
                   {c.title}
@@ -1663,7 +1887,7 @@ function SettingsPage({
     events: Record<string, unknown>[];
     fingerprint: string;
   } | null>(null);
-  const [destination, setDestination] = useState(p.defaultBoardId);
+  const destination = p.defaultBoardId || w.boards[0]?.id || "";
   const [migrationCalendar, setMigrationCalendar] = useState(
     p.defaultCalendarId,
   );
@@ -1849,20 +2073,6 @@ function SettingsPage({
             </datalist>
           </label>
           <label>
-            Lista padrão
-            <select
-              value={p.defaultBoardId}
-              onChange={(e) => setP({ ...p, defaultBoardId: e.target.value })}
-            >
-              <option value="">Escolha uma lista</option>
-              {w.boards.map((b) => (
-                <option value={b.id} key={b.id}>
-                  {b.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
             Calendário padrão
             <select
               value={p.defaultCalendarId}
@@ -1871,12 +2081,22 @@ function SettingsPage({
               }
             >
               <option value="primary">Principal</option>
-              {w.calendars.map((c) => (
-                <option value={c.id} key={c.id}>
-                  {c.title}
-                </option>
-              ))}
+              {w.calendars
+                .filter((c) => !c.readOnly)
+                .map((c) => (
+                  <option value={c.id} key={c.id}>
+                    {c.title}
+                  </option>
+                ))}
             </select>
+          </label>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={p.taskCheckIns !== false}
+              onChange={(e) => setP({ ...p, taskCheckIns: e.target.checked })}
+            />
+            Acompanhar tarefas com horário no celular
           </label>
           <label className="toggle">
             <input
@@ -2117,19 +2337,6 @@ function SettingsPage({
                     </li>
                   ))}
                 </ul>
-                <label>
-                  Quadro de destino
-                  <select
-                    value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
-                  >
-                    {w.boards.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
                 <label>
                   Calendário de destino
                   <select

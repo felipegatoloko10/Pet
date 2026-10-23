@@ -214,7 +214,11 @@ export function scopedTools(
         return {
           summary: dailySummary(w),
           routine: w.preferences.routine ?? [],
-          boards: w.boards,
+          boardId: w.preferences.defaultBoardId || w.boards[0]?.id,
+          columns: (
+            w.boards.find((b) => b.id === w.preferences.defaultBoardId) ??
+            w.boards[0]
+          )?.columns,
           tasks: w.tasks.filter((t) => !t.deleted && !t.archivedAt),
           events: w.events.filter((e) => !e.deleted),
         };
@@ -249,7 +253,22 @@ export function scopedTools(
         task: taskInput,
         expectedRevision: z.number().int(),
       }),
-      execute: async (input) => dispatch({ type: "task.upsert", ...input }),
+      execute: async (input) => {
+        if (!input.task.dueDate)
+          return {
+            error:
+              "Pergunte para qual dia é a tarefa antes de salvar. O horário é opcional.",
+          };
+        const w = await query();
+        return dispatch({
+          type: "task.upsert",
+          ...input,
+          task: {
+            ...input.task,
+            boardId: w.preferences.defaultBoardId || w.boards[0]?.id,
+          },
+        });
+      },
     }),
     salvarCompromisso: tool({
       description:

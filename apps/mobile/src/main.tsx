@@ -4,7 +4,7 @@ import { Browser } from "@capacitor/browser";
 import { Network } from "@capacitor/network";
 import { PingoApp, type Platform } from "@pingo/ui";
 import { Api, webStorage, type Storage } from "@pingo/ui/client";
-import { type Workspace } from "@pingo/core";
+import { type Workspace, taskAlarms } from "@pingo/core";
 import { Native, native, type NoticeTarget, type Reminder } from "./native";
 import { MobileAuth } from "./auth";
 import "@pingo/ui/styles.css";
@@ -26,6 +26,13 @@ async function storage(userId: string): Promise<Storage> {
   await Native.bindAccount({ userId });
   activeUser = userId;
   return {
+    nativeFlush: async () => {
+      const r = await Native.flushOperations({ userId });
+      return r.snapshot ? JSON.parse(r.snapshot) : { pending: [] };
+    },
+    discardPending: async () => {
+      await Native.discardOperations({ userId });
+    },
     get: async (key) => (await Native.readCache({ userId, key })).value,
     set: async (key, value) => {
       await Native.writeCache({ userId, key, value });
@@ -46,6 +53,7 @@ async function registerToken(token: string) {
   await api.post("mobile/devices", {
     installationId: await installationId(),
     token,
+    protocol: 2,
   });
 }
 function syncLocal(w: Workspace, userId: string) {
@@ -79,6 +87,7 @@ function syncLocal(w: Workspace, userId: string) {
         !e.deleted &&
         !e.allDay &&
         !e.recurrence &&
+        !(e.taskId && w.preferences.taskCheckIns !== false) &&
         Date.parse(e.start) > now &&
         Date.parse(e.start) <= now + 7 * 86400000,
     )
@@ -92,6 +101,23 @@ function syncLocal(w: Workspace, userId: string) {
         Date.parse(e.start) - w.preferences.reminderMinutes * 60000,
       ),
     }));
+  reminders.push(
+    ...taskAlarms(w, userId, now).map((a) => ({
+      noticeId: a.id,
+      eventId:
+        w.events.find((e) => e.taskId === a.taskId && !e.deleted)?.id ?? "",
+      taskId: a.taskId,
+      phase: a.phase,
+      snoozePhase: a.snoozePhase,
+      scheduleKey: a.scheduleKey,
+      taskRevision: w.tasks.find((t) => t.id === a.taskId)?.revision,
+      body: a.body,
+      title: a.title,
+      dueAt: Math.max(now, a.dueAt),
+      startAt: a.expiresAt,
+      expiresAt: a.expiresAt,
+    })),
+  );
   const payload = {
     userId,
     timezone: w.preferences.timezone,
@@ -104,7 +130,10 @@ function syncLocal(w: Workspace, userId: string) {
     ...payload,
     reminders: reminders.map((r) => ({
       ...r,
-      dueAt: Math.max(0, r.startAt - w.preferences.reminderMinutes * 60000),
+      dueAt: r.taskId
+        ? (taskAlarms(w, userId, now).find((a) => a.id === r.noticeId)?.dueAt ??
+          r.dueAt)
+        : Math.max(0, r.startAt - w.preferences.reminderMinutes * 60000),
     })),
   });
   if (signature === remindersSignature) return;

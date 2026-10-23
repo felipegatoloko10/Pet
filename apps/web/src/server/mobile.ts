@@ -9,11 +9,13 @@ import { beginGoogle } from "./google";
 export const mobileDeviceInput = z.object({
   installationId: z.uuid(),
   token: z.string().min(20).max(4096),
+  protocol: z.number().int().min(1).max(2).optional(),
 });
 export type AndroidSubscription = {
   transport: "fcm";
   installationId: string;
   token: string;
+  protocol?: number;
 };
 export function androidSubscription(
   data: unknown,
@@ -31,9 +33,14 @@ export async function registerMobile(userId: string, raw: unknown) {
       "As notificações Android na nuvem ainda não foram ativadas pelo administrador.",
       503,
     );
-  const { installationId, token } = mobileDeviceInput.parse(raw);
+  const { installationId, token, protocol } = mobileDeviceInput.parse(raw);
   const id = digest(`android:${userId}:${installationId}`);
-  const data: AndroidSubscription = { transport: "fcm", installationId, token };
+  const data: AndroidSubscription = {
+    transport: "fcm",
+    installationId,
+    token,
+    protocol: protocol ?? 1,
+  };
   await db()
     .insert(subscriptions)
     .values({ id, userId, data })

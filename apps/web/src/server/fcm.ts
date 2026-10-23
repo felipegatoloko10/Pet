@@ -100,17 +100,29 @@ export async function sendAndroidPush(
           token: sub.token,
           android: { priority: "high", ttl: "1800s" },
           data: {
+            ...(notice.taskId
+              ? {
+                  taskId: notice.taskId,
+                  phase: notice.phase ?? "",
+                  snoozePhase: notice.snoozePhase ?? "",
+                  scheduleKey: notice.scheduleKey ?? "",
+                  taskRevision: String(notice.taskRevision ?? 0),
+                }
+              : {}),
             userId,
             noticeId: notice.id,
             title: notice.title,
-            body: notice.id.startsWith("reminder:")
-              ? notice.body
-              : notice.id.startsWith("summary:")
-                ? "Seu resumo do dia está pronto. Abra o Pingo para ver."
-                : "Abra o Pingo para ver este aviso.",
+            body:
+              notice.id.startsWith("reminder:") || notice.taskId
+                ? notice.body
+                : notice.id.startsWith("summary:")
+                  ? "Seu resumo do dia está pronto. Abra o Pingo para ver."
+                  : "Abra o Pingo para ver este aviso.",
             silent: String(!!notice.silent),
             eventId: eventId ?? "",
-            expiresAt: String(Date.parse(notice.createdAt) + 1800000),
+            expiresAt: String(
+              notice.expiresAt ?? Date.parse(notice.createdAt) + 1800000,
+            ),
           },
         },
       }),

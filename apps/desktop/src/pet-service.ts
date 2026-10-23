@@ -44,6 +44,8 @@ export function useDesktopPet(
     async function display(w: Workspace, userId: string, online: boolean) {
       const token = api.token;
       if (!live || !token) return;
+      // A delayed poll must not replace newer preferences received from the panel.
+      if (cachedUser === userId && cached && cached.revision > w.revision) return;
       const signedApi = new Api(api.base, token);
       const storage = await storageFor(userId);
       const sessionHash = await petSessionHash(token);
@@ -55,7 +57,7 @@ export function useDesktopPet(
       if (!live || api.token !== token) return;
       localStorage.setItem("pingo:pet-identity", JSON.stringify({ userId, sessionHash }));
       const candidates = [
-        ...w.notices.filter((n) => !n.read),
+        ...w.notices.filter((n) => !n.read && !n.taskId),
         ...localNotices(w, userId),
       ].filter(
         (n, index, all) => all.findIndex((x) => x.id === n.id) === index,
@@ -156,8 +158,7 @@ export function useDesktopPet(
     const unsubWorkspace = listen<{ workspace: Workspace; userId: string }>(
       "workspace-updated",
       (event) => {
-        if (!busy)
-          void display(
+        void display(
             { ...emptyWorkspace(), ...event.payload.workspace },
             event.payload.userId,
             navigator.onLine,

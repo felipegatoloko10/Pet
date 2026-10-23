@@ -1,5 +1,13 @@
 # Estado da entrega
 
+## Revisão 2.4
+
+Quadro diário, calendário vinculado por tarefa, feriados, lista fixa, colunas com 24 cores e exclusão segura, botão de e-mail para criar tarefa por metadados e marca vetorial do Pingo. No Android, acompanhamento com ações nativas, fila SQLite v2 e trabalho em segundo plano. Campos novos são preservados para clientes anteriores. Detalhes em [REVISION-2.4.md](REVISION-2.4.md).
+
+Validação: 102 testes de domínio/backend, 18 de navegador e 15 Workers/D1 locais passaram. Instrumentação Android 16 validou Comecei/Concluir sem WebView e persistência offline, além da regressão de Keystore, SQLite e interface. O agendador compatível foi publicado na Cloudflare em 23/10/2026 antes da ativação do backend 2.4.
+
+O APK 2.4 mantém a chave de assinatura existente. A pré-release permanece em rascunho até homologação física dos novos botões e da sincronização Tasks/Agenda. A release 2.3 continua recuperável. Os resultados físicos anteriores da 2.3 não são apresentados como confirmação da 2.4.
+
 ## Android 2.3
 
 Aplicativo Android nativo com Capacitor 8, interface compartilhada, login PKCE pelo navegador, SQLite por conta, sessão protegida no Keystore, FCM com coordenador único de notificações e cuidados sincronizados do pet. Firebase está configurado no projeto Pingo sem Analytics ou faturamento; Vercel usa Workload Identity Federation e uma permissão exclusiva de envio, sem chave privada Google.

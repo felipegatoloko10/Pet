@@ -22,7 +22,7 @@ public class StorageInstrumentedTest {
     @Test public void offlineQueueSurvivesDatabaseReopenAndKeepsAccountsSeparate() {
         Context c = InstrumentationRegistry.getInstrumentation().getTargetContext();
         PingoDatabase db = PingoDatabase.get(c);
-        db.write("instrumentation-alice", "snapshot", "{\"pending\":[{\"operationId\":\"stable-test-id\"}]}");
+        db.write("instrumentation-alice", "snapshot", "{\"workspace\":{},\"pending\":[{\"operation\":{\"operationId\":\"stable-test-id\",\"command\":{\"type\":\"pet.care\",\"action\":\"pet\"}}}]}");
         db.close();
         assertTrue(PingoDatabase.get(c).read("instrumentation-alice", "snapshot").contains("stable-test-id"));
         assertNull(PingoDatabase.get(c).read("instrumentation-bob", "snapshot"));

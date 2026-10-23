@@ -61,7 +61,7 @@ async function handler(r: Request) {
     const path = url.pathname.replace("/api/v1/", "");
     if (path === "health")
       return Response.json({
-        version: "2.3.0-beta.1",
+        version: "2.4.0-beta.1",
         configured: !!(
           process.env.DATABASE_URL && process.env.GOOGLE_CLIENT_ID
         ),
@@ -81,7 +81,7 @@ async function handler(r: Request) {
         .object({
           id: z.string(),
           userId: z.string(),
-          kind: z.enum(["routine", "reminder"]),
+          kind: z.enum(["routine", "reminder", "checkin"]),
           dueAt: z.number(),
           entityId: z.string().optional(),
         })

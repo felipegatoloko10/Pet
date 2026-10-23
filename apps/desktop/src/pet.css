@@ -183,6 +183,9 @@ html.pet-surface #root {
   width: 100%;
 }
 .companion-character .pet {
+  opacity: 1;
+  color-scheme: light;
+  forced-color-adjust: none;
   background: transparent;
   border: 0;
   border-radius: 0;

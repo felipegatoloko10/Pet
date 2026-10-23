@@ -1,17 +1,15 @@
-Pingo 2.3.0-beta.1 — Android e cuidados com o companheiro.
+Pingo 2.4.0-beta.1 — quadro diário, agenda integrada e notificações com ações.
 
-Novo aplicativo Android 7 ou superior, com as mesmas contas e dados do site e do Windows. Kanban na primeira página, agenda diária/semanal/mensal/anual, sessões de conversa e ajustes ganham navegação inferior e adaptação ao toque e ao teclado.
+Meu dia reúne tarefas de hoje, atrasadas, compromissos e lembretes de feriados. A lista Google fica fixa. Colunas ganham 24 cores, edição, ordenação e exclusão com transferência segura dos cartões.
 
-A aba Pingo permite alimentar, fazer carinho, brincar e cochilar. Saciedade, humor e energia evoluem pelo tempo decorrido, sem chamadas de IA nem penalidades às tarefas. Os cuidados são compartilhados entre dispositivos, preservando a compatibilidade com clientes anteriores.
+Tarefas datadas têm um evento vinculado no Google Agenda: dia inteiro, horário único ou início/fim. Concluir conserva o evento com ✓. Confirmações de Tasks e Agenda são acompanhadas separadamente. Uma exclusão externa do bloco pede decisão sobre a tarefa, sem recriá-lo automaticamente.
 
-Login Google pelo navegador com retorno automático ao app, PKCE e código de uso único. Sessão protegida com Android Keystore; cache e fila offline em SQLite nativo. A autorização Workspace continua separada da entrada na conta.
+O botão + dos e-mails abre uma tarefa preenchida para revisão, usando somente metadados. Mensagens não são abertas nem enviadas à IA. A cabeça do Pingo identifica o site.
 
-Notificações Android combinam FCM e lembretes locais, com deduplicação, silêncio, privacidade na tela bloqueada e restauração após reinício. A integração Google usa identidade temporária da Vercel, sem chave privada permanente e sem ativação de faturamento. O agendador Cloudflare existente continua ativo.
+No Android, os lembretes oferecem Comecei, Concluir, adiar e alterar status. Há acompanhamento no início e fim, com uma única repetição sem resposta. Ações offline ficam na mesma fila SQLite da interface e são enviadas pelo trabalho nativo. Nenhuma tarefa é concluída automaticamente. Ajustes permite desligar o acompanhamento.
 
-O APK é assinado com uma chave própria do beta, com checksum no arquivo SHA256SUMS-Android.txt. Confira o checksum, instale e entre com sua conta convidada. Instruções e limites de distribuição/homologação em docs/ANDROID.md.
+Instale sobre a versão anterior para preservar os dados. O APK mantém a assinatura do beta. Confira SHA256SUMS-Android.txt. A versão 2.3 continua disponível e recuperável.
 
-Instale sobre a versão anterior para preservar os dados locais. Sessões e dados da conta são preservados. A versão 2.2 permanece recuperável no histórico de releases.
+Rascunho para homologação: os botões das notificações e a sincronização Tasks ↔ evento precisam ser confirmados no telefone físico antes de publicar esta pré-release. A confirmação física da 2.3 cobriu instalação e tarefa no Tasks, não as novas ações da 2.4.
 
-Teste inicial em aparelho físico confirmado pelo titular: instalação e tarefa criada no celular sincronizada com Google Tasks. O pacote Android está registrado, o certificado verificado e o primeiro aparelho autorizado. Notificações no telefone físico, sincronização inversa, reinício offline e restrições de bateria ainda precisam de confirmação.
-
-O beta é gratuito, não comercial e por convite. Notificações são de melhor esforço. Outros aparelhos precisam da própria autorização de distribuição limitada. Nenhuma chamada paga de IA foi usada na validação. O instalador Windows continua sem assinatura comercial.
+Notificações são de melhor esforço, conforme permissões, bateria e conectividade. Beta gratuito, não comercial e por convite. Nenhum serviço pago é ativado. O instalador Windows não possui assinatura comercial. Detalhes em docs/REVISION-2.4.md e docs/ANDROID.md.

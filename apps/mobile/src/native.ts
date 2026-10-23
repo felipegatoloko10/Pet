@@ -4,14 +4,27 @@ import {
   type PluginListenerHandle,
 } from "@capacitor/core";
 export type Reminder = {
+  taskId?: string;
+  phase?: string;
+  snoozePhase?: string;
+  scheduleKey?: string;
+  taskRevision?: number;
+  expiresAt?: number;
+  body?: string;
   noticeId: string;
   eventId: string;
   title: string;
   dueAt: number;
   startAt: number;
 };
-export type NoticeTarget = { eventId?: string; noticeId?: string };
+export type NoticeTarget = {
+  eventId?: string;
+  noticeId?: string;
+  taskId?: string;
+};
 export interface NativeBridge {
+  flushOperations(v: { userId: string }): Promise<{ snapshot: string | null }>;
+  discardOperations(v: { userId: string }): Promise<void>;
   readSecure(v: { key: string }): Promise<{ value: string | null }>;
   writeSecure(v: { key: string; value: string | null }): Promise<void>;
   bindAccount(v: { userId: string }): Promise<void>;

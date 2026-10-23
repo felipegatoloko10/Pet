@@ -24,25 +24,32 @@ import {
   type Workspace,
   type Command,
   type Column,
+  taskOnDay,
+  taskIsLate,
+  eventOnDate,
+  eventIsHoliday,
+  localDay,
+  pastelColors,
 } from "@pingo/core";
 type Props = {
   w: Workspace;
   today: string;
   act: (c: Command) => Promise<void>;
   onEdit: (t: Partial<Task>) => void;
+  onEventEdit?: (e: import("@pingo/core").CalendarEvent) => void;
 };
-export function Board({ w, today, act, onEdit }: Props) {
-  const [selected, setSelected] = useState(w.preferences.defaultBoardId),
-    [query, setQuery] = useState(""),
+export function Board({ w, today, act, onEdit, onEventEdit }: Props) {
+  const [query, setQuery] = useState(""),
     [priority, setPriority] = useState(""),
     [label, setLabel] = useState(""),
-    [due, setDue] = useState(""),
-    [status, setStatus] = useState(""),
     [archive, setArchive] = useState(false),
     [active, setActive] = useState<string | null>(null),
     [detail, setDetail] = useState<string | null>(null),
     [error, setError] = useState("");
-  const b = w.boards.find((b) => b.id === selected) ?? w.boards[0];
+  const [columnEditor, setColumnEditor] = useState<Column | "new" | null>(null);
+  const [organize, setOrganize] = useState(false);
+  const b =
+    w.boards.find((b) => b.id === w.preferences.defaultBoardId) ?? w.boards[0];
   const perform = (c: Command) => {
     setError("");
     void act(c).catch((e) => setError(e.message));
@@ -53,7 +60,76 @@ export function Board({ w, today, act, onEdit }: Props) {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
   );
-  const cards = w.tasks.filter((t) => !t.deleted && t.boardId === b?.id);
+  const tasks = w.tasks.filter((t) => !t.deleted && t.boardId === b?.id);
+  const events = w.events.filter(
+    (e) =>
+      !e.deleted &&
+      !e.recurrence &&
+      !e.taskId &&
+      !eventIsHoliday(w, e) &&
+      eventOnDate(e, today, w.preferences.timezone),
+  );
+  const cards: Task[] = [
+    ...tasks,
+    ...events.map((e) => ({
+      id: `event:${e.id}`,
+      boardId: b?.id ?? "",
+      columnId: b?.columns.some((c) => c.id === e.columnId)
+        ? e.columnId!
+        : (b?.columns[0]?.id ?? ""),
+      title: e.title,
+      notes: "Compromisso",
+      dueDate: e.allDay ? e.start : localDay(e.start, w.preferences.timezone),
+      scheduledStart: e.allDay ? null : e.start,
+      scheduledEnd: e.allDay ? null : e.end,
+      priority: "normal" as const,
+      completed: !!e.completedAt,
+      completedAt: e.completedAt,
+      revision: e.revision,
+      syncState: e.syncState,
+      position: e.position,
+    })),
+  ];
+  const edit = (t: Partial<Task>) => {
+    if (t.id?.startsWith("event:")) {
+      const e = events.find((e) => `event:${e.id}` === t.id);
+      if (e) onEventEdit?.(e);
+    } else onEdit(t);
+  };
+  const move = (t: Task, columnId: string, beforeId: string | null) =>
+    perform(
+      t.id.startsWith("event:")
+        ? {
+            type: "event.move",
+            id: t.id.slice(6),
+            columnId,
+            beforeId,
+            expectedRevision: t.revision,
+          }
+        : {
+            type: "task.move",
+            id: t.id,
+            columnId,
+            beforeId,
+            expectedRevision: t.revision,
+          },
+    );
+  const holidays = w.events
+    .filter(
+      (e) =>
+        !e.deleted &&
+        !e.recurrence &&
+        eventIsHoliday(w, e) &&
+        eventOnDate(e, today, w.preferences.timezone),
+    )
+    .filter(
+      (e, i, all) =>
+        all.findIndex(
+          (x) =>
+            x.title.toLocaleLowerCase() === e.title.toLocaleLowerCase() &&
+            x.start === e.start,
+        ) === i,
+    );
   const labels = [
     ...new Map(
       cards.flatMap((t) => t.labels ?? []).map((l) => [l.id, l]),
@@ -63,19 +139,17 @@ export function Board({ w, today, act, onEdit }: Props) {
     .filter(
       (t) =>
         !!t.archivedAt === archive &&
+        (archive ||
+          t.id.startsWith("event:") ||
+          (organize
+            ? !t.dueDate
+            : taskOnDay(t, today, w.preferences.timezone))) &&
         (!query ||
           `${t.title} ${t.notes}`
             .toLowerCase()
             .includes(query.toLowerCase())) &&
         (!priority || t.priority === priority) &&
-        (!label || t.labels?.some((l) => l.id === label)) &&
-        (!status || t.columnId === status) &&
-        (!due ||
-          (due === "today"
-            ? t.dueDate === today
-            : due === "late"
-              ? !!t.dueDate && t.dueDate < today && !t.completed
-              : !t.dueDate)),
+        (!label || t.labels?.some((l) => l.id === label)),
     )
     .sort(taskOrder);
   function drop(e: DragEndEvent) {
@@ -124,13 +198,7 @@ export function Board({ w, today, act, onEdit }: Props) {
         .sort(taskOrder);
       beforeId = list[list.findIndex((t) => t.id === over.id) + 1]?.id ?? null;
     }
-    perform({
-      type: "task.move",
-      id: task.id,
-      columnId: col.id,
-      beforeId,
-      expectedRevision: task.revision,
-    });
+    move(task, col.id, beforeId);
   }
   return (
     <section className="home-board" aria-label="Meu quadro de tarefas">
@@ -152,20 +220,6 @@ export function Board({ w, today, act, onEdit }: Props) {
         </button>
       </div>
       <div className="board-toolbar">
-        <label>
-          Lista{" "}
-          <select
-            aria-label="Lista do quadro"
-            value={b?.id ?? ""}
-            onChange={(e) => setSelected(e.target.value)}
-          >
-            {w.boards.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.title}
-              </option>
-            ))}
-          </select>
-        </label>
         <input
           aria-label="Buscar tarefas"
           placeholder="Buscar título ou descrição"
@@ -194,32 +248,34 @@ export function Board({ w, today, act, onEdit }: Props) {
             </option>
           ))}
         </select>
-        <select
-          aria-label="Filtrar prazo"
-          value={due}
-          onChange={(e) => setDue(e.target.value)}
+        <button
+          className="button small"
+          aria-label={archive ? "Voltar ao quadro" : "Arquivados"}
+          title={archive ? "Voltar ao quadro" : "Arquivados"}
+          aria-pressed={archive}
+          onClick={() => {
+            setArchive(!archive);
+            setOrganize(false);
+          }}
         >
-          <option value="">Todos os prazos</option>
-          <option value="today">Hoje</option>
-          <option value="late">Atrasadas</option>
-          <option value="none">Sem prazo</option>
-        </select>
-        <select
-          aria-label="Filtrar status"
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-        >
-          <option value="">Todos os status</option>
-          {b?.columns.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.title}
-            </option>
-          ))}
-        </select>
-        <button className="button small" onClick={() => setArchive(!archive)}>
-          {archive ? "Voltar ao quadro" : "Arquivados"}
+          {archive ? "↩" : "▣"}
         </button>
       </div>
+      {!!tasks.filter((t) => !t.completed && !t.archivedAt && !t.dueDate)
+        .length && (
+        <p className="organize-undated">
+          Você tem tarefas sem data.{" "}
+          <button
+            className="text-link"
+            onClick={() => {
+              setOrganize(!organize);
+              setArchive(false);
+            }}
+          >
+            {organize ? "Voltar ao dia" : "Organizar datas"}
+          </button>
+        </p>
+      )}
       {error && (
         <p role="alert" className="error">
           {error}
@@ -249,6 +305,21 @@ export function Board({ w, today, act, onEdit }: Props) {
             strategy={horizontalListSortingStrategy}
           >
             <div className="kanban">
+              {!archive && !organize && !!holidays.length && (
+                <section className="kanban-column day-holidays">
+                  <header>
+                    <strong>Lembretes do dia</strong>
+                    <small>{holidays.length}</small>
+                  </header>
+                  {holidays.map((e) => (
+                    <article className="task-card" key={e.id}>
+                      <span className="priority">Data especial</span>
+                      <h3>Hoje é {e.title}</h3>
+                      <small>Um lembrete para o seu dia.</small>
+                    </article>
+                  ))}
+                </section>
+              )}
               {b.columns.map((col, index) => (
                 <BoardColumn
                   key={col.id}
@@ -256,18 +327,7 @@ export function Board({ w, today, act, onEdit }: Props) {
                   count={visible.filter((t) => t.columnId === col.id).length}
                   archive={archive}
                   onAdd={() => onEdit({ boardId: b.id, columnId: col.id })}
-                  onRename={() => {
-                    const title = prompt("Nome da coluna", col.title);
-                    if (title?.trim())
-                      perform({
-                        type: "column.update",
-                        boardId: b.id,
-                        columnId: col.id,
-                        title,
-                        index,
-                        expectedRevision: b.revision,
-                      });
-                  }}
+                  onRename={() => setColumnEditor(col)}
                   onShift={(direction) => {
                     if (
                       index + direction < 0 ||
@@ -298,17 +358,19 @@ export function Board({ w, today, act, onEdit }: Props) {
                           task={t}
                           columns={b.columns}
                           archive={archive}
-                          onEdit={() => onEdit(t)}
-                          onDetails={() => setDetail(t.id)}
-                          onMove={(columnId) =>
-                            perform({
-                              type: "task.move",
-                              id: t.id,
-                              columnId,
-                              beforeId: null,
-                              expectedRevision: t.revision,
-                            })
+                          today={today}
+                          calendarState={
+                            w.events.find(
+                              (e) => e.taskId === t.id && !e.deleted,
+                            )?.syncState
                           }
+                          onEdit={() => edit(t)}
+                          onDetails={() =>
+                            t.id.startsWith("event:")
+                              ? edit(t)
+                              : setDetail(t.id)
+                          }
+                          onMove={(columnId) => move(t, columnId, null)}
                           onReorder={(direction) => {
                             const list = cards
                                 .filter(
@@ -322,16 +384,13 @@ export function Board({ w, today, act, onEdit }: Props) {
                               index + direction >= list.length
                             )
                               return;
-                            perform({
-                              type: "task.move",
-                              id: t.id,
-                              columnId: t.columnId,
-                              beforeId:
-                                direction < 0
-                                  ? list[index - 1].id
-                                  : (list[index + 2]?.id ?? null),
-                              expectedRevision: t.revision,
-                            });
+                            move(
+                              t,
+                              t.columnId,
+                              direction < 0
+                                ? list[index - 1].id
+                                : (list[index + 2]?.id ?? null),
+                            );
                           }}
                         />
                       ))}
@@ -352,39 +411,21 @@ export function Board({ w, today, act, onEdit }: Props) {
       ) : (
         <div className="panel">
           <p>Conecte suas listas Google em Ajustes para começar.</p>
-          <button
-            className="button"
-            onClick={() => {
-              const title = prompt("Nome do quadro local");
-              if (title)
-                perform({
-                  type: "board.create",
-                  id: crypto.randomUUID(),
-                  title,
-                });
-            }}
-          >
-            Criar quadro local
-          </button>
         </div>
       )}
       {b && (
-        <button
-          className="add-inline"
-          onClick={() => {
-            const title = prompt("Nome da nova coluna");
-            if (title)
-              perform({
-                type: "column.create",
-                id: crypto.randomUUID(),
-                boardId: b.id,
-                title,
-                expectedRevision: b.revision,
-              });
-          }}
-        >
+        <button className="add-inline" onClick={() => setColumnEditor("new")}>
           ＋ Adicionar coluna
         </button>
+      )}
+      {b && columnEditor && (
+        <ColumnEditor
+          key={typeof columnEditor === "string" ? "new" : columnEditor.id}
+          board={b}
+          column={columnEditor === "new" ? undefined : columnEditor}
+          act={act}
+          onClose={() => setColumnEditor(null)}
+        />
       )}
       {detail && cards.find((t) => t.id === detail) && (
         <CardDetails
@@ -397,6 +438,204 @@ export function Board({ w, today, act, onEdit }: Props) {
         />
       )}
     </section>
+  );
+}
+function ColumnEditor({
+  board,
+  column,
+  act,
+  onClose,
+}: {
+  board: import("@pingo/core").Board;
+  column?: Column;
+  act: Props["act"];
+  onClose: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null),
+    [title, setTitle] = useState(column?.title ?? ""),
+    [color, setColor] = useState(column?.color ?? pastelColors[0]),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false),
+    [destination, setDestination] = useState(
+      board.columns.find((c) => c.kind === "todo")!.id,
+    );
+  useEffect(() => {
+    dialog.current?.showModal();
+    return () => dialog.current?.close();
+  }, []);
+  const index = column
+    ? board.columns.findIndex((c) => c.id === column.id)
+    : board.columns.length;
+  async function run(c: Command) {
+    setBusy(true);
+    try {
+      await act(c);
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <dialog
+      ref={dialog}
+      className="modal"
+      aria-label={column ? "Editar coluna" : "Nova coluna"}
+      onCancel={onClose}
+    >
+      <div className="editor-form column-editor">
+        <header className="section-heading">
+          <h2>{column ? "Editar coluna" : "Nova coluna"}</h2>
+          <button className="icon-button" onClick={onClose} aria-label="Fechar">
+            ×
+          </button>
+        </header>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(
+              column
+                ? {
+                    type: "column.update",
+                    boardId: board.id,
+                    columnId: column.id,
+                    title,
+                    color,
+                    index,
+                    expectedRevision: board.revision,
+                  }
+                : {
+                    type: "column.create",
+                    boardId: board.id,
+                    id: crypto.randomUUID(),
+                    title,
+                    color,
+                    expectedRevision: board.revision,
+                  },
+            );
+          }}
+        >
+          <label>
+            Nome da coluna
+            <input
+              autoFocus
+              required
+              maxLength={100}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </label>
+          <fieldset>
+            <legend>Cor da coluna</legend>
+            <div className="pastel-palette">
+              {pastelColors.map((c, i) => (
+                <button
+                  type="button"
+                  key={c}
+                  aria-label={`Cor pastel ${i + 1}`}
+                  aria-pressed={color === c}
+                  onClick={() => setColor(c)}
+                  style={{ background: c }}
+                >
+                  {color === c ? "✓" : ""}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <button className="button primary" disabled={busy}>
+            {column ? "Salvar alterações" : "Criar coluna"}
+          </button>
+        </form>
+        {column && (
+          <>
+            <div className="form-actions">
+              <button
+                className="button"
+                disabled={busy || index === 0}
+                onClick={() =>
+                  void run({
+                    type: "column.update",
+                    boardId: board.id,
+                    columnId: column.id,
+                    title: column.title,
+                    index: index - 1,
+                    expectedRevision: board.revision,
+                  })
+                }
+              >
+                ← Mover
+              </button>
+              <button
+                className="button"
+                disabled={busy || index === board.columns.length - 1}
+                onClick={() =>
+                  void run({
+                    type: "column.update",
+                    boardId: board.id,
+                    columnId: column.id,
+                    title: column.title,
+                    index: index + 1,
+                    expectedRevision: board.revision,
+                  })
+                }
+              >
+                Mover →
+              </button>
+            </div>
+            {["todo", "active", "done"].includes(column.kind) ? (
+              <p>
+                Esta coluna tem uma função essencial. Você pode mudar seu nome e
+                sua cor.
+              </p>
+            ) : (
+              <>
+                <label>
+                  Mover cartões para
+                  <select
+                    value={destination}
+                    onChange={(e) => setDestination(e.target.value)}
+                  >
+                    {board.columns
+                      .filter((c) => c.id !== column.id && c.kind !== "done")
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.title}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <button
+                  className="button danger"
+                  disabled={busy}
+                  onClick={() => {
+                    if (
+                      confirm(
+                        "Excluir esta coluna e mover seus cartões para a coluna escolhida? Nenhuma tarefa ou compromisso será excluído.",
+                      )
+                    )
+                      void run({
+                        type: "column.delete",
+                        boardId: board.id,
+                        columnId: column.id,
+                        destinationId: destination,
+                        expectedRevision: board.revision,
+                      });
+                  }}
+                >
+                  Excluir coluna
+                </button>
+              </>
+            )}
+          </>
+        )}
+        {error && (
+          <p role="alert" className="error">
+            {error}
+          </p>
+        )}
+      </div>
+    </dialog>
   );
 }
 function BoardColumn({
@@ -425,6 +664,12 @@ function BoardColumn({
     <section
       ref={sortable.setNodeRef}
       style={{
+        background:
+          col.color ??
+          pastelColors[
+            ["todo", "active", "waiting", "done"].indexOf(col.kind) * 4
+          ] ??
+          pastelColors[8],
         transform: CSS.Transform.toString(sortable.transform),
         transition: sortable.transition,
       }}
@@ -452,6 +697,13 @@ function BoardColumn({
         <small>{count}</small>
         <button
           className="icon-button"
+          aria-label={`Editar coluna ${col.title}`}
+          onClick={onRename}
+        >
+          •••
+        </button>
+        <button
+          className="icon-button"
           aria-label={`Adicionar em ${col.title}`}
           onClick={onAdd}
         >
@@ -463,6 +715,8 @@ function BoardColumn({
   );
 }
 function Card({
+  today,
+  calendarState,
   task: t,
   columns,
   archive,
@@ -471,6 +725,8 @@ function Card({
   onMove,
   onReorder,
 }: {
+  today: string;
+  calendarState?: import("@pingo/core").SyncState;
   task: Task;
   columns: Column[];
   archive: boolean;
@@ -542,13 +798,25 @@ function Card({
       <button className="card-main" onClick={onEdit}>
         <h3>{t.title}</h3>
         {t.notes && <p>{t.notes}</p>}
-        <small className="card-due">{t.dueDate ?? "Sem prazo"}</small>
+        {t.id.startsWith("event:") && (
+          <span className="priority">Compromisso</span>
+        )}
+        {taskIsLate(t, today) && !t.id.startsWith("event:") && (
+          <strong className="overdue-badge">Atrasada · {t.dueDate}</strong>
+        )}
+        <small className="card-due">
+          {t.dueDate ?? "Sem data"}
+          {t.scheduledStart
+            ? ` · ${new Date(t.scheduledStart).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+            : ""}
+        </small>
         {!!t.checklist?.length && (
           <small>
             ☑ {t.checklist.filter((i) => i.done).length}/{t.checklist.length}
           </small>
         )}
         <small className={`sync-state state-${t.syncState}`}>
+          {calendarState ? "Tasks: " : ""}
           {
             {
               pending: "Pendente",
@@ -559,6 +827,20 @@ function Card({
             }[t.syncState]
           }
         </small>
+        {calendarState && (
+          <small className={`sync-state state-${calendarState}`}>
+            Agenda:{" "}
+            {
+              {
+                pending: "Pendente",
+                syncing: "Sincronizando",
+                synced: "Sincronizada",
+                error: "Erro",
+                conflict: "Conflito",
+              }[calendarState]
+            }
+          </small>
+        )}
       </button>
       <select
         aria-label={`Mover ${t.title}`}

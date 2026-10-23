@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 type Job = {
   id: string;
   userId: string;
-  kind: "routine" | "reminder";
+  kind: "routine" | "reminder" | "checkin";
   entityId?: string;
   dueAt: number;
 };
@@ -34,7 +34,7 @@ function valid(job: Job | null) {
     typeof job.id === "string" &&
     job.id.length < 400 &&
     typeof job.userId === "string" &&
-    ["routine", "reminder"].includes(job.kind) &&
+    ["routine", "reminder", "checkin"].includes(job.kind) &&
     Number.isSafeInteger(job.dueAt)
   );
 }

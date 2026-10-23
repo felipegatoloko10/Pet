@@ -4,6 +4,7 @@ export const metadata: Metadata = {
   title: "Pingo — seu pequeno assistente",
   description:
     "Seu dia, suas tarefas e um pequeno amigo para cuidar da rotina.",
+  icons: { icon: "/icon.svg", shortcut: "/icon.svg", apple: "/icon.svg" },
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Pingo", statusBarStyle: "default" },
 };

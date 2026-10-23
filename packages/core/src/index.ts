@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { TZDate } from "@date-fns/tz";
+import { reconcileTaskCalendars, taskScheduleKey } from "./planning";
+export * from "./planning";
 
 export function taskOrder(a: Task, b: Task) {
   return (a.position ?? 1e9) - (b.position ?? 1e9) || a.id.localeCompare(b.id);
@@ -39,6 +41,7 @@ export function dayBounds(date: string, timezone: string) {
   };
 }
 export function overlaps(a: CalendarEvent, b: CalendarEvent, timezone: string) {
+  if (a.transparent || b.transparent) return false;
   const bounds = (e: CalendarEvent) =>
     e.allDay
       ? [dayBounds(e.start, timezone).start, dayBounds(e.end, timezone).start]
@@ -57,6 +60,7 @@ export const syncStates = [
 ] as const;
 export type SyncState = (typeof syncStates)[number];
 export type Column = {
+  color?: string;
   id: string;
   title: string;
   kind: "todo" | "active" | "waiting" | "done" | "custom";
@@ -69,6 +73,18 @@ export type Board = {
   revision: number;
 };
 export type Task = {
+  timeMode?: "none" | "point" | "range";
+  completedAt?: string | null;
+  actualStartedAt?: string | null;
+  calendarSuppressed?: boolean;
+  calendarRemoved?: boolean;
+  sourceMail?: { id: string; from: string; receivedAt: string };
+  checkIn?: {
+    key: string;
+    endAnswered?: boolean;
+    snoozeAt?: string;
+    snoozePhase?: "before" | "start" | "end";
+  };
   position?: number;
   labels?: { id: string; name: string; color: string }[];
   checklist?: { id: string; text: string; done: boolean }[];
@@ -94,6 +110,10 @@ export type Task = {
   error?: string;
 };
 export type CalendarEvent = {
+  transparent?: boolean;
+  columnId?: string;
+  position?: number;
+  completedAt?: string | null;
   id: string;
   title: string;
   start: string;
@@ -122,6 +142,12 @@ export type Mail = {
   isRead?: boolean;
 };
 export type Notice = {
+  taskId?: string;
+  phase?: "before" | "start" | "end" | "repeat" | "snooze";
+  scheduleKey?: string;
+  taskRevision?: number;
+  snoozePhase?: string;
+  expiresAt?: number;
   id: string;
   title: string;
   body: string;
@@ -131,6 +157,7 @@ export type Notice = {
   silent?: boolean;
 };
 export type Preferences = {
+  taskCheckIns?: boolean;
   routine?: RoutineDay[];
   name: string;
   color: string;
@@ -194,6 +221,7 @@ export const defaultPreferences: Preferences = {
   aiProvider: "openai",
   aiModel: "",
   proactiveAI: false,
+  taskCheckIns: true,
 };
 export type SyncJob = {
   id: string;
@@ -222,7 +250,13 @@ export type Workspace = {
   notices: Notice[];
   preferences: Preferences;
   outbox: SyncJob[];
-  calendars: { id: string; title: string }[];
+  calendars: {
+    id: string;
+    title: string;
+    readOnly?: boolean;
+    holiday?: boolean;
+    publicFallback?: boolean;
+  }[];
   connection: {
     subject?: string;
     email?: string;
@@ -279,6 +313,14 @@ const id = z.string().min(1).max(200);
 const date = z.iso.date();
 const datetime = z.iso.datetime({ offset: true });
 export const taskInput = z.object({
+  timeMode: z.enum(["none", "point", "range"]).optional(),
+  sourceMail: z
+    .object({
+      id: z.string().max(200),
+      from: z.string().max(1024),
+      receivedAt: z.iso.datetime({ offset: true }),
+    })
+    .optional(),
   position: z.number().optional(),
   labels: z
     .array(
@@ -365,6 +407,7 @@ export const routineInput = z
   .max(7)
   .refine((days) => new Set(days.map((d) => d.day)).size === days.length);
 export const preferenceInput = z.object({
+  taskCheckIns: z.boolean().optional(),
   routine: routineInput.optional(),
   name: z.string().trim().min(1).max(30),
   color: z.string().regex(/^#[0-9a-f]{6}$/i),
@@ -394,11 +437,45 @@ export const preferenceInput = z.object({
 });
 export const commandSchema = z.discriminatedUnion("type", [
   z.object({
+    type: z.literal("column.delete"),
+    boardId: id,
+    columnId: id,
+    destinationId: id,
+    expectedRevision: z.number().int(),
+  }),
+  z.object({
+    type: z.literal("event.move"),
+    id,
+    columnId: id,
+    beforeId: id.nullable(),
+    expectedRevision: z.number().int(),
+  }),
+  z.object({
+    type: z.literal("task.calendarDecision"),
+    id,
+    removeTask: z.boolean(),
+    expectedRevision: z.number().int(),
+    confirmed: z.literal(true),
+  }),
+  z.object({
+    type: z.literal("task.checkIn"),
+    id,
+    action: z.enum(["start", "complete", "snooze"]),
+    actedAt: z.iso.datetime().optional(),
+    phase: z.enum(["before", "start", "end", "repeat", "snooze"]),
+    scheduleKey: z.string().max(200),
+    expectedRevision: z.number().int(),
+  }),
+  z.object({
     type: z.literal("pet.care"),
     action: z.enum(["feed", "pet", "play", "nap", "wake"]),
   }),
   z.object({
     type: z.literal("column.update"),
+    color: z
+      .string()
+      .regex(/^#[0-9a-f]{6}$/i)
+      .optional(),
     boardId: id,
     columnId: id,
     title: z.string().trim().min(1).max(100),
@@ -440,6 +517,10 @@ export const commandSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("column.create"),
+    color: z
+      .string()
+      .regex(/^#[0-9a-f]{6}$/i)
+      .optional(),
     boardId: id,
     id,
     title: z.string().trim().min(1).max(100),
@@ -531,7 +612,7 @@ export function applyCommand(
       (j) => !(j.kind === kind && j.entityId === entityId),
     );
     w.outbox.push({
-      id: operationId,
+      id: `${operationId}:${kind}:${entityId}`,
       kind,
       entityId,
       action,
@@ -541,6 +622,143 @@ export function applyCommand(
     });
   };
   switch (c.type) {
+    case "task.calendarDecision": {
+      const t = w.tasks.find((t) => t.id === c.id && !t.deleted);
+      if (!t) throw new DomainError("missing", "Tarefa não encontrada.");
+      checkRevision(t, c.expectedRevision);
+      t.calendarRemoved = false;
+      if (c.removeTask) {
+        t.deleted = true;
+        t.syncState = "pending";
+        enqueue("task", t.id, "delete");
+      }
+      t.revision++;
+      break;
+    }
+    case "task.checkIn": {
+      const t = w.tasks.find((t) => t.id === c.id && !t.deleted);
+      if (!t) throw new DomainError("missing", "Tarefa não encontrada.");
+      if (t.completed) break;
+      checkRevision(t, c.expectedRevision);
+      if (taskScheduleKey(t) !== c.scheduleKey)
+        throw new DomainError(
+          "conflict",
+          "O horário desta tarefa mudou. Abra a tarefa para revisar.",
+          409,
+        );
+      t.checkIn = {
+        ...(t.checkIn?.key === c.scheduleKey ? t.checkIn : {}),
+        key: c.scheduleKey,
+      };
+      const endPhase =
+        ["end", "repeat"].includes(c.phase) ||
+        (c.phase === "snooze" && t.checkIn.snoozePhase === "end");
+      const actedAt =
+        c.actedAt && Date.parse(c.actedAt) <= Date.parse(now) + 60000
+          ? c.actedAt
+          : now;
+      if (endPhase) t.checkIn.endAnswered = true;
+      if (c.action === "snooze") {
+        t.checkIn.snoozeAt = new Date(
+          Date.parse(actedAt) + (endPhase ? 15 : 10) * 60000,
+        ).toISOString();
+        t.checkIn.snoozePhase = endPhase ? "end" : "start";
+      } else {
+        delete t.checkIn.snoozeAt;
+        const b = w.boards.find((b) => b.id === t.boardId)!;
+        t.columnId = b.columns.find(
+          (col) => col.kind === (c.action === "complete" ? "done" : "active"),
+        )!.id;
+        t.completed = c.action === "complete";
+        t.completedAt = t.completed ? actedAt : null;
+        if (!t.completed) t.actualStartedAt = actedAt;
+        if (t.completed) {
+          t.syncState = "pending";
+          enqueue("task", t.id, "upsert");
+        }
+      }
+      t.revision++;
+      break;
+    }
+    case "event.move": {
+      const e = w.events.find((e) => e.id === c.id && !e.deleted);
+      if (!e || e.taskId)
+        throw new DomainError("missing", "Compromisso não encontrado.");
+      checkRevision(e, c.expectedRevision);
+      const b =
+        w.boards.find((b) => b.id === w.preferences.defaultBoardId) ??
+        w.boards[0];
+      const col = b?.columns.find((col) => col.id === c.columnId);
+      if (
+        !col ||
+        w.calendars.some((cal) => cal.id === e.calendarId && cal.holiday)
+      )
+        throw new DomainError("readonly", "Este lembrete é somente leitura.");
+      e.columnId = col.id;
+      e.completedAt = col.kind === "done" ? now : null;
+      const list: { id: string; item: { position?: number } }[] = [
+        ...w.events
+          .filter(
+            (x) =>
+              !x.deleted && !x.taskId && x.columnId === col.id && x.id !== e.id,
+          )
+          .map((x) => ({ id: `event:${x.id}`, item: x })),
+        ...w.tasks
+          .filter(
+            (x) =>
+              !x.deleted &&
+              !x.archivedAt &&
+              x.boardId === b.id &&
+              x.columnId === col.id,
+          )
+          .map((x) => ({ id: x.id, item: x })),
+      ].sort((a, b) => (a.item.position ?? 1e9) - (b.item.position ?? 1e9));
+      let index = c.beforeId
+        ? list.findIndex((x) => x.id === c.beforeId)
+        : list.length;
+      if (index < 0)
+        throw new DomainError(
+          "conflict",
+          "O destino mudou. Tente novamente.",
+          409,
+        );
+      list.splice(index, 0, { id: `event:${e.id}`, item: e });
+      list.forEach((x, i) => {
+        x.item.position = i;
+      });
+      e.revision++;
+      break;
+    }
+    case "column.delete": {
+      const b = w.boards.find((b) => b.id === c.boardId);
+      if (!b) throw new DomainError("missing", "Quadro não encontrado.");
+      checkRevision(b, c.expectedRevision);
+      const col = b.columns.find((x) => x.id === c.columnId),
+        dest = b.columns.find((x) => x.id === c.destinationId);
+      if (!col || ["todo", "active", "done"].includes(col.kind))
+        throw new DomainError(
+          "protected",
+          "Esta coluna tem uma função essencial e não pode ser excluída.",
+        );
+      if (!dest || dest.id === col.id || dest.kind === "done")
+        throw new DomainError(
+          "destination",
+          "Escolha outra coluna pendente para receber os cartões.",
+        );
+      for (const t of w.tasks.filter(
+        (t) => t.boardId === b.id && t.columnId === col.id,
+      )) {
+        t.columnId = dest.id;
+        t.revision++;
+      }
+      for (const e of w.events.filter((e) => e.columnId === col.id)) {
+        e.columnId = dest.id;
+        e.revision++;
+      }
+      b.columns = b.columns.filter((x) => x.id !== col.id);
+      b.revision++;
+      break;
+    }
     case "pet.care": {
       const at = new Date(now);
       const care = advancePetCare(
@@ -601,6 +819,7 @@ export function applyCommand(
       const col = b.columns.find((x) => x.id === c.columnId);
       if (!col) throw new DomainError("missing", "Coluna não encontrada.");
       col.title = c.title;
+      if (c.color) col.color = c.color;
       b.columns = b.columns.filter((x) => x.id !== col.id);
       b.columns.splice(Math.min(c.index, b.columns.length), 0, col);
       b.revision++;
@@ -621,18 +840,24 @@ export function applyCommand(
       const b = w.boards.find((x) => x.id === t.boardId)!,
         col = b.columns.find((x) => x.id === c.columnId);
       if (!col) throw new DomainError("missing", "Coluna não encontrada.");
-      const cards = w.tasks
-        .filter(
-          (x) =>
-            !x.deleted &&
-            x.boardId === t.boardId &&
-            x.columnId === col.id &&
-            x.id !== t.id,
-        )
-        .sort(taskOrder);
+      const entries: { id: string; item: { position?: number } }[] = [
+        ...w.tasks
+          .filter(
+            (x) =>
+              !x.deleted &&
+              !x.archivedAt &&
+              x.boardId === t.boardId &&
+              x.columnId === col.id &&
+              x.id !== t.id,
+          )
+          .map((x) => ({ id: x.id, item: x })),
+        ...w.events
+          .filter((x) => !x.deleted && !x.taskId && x.columnId === col.id)
+          .map((x) => ({ id: `event:${x.id}`, item: x })),
+      ].sort((a, b) => (a.item.position ?? 1e9) - (b.item.position ?? 1e9));
       const index = c.beforeId
-        ? cards.findIndex((x) => x.id === c.beforeId)
-        : cards.length;
+        ? entries.findIndex((x) => x.id === c.beforeId)
+        : entries.length;
       if (index < 0)
         throw new DomainError(
           "conflict",
@@ -642,10 +867,18 @@ export function applyCommand(
       const changed = t.completed !== (col.kind === "done");
       t.columnId = col.id;
       t.completed = col.kind === "done";
+      if (changed) t.completedAt = t.completed ? now : null;
+      if (col.kind === "active" && !t.actualStartedAt) t.actualStartedAt = now;
+      if (t.scheduledEnd && Date.parse(t.scheduledEnd) <= Date.parse(now))
+        t.checkIn = {
+          ...t.checkIn,
+          key: taskScheduleKey(t),
+          endAnswered: true,
+        };
       t.revision++;
-      cards.splice(index, 0, t);
-      cards.forEach((x, i) => {
-        x.position = i;
+      entries.splice(index, 0, { id: t.id, item: t });
+      entries.forEach((x, i) => {
+        x.item.position = i;
       });
       if (changed) {
         t.syncState = "pending";
@@ -669,7 +902,12 @@ export function applyCommand(
       checkRevision(b, c.expectedRevision);
       if (b.columns.some((x) => x.id === c.id))
         throw new DomainError("exists", "Coluna já existe.");
-      b.columns.push({ id: c.id, title: c.title, kind: "custom" });
+      b.columns.push({
+        id: c.id,
+        title: c.title,
+        kind: "custom",
+        color: c.color,
+      });
       b.revision++;
       break;
     }
@@ -683,6 +921,30 @@ export function applyCommand(
           404,
         );
       const old = w.tasks.find((t) => t.id === c.task.id);
+      if (
+        old &&
+        w.events.some(
+          (e) =>
+            e.taskId === old.id &&
+            w.outbox.some(
+              (j) => j.entityId === e.id && j.state === "uncertain",
+            ),
+        )
+      )
+        throw new DomainError(
+          "uncertain",
+          "Aguardando confirmação da agenda antes de alterar esta tarefa.",
+          409,
+        );
+      if (
+        !old &&
+        w.preferences.defaultBoardId &&
+        c.task.boardId !== w.preferences.defaultBoardId
+      )
+        throw new DomainError(
+          "fixed_list",
+          "O Pingo usa uma lista fixa de tarefas.",
+        );
       checkRevision(old, c.expectedRevision);
       if (
         c.task.scheduledEnd &&
@@ -712,6 +974,30 @@ export function applyCommand(
         deleted: false,
         error: undefined,
       };
+      if (!old || old.completed !== t.completed)
+        t.completedAt = t.completed ? now : null;
+      if (
+        !old ||
+        old.dueDate !== t.dueDate ||
+        old.scheduledStart !== t.scheduledStart ||
+        old.scheduledEnd !== t.scheduledEnd
+      ) {
+        t.calendarSuppressed = false;
+        t.calendarRemoved = false;
+        t.checkIn = undefined;
+        t.actualStartedAt = null;
+      } else if (
+        old.columnId !== t.columnId &&
+        t.scheduledEnd &&
+        Date.parse(now) >= Date.parse(t.scheduledEnd)
+      ) {
+        t.checkIn = {
+          ...t.checkIn,
+          key: taskScheduleKey(t),
+          endAnswered: true,
+          snoozeAt: undefined,
+        };
+      }
       if (old && old.boardId !== b.id)
         throw new DomainError(
           "move",
@@ -732,6 +1018,14 @@ export function applyCommand(
       break;
     }
     case "event.upsert": {
+      if (
+        w.calendars.some((cal) => cal.id === c.event.calendarId && cal.readOnly)
+      )
+        throw new DomainError(
+          "readonly",
+          "Esta agenda é somente leitura.",
+          403,
+        );
       const old = w.events.find((e) => e.id === c.event.id);
       checkRevision(old, c.expectedRevision);
       if (
@@ -784,6 +1078,15 @@ export function applyCommand(
         const t = w.tasks.find((t) => t.id === e.taskId)!;
         t.scheduledStart = e.start;
         t.scheduledEnd = e.end;
+        t.dueDate = e.allDay
+          ? e.start
+          : zonedParts(new Date(e.start), w.preferences.timezone).date;
+        t.timeMode = e.allDay ? "none" : "range";
+        t.title = e.title.replace(/^✓\s*/, "");
+        t.calendarSuppressed = false;
+        t.calendarRemoved = false;
+        t.syncState = "pending";
+        enqueue("task", t.id, "upsert");
         t.revision++;
       }
       enqueue("event", e.id, "upsert");
@@ -794,6 +1097,12 @@ export function applyCommand(
       if (!e)
         throw new DomainError("missing", "Compromisso não encontrado.", 404);
       checkRevision(e, c.expectedRevision);
+      if (w.calendars.some((cal) => cal.id === e.calendarId && cal.readOnly))
+        throw new DomainError(
+          "readonly",
+          "Esta agenda é somente leitura.",
+          403,
+        );
       e.deleted = true;
       e.revision++;
       e.syncState = "pending";
@@ -802,6 +1111,7 @@ export function applyCommand(
         if (t) {
           t.scheduledStart = null;
           t.scheduledEnd = null;
+          t.calendarSuppressed = true;
           t.revision++;
         }
       }
@@ -809,7 +1119,12 @@ export function applyCommand(
       break;
     }
     case "preferences.update":
-      w.preferences = { ...w.preferences, ...c.preferences };
+      w.preferences = {
+        ...w.preferences,
+        ...c.preferences,
+        defaultBoardId:
+          w.preferences.defaultBoardId || c.preferences.defaultBoardId,
+      };
       break;
     case "notice.read": {
       const n = w.notices.find((n) => n.id === c.id);
@@ -822,6 +1137,17 @@ export function applyCommand(
       break;
     }
   }
+  if (
+    [
+      "task.upsert",
+      "task.move",
+      "task.delete",
+      "task.checkIn",
+      "task.calendarDecision",
+      "event.upsert",
+    ].includes(c.type)
+  )
+    reconcileTaskCalendars(w, enqueue, now);
   w.revision++;
   return w;
 }
@@ -837,6 +1163,7 @@ export function mergeGoogleTask(
     deleted?: boolean;
     updated?: string;
     etag?: string;
+    completed?: string;
   },
 ): void {
   const old = w.tasks.find(
@@ -867,6 +1194,7 @@ export function mergeGoogleTask(
     scheduledEnd: old?.scheduledEnd ?? null,
     priority: old?.priority ?? "normal",
     completed: done,
+    completedAt: done ? (g.completed ?? old?.completedAt ?? null) : null,
     deleted: g.deleted,
     googleId: g.id,
     googleEtag: g.etag,

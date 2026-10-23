@@ -91,6 +91,7 @@ final class NotificationCoordinator {
                 long now = System.currentTimeMillis(), starts = r.getLong("startAt");
                 if (now < r.getLong("dueAt") - 1000) { schedule(c, r); return; }
                 if (starts <= now) return;
+                if(!r.optString("taskId").isEmpty()){deliver(c,r);return;}
                 r.put("body", "Começa em " + Math.max(0, Math.round((starts - now) / 60000.0)) + " minutos.");
                 r.put("expiresAt", starts); deliver(c, r);
             } catch (Exception ignored) {}
@@ -110,6 +111,7 @@ final class NotificationCoordinator {
                 String userId = n.getString("userId"), id = n.getString("noticeId");
                 if (!prefs(c).getBoolean("enabled", false)) return;
                 if (!userId.equals(prefs(c).getString("userId", "")) || userId.isEmpty()) return;
+                if(!TaskActions.valid(c,n))return;
                 long now = System.currentTimeMillis();
                 if (n.optLong("expiresAt", 0) <= now) return;
                 if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(c, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
@@ -119,16 +121,52 @@ final class NotificationCoordinator {
                 channels(c);
                 boolean hidden = prefs(c).getBoolean("hidden", false), silent = n.optBoolean("silent", false) || quiet(c, now);
                 Intent open = new Intent(c, MainActivity.class).setAction("pingo.NOTICE").setData(Uri.parse("pingo-notice:" + Uri.encode(id))).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                open.putExtra("noticeId", id); open.putExtra("eventId", n.optString("eventId", ""));
+                open.putExtra("noticeId", id); open.putExtra("eventId", n.optString("eventId", ""));open.putExtra("taskId",n.optString("taskId",""));
                 PendingIntent pending = PendingIntent.getActivity(c, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
                 Notification publicVersion = new NotificationCompat.Builder(c, SILENT).setSmallIcon(R.drawable.ic_notification).setContentTitle("Pingo").setContentText("Você tem um lembrete do Pingo").build();
                 NotificationCompat.Builder builder = new NotificationCompat.Builder(c, silent ? SILENT : NORMAL).setSmallIcon(R.drawable.ic_notification).setContentTitle(n.optString("title", "Pingo")).setContentText(n.optString("body", "Você tem um lembrete do Pingo")).setAutoCancel(true).setOnlyAlertOnce(true).setContentIntent(pending).setVisibility(hidden ? NotificationCompat.VISIBILITY_PRIVATE : NotificationCompat.VISIBILITY_PUBLIC).setPublicVersion(publicVersion);
+                if(!n.optString("taskId").isEmpty()){
+                    android.os.Bundle metadata=new android.os.Bundle();metadata.putString("pingoTaskId",n.getString("taskId"));metadata.putString("pingoPhase",n.optString("phase"));builder.addExtras(metadata).setGroup("pingo-tasks").setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN);
+                    boolean end=n.optString("phase").equals("end")||n.optString("phase").equals("repeat") || n.optString("snoozePhase").equals("end");
+                    builder.addAction(taskAction(c,n,end?"complete":"start",end?"Concluir":"Comecei"));
+                    builder.addAction(taskAction(c,n,"snooze",end?"Lembrar em 15 min":"Lembrar em 10 min"));
+                    builder.addAction(new NotificationCompat.Action.Builder(0,"Alterar status",pending).setAuthenticationRequired(true).build());
+                }
                 if (silent) builder.setSilent(true);
                 NotificationManagerCompat.from(c).notify(id, 0, builder.build());
+                if(!n.optString("taskId").isEmpty())group(c);
                 ContentValues row = new ContentValues(); row.put("id", id); row.put("user_id", userId); row.put("at", now);
                 db.insertWithOnConflict("deliveries", null, row, SQLiteDatabase.CONFLICT_IGNORE);
                 c.getSystemService(AlarmManager.class).cancel(alarmIntent(c, id));
             } catch (Exception ignored) { /* Never log notification contents, credentials or tokens. */ }
+        }
+    }
+    private static NotificationCompat.Action taskAction(Context c,JSONObject n,String action,String label)throws Exception{
+        JSONObject payload=new JSONObject(n.toString());payload.put("operationId",java.util.UUID.randomUUID().toString());
+        Intent target=new Intent(c,TaskActionActivity.class).setData(Uri.parse("pingo-action:"+Uri.encode(n.getString("noticeId")+":"+action))).putExtra("payload",payload.toString()).putExtra("taskAction",action);
+        PendingIntent pending=PendingIntent.getActivity(c,0,target,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        return new NotificationCompat.Action.Builder(0,label,pending).setAuthenticationRequired(true).build();
+    }
+    private static void group(Context c){
+        int count=0;for(android.service.notification.StatusBarNotification n:c.getSystemService(NotificationManager.class).getActiveNotifications())if(n.getNotification().extras.containsKey("pingoTaskId"))count++;
+        if(count<2){NotificationManagerCompat.from(c).cancel("pingo-task-group",1);return;}
+        Notification summary=new NotificationCompat.Builder(c,SILENT).setSmallIcon(R.drawable.ic_notification).setContentTitle("Pingo").setContentText(count+" tarefas para acompanhar").setGroup("pingo-tasks").setGroupSummary(true).setSilent(true).setVisibility(NotificationCompat.VISIBILITY_PRIVATE).build();NotificationManagerCompat.from(c).notify("pingo-task-group",1,summary);
+    }
+    static void afterAction(Context c,JSONObject n,String action)throws Exception{
+        synchronized(LOCK){
+            String task=n.getString("taskId"),phase=n.optString("phase");boolean end=phase.equals("end")||phase.equals("repeat")||n.optString("snoozePhase").equals("end");
+            java.util.ArrayList<String> remove=new java.util.ArrayList<>();
+            try(Cursor rows=PingoDatabase.get(c).getReadableDatabase().rawQuery("SELECT id,data FROM reminders WHERE user_id=?",new String[]{n.getString("userId")})){
+                while(rows.moveToNext()){JSONObject r=new JSONObject(rows.getString(1));String p=r.optString("phase");if(task.equals(r.optString("taskId"))&&(action.equals("complete")||p.equals("snooze")||p.equals(phase)||(end&&(p.equals("end")||p.equals("repeat")))||(action.equals("start")&&(p.equals("start")||p.equals("before")))))remove.add(rows.getString(0));}
+            }
+            for(String id:remove){c.getSystemService(AlarmManager.class).cancel(alarmIntent(c,id));PingoDatabase.get(c).getWritableDatabase().delete("reminders","id=?",new String[]{id});NotificationManagerCompat.from(c).cancel(id,0);}
+            NotificationManagerCompat.from(c).cancel(n.getString("noticeId"),0);
+            if(action.equals("complete"))for(android.service.notification.StatusBarNotification shown:c.getSystemService(NotificationManager.class).getActiveNotifications())if(task.equals(shown.getNotification().extras.getString("pingoTaskId")))NotificationManagerCompat.from(c).cancel(shown.getTag(),shown.getId());
+            if(action.equals("snooze")){
+                String snapshot=PingoDatabase.get(c).read(n.getString("userId"),"snapshot");JSONObject t=TaskActions.task(new JSONObject(snapshot).getJSONObject("workspace"),task);
+                if(t!=null){JSONObject check=t.getJSONObject("checkIn"),r=new JSONObject(n.toString());String at=check.getString("snoozeAt");java.text.SimpleDateFormat f=new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",Locale.ROOT);f.setTimeZone(TimeZone.getTimeZone("UTC"));long due=f.parse(at).getTime();r.put("snoozePhase",check.optString("snoozePhase")).put("noticeId","task:"+n.getString("userId")+":"+task+":"+n.getString("scheduleKey")+":snooze:"+at).put("phase","snooze").put("dueAt",due).put("startAt",due+900000).put("expiresAt",due+900000).put("body","Vamos retomar “"+n.optString("title")+"”?").put("taskRevision",t.getInt("revision"));ContentValues row=new ContentValues();row.put("id",r.getString("noticeId"));row.put("user_id",n.getString("userId"));row.put("data",r.toString());PingoDatabase.get(c).getWritableDatabase().insertWithOnConflict("reminders",null,row,SQLiteDatabase.CONFLICT_REPLACE);schedule(c,r);}
+            }
+            group(c);
         }
     }
     static void clear(Context c) {

@@ -25,6 +25,7 @@ public static class PingoWindows {
     [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hwnd,IntPtr dc);
     [DllImport("gdi32.dll")] private static extern uint GetPixel(IntPtr dc,int x,int y);
     public static uint Pixel(int x,int y) { var dc=GetDC(IntPtr.Zero); try {return GetPixel(dc,x,y);} finally {ReleaseDC(IntPtr.Zero,dc);} }
+    public static int CountColor(IntPtr hwnd,uint color) { var b=Rectangle(hwnd); var dc=GetDC(IntPtr.Zero); int count=0; try { for(int y=b.Top;y<b.Bottom;y+=3) for(int x=b.Left;x<b.Right;x+=3) if(GetPixel(dc,x,y)==color) count++; } finally {ReleaseDC(IntPtr.Zero,dc);} return count; }
     [DllImport("user32.dll",EntryPoint="GetWindowLongPtrW")] private static extern IntPtr GetWindowLongPtr(IntPtr hwnd,int index);
     public static bool IgnoresMouse(IntPtr hwnd) { return (GetWindowLongPtr(hwnd,-20).ToInt64() & 0x20) != 0; }
     public static Bounds Rectangle(IntPtr hwnd) { Bounds bounds; if(!GetWindowRect(hwnd,out bounds)) throw new Exception("Janela indisponível"); return bounds; }
@@ -109,6 +110,18 @@ try {
         if ([PingoWindows]::IgnoresMouse($petHandle)) { throw 'A barra de conversa não recuperou os cliques.' }
         Write-Output 'Passagem do cursor no fundo transparente e captura na barra de conversa verificadas.'
     } else { Write-Warning 'Desktop sem cursor interativo: a passagem do mouse não pôde ser verificada neste host.' }
+    $panelHandle = [PingoWindows]::Find($window.Id, 'Pingo — meu dia')
+    $colorBefore = [PingoWindows]::CountColor($petHandle,0xBDD595)
+    [PingoWindows]::ShowWindow($panelHandle,6) | Out-Null
+    Start-Sleep -Milliseconds 900
+    $colorMinimized = [PingoWindows]::CountColor($petHandle,0xBDD595)
+    [PingoWindows]::ShowWindow($panelHandle,9) | Out-Null
+    Start-Sleep -Milliseconds 900
+    $colorRestored = [PingoWindows]::CountColor($petHandle,0xBDD595)
+    if ($colorBefore -gt 100) {
+        if ($colorMinimized -lt 100 -or $colorRestored -lt 100) { throw 'A cor opaca do personagem mudou ao minimizar/restaurar o painel.' }
+        Write-Output 'Cor RGB opaca do avatar preservada com painel aberto, minimizado e restaurado.'
+    } else { Write-Warning 'Amostragem de cor nativa indisponível ou cor personalizada; comparar a aparência no desktop interativo.' }
     Close-PingoWindow $window 'Pingo — meu dia'
     $started = Start-Process -FilePath $binary -WindowStyle Hidden -PassThru
     $petHandle = Wait-PingoWindows $started

@@ -47,6 +47,107 @@ beforeEach(() => {
   process.env.BETTER_AUTH_URL = "http://localhost:3000";
 });
 afterEach(() => vi.unstubAllGlobals());
+it("tarefa com data confirma Tasks e Agenda antes de avisar e não duplica na repetição", async () => {
+  let w = memory.workspace!;
+  w.preferences.defaultBoardId = "b";
+  w.connection.scopes.push("https://www.googleapis.com/auth/calendar.events");
+  w = applyCommand(
+    w,
+    {
+      type: "task.upsert",
+      task: { ...w.tasks[0], dueDate: "2026-10-23" },
+      expectedRevision: w.tasks[0].revision,
+    },
+    crypto.randomUUID(),
+  );
+  memory.workspace = w;
+  let event: Record<string, unknown> | undefined,
+    task: Record<string, unknown> | undefined,
+    taskCreates = 0,
+    eventCreates = 0;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string, init?: RequestInit) => {
+      const url = new URL(input),
+        method = init?.method ?? "GET";
+      if (method === "POST" && url.hostname === "tasks.googleapis.com") {
+        taskCreates++;
+        expect(memory.workspace!.notices).toHaveLength(0);
+        task = {
+          ...JSON.parse(init!.body as string),
+          id: "gt",
+          etag: "task1",
+          updated: "2026-10-23T12:00:00Z",
+        };
+        return Response.json(task);
+      }
+      if (method === "POST" && url.pathname.includes("/calendars/")) {
+        eventCreates++;
+        expect(memory.workspace!.notices).toHaveLength(0);
+        event = { ...JSON.parse(init!.body as string), etag: "event1" };
+        return Response.json(event);
+      }
+      if (url.pathname.endsWith("/lists"))
+        return Response.json({ items: [{ id: "list", title: "Lista" }] });
+      if (url.hostname === "tasks.googleapis.com")
+        return Response.json({ items: task ? [task] : [] });
+      return Response.json({
+        items: url.pathname.includes("/primary/") && event ? [event] : [],
+      });
+    }),
+  );
+  await syncGoogle("alice");
+  expect(memory.workspace!.events).toHaveLength(1);
+  expect(
+    memory.workspace!.notices.filter((n) =>
+      n.body.includes("Já confirmei e sincronizei"),
+    ),
+  ).toHaveLength(1);
+  await syncGoogle("alice");
+  expect(taskCreates).toBe(1);
+  expect(eventCreates).toBe(1);
+});
+it("falha na Agenda preserva a confirmação parcial sem anunciar sincronização completa", async () => {
+  let w = memory.workspace!;
+  w.connection.scopes.push("https://www.googleapis.com/auth/calendar.events");
+  w = applyCommand(
+    w,
+    {
+      type: "task.upsert",
+      task: { ...w.tasks[0], dueDate: "2026-10-23" },
+      expectedRevision: w.tasks[0].revision,
+    },
+    crypto.randomUUID(),
+  );
+  memory.workspace = w;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (method === "POST" && input.includes("tasks.googleapis.com"))
+        return Response.json({
+          id: "gt",
+          etag: "t1",
+          updated: "2026-10-23T12:00:00Z",
+        });
+      if (method === "POST") return new Response("", { status: 500 });
+      return Response.json({ items: [] });
+    }),
+  );
+  await syncGoogle("alice");
+  expect(memory.workspace!.tasks[0].syncState).toBe("synced");
+  expect(memory.workspace!.events[0].syncState).not.toBe("synced");
+  expect(
+    memory.workspace!.notices.some((n) =>
+      n.body.includes("Já confirmei e sincronizei"),
+    ),
+  ).toBe(false);
+  expect(
+    memory.workspace!.outbox.some(
+      (j) => j.kind === "event" && j.state === "uncertain",
+    ),
+  ).toBe(true);
+});
 it("Gmail pagina somente cabeçalhos do dia e atualiza lidos sem gerar avisos", async () => {
   memory.workspace!.outbox = [];
   memory.workspace!.connection.scopes = [

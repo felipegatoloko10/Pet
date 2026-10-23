@@ -38,6 +38,57 @@ function seed(timed = true) {
   );
 }
 describe("quadro diário e agenda vinculada", () => {
+  it("compara instantes de fusos diferentes sem usar a ordem textual do horário", () => {
+    const w = seed();
+    const changed = applyCommand(
+      w,
+      {
+        type: "task.upsert",
+        task: {
+          ...w.tasks[0],
+          scheduledStart: "2026-10-23T13:30:00+02:00",
+          scheduledEnd: "2026-10-23T12:30:00Z",
+        },
+        expectedRevision: 1,
+      },
+      "offsets",
+      at,
+    );
+    expect(
+      Date.parse(changed.events[0].end) - Date.parse(changed.events[0].start),
+    ).toBe(3600000);
+  });
+  it("converter a reserva para dia inteiro não inventa um horário na tarefa", () => {
+    let w = seed();
+    w = applyCommand(
+      w,
+      {
+        type: "event.upsert",
+        event: {
+          ...w.events[0],
+          allDay: true,
+          start: "2026-10-24",
+          end: "2026-10-25",
+        },
+        expectedRevision: w.events[0].revision,
+        confirmed: true,
+      },
+      "all-day",
+      at,
+    );
+    expect(w.tasks[0]).toMatchObject({
+      dueDate: "2026-10-24",
+      scheduledStart: null,
+      scheduledEnd: null,
+      timeMode: "none",
+    });
+    expect(w.events).toHaveLength(1);
+    expect(w.events[0]).toMatchObject({
+      allDay: true,
+      start: "2026-10-24",
+      end: "2026-10-25",
+    });
+  });
   it("cria apenas um vínculo estável e reserva dia inteiro quando não há horário", () => {
     let w = seed(false);
     expect(w.events).toHaveLength(1);

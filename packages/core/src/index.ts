@@ -375,7 +375,7 @@ export const eventInput = z
     if (
       !schema.safeParse(v.start).success ||
       !schema.safeParse(v.end).success ||
-      v.end <= v.start
+      Date.parse(v.end) <= Date.parse(v.start)
     )
       c.addIssue({
         code: "custom",
@@ -948,7 +948,8 @@ export function applyCommand(
       checkRevision(old, c.expectedRevision);
       if (
         c.task.scheduledEnd &&
-        (!c.task.scheduledStart || c.task.scheduledEnd <= c.task.scheduledStart)
+        (!c.task.scheduledStart ||
+          Date.parse(c.task.scheduledEnd) <= Date.parse(c.task.scheduledStart))
       )
         throw new DomainError("time", "Horário reservado inválido.");
       if (
@@ -1076,8 +1077,8 @@ export function applyCommand(
       w.events = w.events.filter((x) => x.id !== e.id).concat(e);
       if (e.taskId) {
         const t = w.tasks.find((t) => t.id === e.taskId)!;
-        t.scheduledStart = e.start;
-        t.scheduledEnd = e.end;
+        t.scheduledStart = e.allDay ? null : e.start;
+        t.scheduledEnd = e.allDay ? null : e.end;
         t.dueDate = e.allDay
           ? e.start
           : zonedParts(new Date(e.start), w.preferences.timezone).date;
@@ -1085,6 +1086,8 @@ export function applyCommand(
         t.title = e.title.replace(/^✓\s*/, "");
         t.calendarSuppressed = false;
         t.calendarRemoved = false;
+        t.checkIn = undefined;
+        t.actualStartedAt = null;
         t.syncState = "pending";
         enqueue("task", t.id, "upsert");
         t.revision++;

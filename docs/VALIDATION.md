@@ -2,10 +2,12 @@
 
 ## Revisão 2.4 — 23/10/2026
 
-- 103 testes unitários/simulados de domínio/backend e 18 testes de navegador passaram.
+- 106 testes unitários/simulados de domínio/backend e 18 testes de navegador passaram.
 - 15 verificações do agendador no runtime Workers/D1 local passaram.
 - Android: migração SQLite 1 → 2 preservando fila/cache, recibos contra reintrodução de operações e ações nativas de notificação.
 - Instrumentação Android 16: cinco testes passaram; um teste FCM de produção opt-in foi omitido nessa execução local. Comecei e Concluir funcionaram sem WebView, sem sessão de rede, preservando a agenda e a fila após reabrir SQLite.
+- Em execução opt-in separada, o backend 2.4 enviou um check-in FCM real ao emulador sem Activity aberta. O botão Comecei alcançou a API de produção, a fila foi confirmada e o início planejado permaneceu intacto. Conta artificial, sessão, assinatura e trabalhos foram removidos ao terminar; nenhum Google Workspace ou IA foi usado nessa prova.
+- Google real na conta autorizada: tarefa de homologação criou um único evento; editar o horário no Google Agenda para 18h05 atualizou a reserva do Pingo. O alias primary foi reconciliado com o identificador real da agenda para evitar registros locais duplicados.
 - Resta homologar os novos botões em telefone físico e a ligação Tasks/Agenda com Google real. A homologação física da 2.3 não conta como homologação da 2.4.
 
 Teste físico: crie uma tarefa com início e fim próximos; confirme um único cartão/evento; use Comecei com o app fechado; adie o aviso final; desligue a rede e conclua pelo aviso. Reabra, reconecte e confira o cartão concluído, Tasks concluída e evento com ✓. Teste também reagendamento e cancelamento dos avisos antigos.

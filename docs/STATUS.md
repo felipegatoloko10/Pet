@@ -4,9 +4,11 @@
 
 Quadro diário, calendário vinculado por tarefa, feriados, lista fixa, colunas com 24 cores e exclusão segura, botão de e-mail para criar tarefa por metadados e marca vetorial do Pingo. No Android, acompanhamento com ações nativas, fila SQLite v2 e trabalho em segundo plano. Campos novos são preservados para clientes anteriores. Detalhes em [REVISION-2.4.md](REVISION-2.4.md).
 
-Validação: 103 testes de domínio/backend, 18 de navegador e 15 Workers/D1 locais passaram. Instrumentação Android 16 validou Comecei/Concluir sem WebView e persistência offline, além da regressão de Keystore, SQLite e interface. O agendador compatível foi publicado na Cloudflare em 23/10/2026 antes da ativação do backend 2.4.
+Validação: 106 testes de domínio/backend, 18 de navegador e 15 Workers/D1 locais passaram. Instrumentação Android 16 validou Comecei/Concluir sem WebView e persistência offline, além da regressão de Keystore, SQLite e interface. O agendador compatível foi publicado na Cloudflare em 23/10/2026 antes da ativação do backend 2.4.
 
 O APK 2.4 mantém a chave de assinatura existente. A pré-release permanece em rascunho até homologação física dos novos botões e da sincronização Tasks/Agenda. A release 2.3 continua recuperável. Os resultados físicos anteriores da 2.3 não são apresentados como confirmação da 2.4.
+
+O check-in FCM real e a ação Comecei foram confirmados de ponta a ponta no emulador, sem WebView, com envio da fila nativa ao backend de produção. A conta artificial foi removida. Na conta Google autorizada, a tarefa de homologação criou seu evento e recebeu de volta uma edição de horário feita diretamente no Google Agenda, sem duplicação. A produção está em 2.4.0-beta.1.
 
 ## Android 2.3
 

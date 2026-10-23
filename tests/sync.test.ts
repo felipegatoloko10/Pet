@@ -47,6 +47,46 @@ beforeEach(() => {
   process.env.BETTER_AUTH_URL = "http://localhost:3000";
 });
 afterEach(() => vi.unstubAllGlobals());
+it("bloco removido no Google durante edição preserva a tarefa sem recriar evento", async () => {
+  let w = memory.workspace!;
+  w = applyCommand(
+    w,
+    {
+      type: "task.upsert",
+      task: {
+        ...w.tasks[0],
+        dueDate: "2026-10-23",
+        scheduledStart: "2026-10-23T12:00:00Z",
+        scheduledEnd: "2026-10-23T12:30:00Z",
+      },
+      expectedRevision: 1,
+    },
+    crypto.randomUUID(),
+  );
+  const e = w.events[0];
+  e.googleId = "removed";
+  e.googleEtag = "old";
+  w.tasks[0].syncState = "synced";
+  w.tasks[0].googleId = "gt";
+  w.outbox = w.outbox.filter((j) => j.kind === "event");
+  w.connection.scopes = [];
+  memory.workspace = w;
+  const transport = vi.fn(async () => new Response(null, { status: 404 }));
+  vi.stubGlobal("fetch", transport);
+  await syncGoogle("alice");
+  expect(memory.workspace!.tasks[0]).toMatchObject({
+    deleted: false,
+    calendarRemoved: true,
+    calendarSuppressed: true,
+    scheduledStart: null,
+    scheduledEnd: null,
+  });
+  expect(memory.workspace!.events.filter((e) => !e.deleted)).toHaveLength(0);
+  expect(memory.workspace!.outbox).toHaveLength(0);
+  const calls = transport.mock.calls.length;
+  await syncGoogle("alice");
+  expect(transport.mock.calls).toHaveLength(calls);
+});
 it("o alias primary e o ID real da agenda não duplicam o evento vinculado", async () => {
   let w = memory.workspace!;
   w.connection.scopes = [

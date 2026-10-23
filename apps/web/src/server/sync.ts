@@ -77,11 +77,21 @@ function syncLinkedTask(w: Workspace, e: CalendarEvent, prior?: CalendarEvent) {
   if (!t) return;
   if (e.deleted) {
     if (!t.deleted) {
+      const changed =
+        !t.calendarSuppressed ||
+        !t.calendarRemoved ||
+        !!t.scheduledStart ||
+        !!t.scheduledEnd;
       t.calendarSuppressed = true;
       t.calendarRemoved = true;
       t.timeMode = "none";
       t.checkIn = undefined;
+      t.scheduledStart = null;
+      t.scheduledEnd = null;
+      t.actualStartedAt = null;
+      if (changed) t.revision++;
     }
+    return;
   }
   if (!e.deleted && t.syncState === "conflict") return;
   const start = e.deleted ? null : e.start,
@@ -121,7 +131,11 @@ function syncLinkedTask(w: Workspace, e: CalendarEvent, prior?: CalendarEvent) {
     if (!e.deleted) {
       t.title = title;
       t.dueDate = due;
-      t.timeMode = e.allDay ? "none" : (t.timeMode ?? "range");
+      t.timeMode = e.allDay
+        ? "none"
+        : t.timeMode === "none"
+          ? "range"
+          : (t.timeMode ?? "range");
     }
     t.checkIn = undefined;
     t.actualStartedAt = null;
@@ -320,6 +334,20 @@ async function deliverJob(userId: string, client: GoogleClient, job: SyncJob) {
       const j = current.outbox.find((j) => j.id === job.id);
       if (!i || !j) return;
       const status = error instanceof GoogleError ? error.status : 0;
+      if (
+        job.kind === "event" &&
+        i.googleId &&
+        job.action === "upsert" &&
+        [404, 410].includes(status)
+      ) {
+        i.deleted = true;
+        i.syncState = "synced";
+        i.revision++;
+        current.outbox = current.outbox.filter((x) => x.id !== job.id);
+        syncLinkedTask(current, i as CalendarEvent);
+        current.revision++;
+        return;
+      }
       const uncertain =
         !item.googleId &&
         job.action === "upsert" &&

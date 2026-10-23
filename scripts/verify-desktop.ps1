@@ -25,7 +25,19 @@ public static class PingoWindows {
     [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hwnd,IntPtr dc);
     [DllImport("gdi32.dll")] private static extern uint GetPixel(IntPtr dc,int x,int y);
     public static uint Pixel(int x,int y) { var dc=GetDC(IntPtr.Zero); try {return GetPixel(dc,x,y);} finally {ReleaseDC(IntPtr.Zero,dc);} }
-    public static int CountColor(IntPtr hwnd,uint color) { var b=Rectangle(hwnd); var dc=GetDC(IntPtr.Zero); int count=0; try { for(int y=b.Top;y<b.Bottom;y+=3) for(int x=b.Left;x<b.Right;x+=3) if(GetPixel(dc,x,y)==color) count++; } finally {ReleaseDC(IntPtr.Zero,dc);} return count; }
+    [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr dc);
+    [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleBitmap(IntPtr dc,int width,int height);
+    [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr dc,IntPtr value);
+    [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr value);
+    [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr dc);
+    [DllImport("gdi32.dll")] private static extern bool BitBlt(IntPtr target,int x,int y,int width,int height,IntPtr source,int sourceX,int sourceY,uint mode);
+    public static int CountColor(IntPtr hwnd,uint color) {
+        var b=Rectangle(hwnd); var screen=GetDC(IntPtr.Zero); var memory=CreateCompatibleDC(screen);
+        var bitmap=CreateCompatibleBitmap(screen,b.Right-b.Left,b.Bottom-b.Top);var previous=SelectObject(memory,bitmap);int count=0;
+        try { if(!BitBlt(memory,0,0,b.Right-b.Left,b.Bottom-b.Top,screen,b.Left,b.Top,0x00CC0020)) return 0;
+            for(int y=0;y<b.Bottom-b.Top;y+=3) for(int x=0;x<b.Right-b.Left;x+=3) if(GetPixel(memory,x,y)==color) count++;
+        } finally { SelectObject(memory,previous);DeleteObject(bitmap);DeleteDC(memory);ReleaseDC(IntPtr.Zero,screen); }return count;
+    }
     [DllImport("user32.dll",EntryPoint="GetWindowLongPtrW")] private static extern IntPtr GetWindowLongPtr(IntPtr hwnd,int index);
     public static bool IgnoresMouse(IntPtr hwnd) { return (GetWindowLongPtr(hwnd,-20).ToInt64() & 0x20) != 0; }
     public static Bounds Rectangle(IntPtr hwnd) { Bounds bounds; if(!GetWindowRect(hwnd,out bounds)) throw new Exception("Janela indisponível"); return bounds; }

@@ -17,6 +17,7 @@ const allowed = new Set([
   "VAPID_SUBJECT",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
+  "FIREBASE_FEDERATION_CONFIG",
 ]);
 const variables = Object.entries(environment)
   .filter(([key, value]) => allowed.has(key) && !!value)

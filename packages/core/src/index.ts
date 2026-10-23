@@ -6,6 +6,7 @@ export function taskOrder(a: Task, b: Task) {
 }
 export function normalizeWorkspace(w: Workspace): Workspace {
   w.preferences = { ...defaultPreferences, ...w.preferences };
+  w.petCare ??= initialPetCare();
   if (!w.conversations || (!w.conversations.length && w.conversation?.length))
     w.conversations = w.conversation?.length
       ? [
@@ -206,6 +207,7 @@ export type SyncJob = {
   sentAt?: string;
 };
 export type Workspace = {
+  petCare?: PetCare;
   conversations?: Conversation[];
   conversation?: {
     role: "user" | "assistant";
@@ -231,7 +233,10 @@ export type Workspace = {
   };
   cursor: {
     routineLastAt?: number;
-    push?: Record<string, Record<string, { lease: string; until: number; sent?: boolean }>>;
+    push?: Record<
+      string,
+      Record<string, { lease: string; until: number; sent?: boolean }>
+    >;
     tasks?: Record<string, string>;
     calendar?: Record<string, string>;
     gmail?: string;
@@ -389,6 +394,10 @@ export const preferenceInput = z.object({
 });
 export const commandSchema = z.discriminatedUnion("type", [
   z.object({
+    type: z.literal("pet.care"),
+    action: z.enum(["feed", "pet", "play", "nap", "wake"]),
+  }),
+  z.object({
     type: z.literal("column.update"),
     boardId: id,
     columnId: id,
@@ -532,6 +541,37 @@ export function applyCommand(
     });
   };
   switch (c.type) {
+    case "pet.care": {
+      const at = new Date(now);
+      const care = advancePetCare(
+        w.petCare ?? initialPetCare(at),
+        w.preferences,
+        at,
+      );
+      if (c.action === "feed") care.satiety = Math.min(100, care.satiety + 25);
+      if (c.action === "pet") care.mood = Math.min(100, care.mood + 10);
+      if (c.action === "play") {
+        care.mood = Math.min(100, care.mood + 20);
+        care.energy = Math.max(0, care.energy - 10);
+      }
+      if (c.action === "nap") {
+        care.napUntil = new Date(+at + 1800000).toISOString();
+        care.awakeUntil = undefined;
+      }
+      if (c.action === "wake") {
+        care.napUntil = undefined;
+        care.awakeUntil =
+          petState(at, w.preferences) === "sleep"
+            ? nextPetBoundary(
+                at,
+                w.preferences.wakeTime,
+                w.preferences.timezone,
+              ).toISOString()
+            : undefined;
+      }
+      w.petCare = care;
+      break;
+    }
     case "conversation.update": {
       normalizeWorkspace(w);
       const old = w.conversations!.find((x) => x.id === c.id);
@@ -951,6 +991,80 @@ export function petState(now: Date, p: Preferences, focused = false): PetState {
     : focused
       ? "focus"
       : "idle";
+}
+export type PetCare = {
+  satiety: number;
+  mood: number;
+  energy: number;
+  updatedAt: string;
+  napUntil?: string;
+  awakeUntil?: string;
+};
+export function initialPetCare(now = new Date()): PetCare {
+  return { satiety: 80, mood: 80, energy: 80, updatedAt: now.toISOString() };
+}
+function nextPetBoundary(now: Date, time: string, timezone: string) {
+  const local = TZDate.tz(timezone, now);
+  const [h, m] = time.split(":").map(Number);
+  let next = new TZDate(
+    local.getFullYear(),
+    local.getMonth(),
+    local.getDate(),
+    h,
+    m,
+    0,
+    timezone,
+  );
+  if (+next <= +now)
+    next = new TZDate(
+      local.getFullYear(),
+      local.getMonth(),
+      local.getDate() + 1,
+      h,
+      m,
+      0,
+      timezone,
+    );
+  return new Date(+next);
+}
+export function petSleeping(care: PetCare, p: Preferences, now = new Date()) {
+  if (care.awakeUntil && Date.parse(care.awakeUntil) > +now) return false;
+  return (
+    !!(care.napUntil && Date.parse(care.napUntil) > +now) ||
+    petState(now, p) === "sleep"
+  );
+}
+export function advancePetCare(
+  saved: PetCare,
+  p: Preferences,
+  now = new Date(),
+): PetCare {
+  const care = { ...saved };
+  let cursor = Date.parse(care.updatedAt);
+  if (!Number.isFinite(cursor)) return initialPetCare(now);
+  // Split on civil sleep/wake boundaries so DST and long absences need no running timer.
+  while (cursor < +now) {
+    const date = new Date(cursor);
+    const next = Math.min(
+      +now,
+      +nextPetBoundary(date, p.sleepStart, p.timezone),
+      +nextPetBoundary(date, p.wakeTime, p.timezone),
+      ...[care.napUntil, care.awakeUntil]
+        .map((x) => x && Date.parse(x))
+        .filter((x): x is number => typeof x === "number" && x > cursor),
+    );
+    const hours = (next - cursor) / 3600000;
+    if (petSleeping(care, p, date))
+      care.energy = Math.min(100, care.energy + 10 * hours);
+    else {
+      care.satiety = Math.max(0, care.satiety - 3 * hours);
+      care.mood = Math.max(0, care.mood - hours);
+      care.energy = Math.max(0, care.energy - 4 * hours);
+    }
+    cursor = next;
+  }
+  care.updatedAt = new Date(Math.max(cursor, +now)).toISOString();
+  return care;
 }
 export function sanitizeWorkspace(
   w: Workspace,

@@ -5,6 +5,7 @@ export function cors(request: Request, response: Response) {
     "tauri://localhost",
     "http://tauri.localhost",
     "https://tauri.localhost",
+    "https://localhost",
   ];
   if (origin && allowed.includes(origin)) {
     response.headers.set("Access-Control-Allow-Origin", origin);

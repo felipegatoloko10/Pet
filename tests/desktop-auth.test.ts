@@ -104,3 +104,14 @@ it("state inválido e segunda autorização não vinculam outra conta", async ()
   );
   expect(JSON.parse(memory.row!.value).userId).toBe("alice");
 });
+it("mobile authorizations return the Android scheme and cannot be exchanged as desktop", async () => {
+  memory.row!.value = JSON.stringify({ challenge, state, client: "mobile" });
+  const result = await authorizeDesktop("alice", id, state, "mobile");
+  const url = new URL(result.url);
+  expect(url.protocol).toBe("app.pingo.mobile:");
+  const input = { id, state, verifier, code: url.searchParams.get("code") };
+  await expect(exchangeDesktop(input)).rejects.toThrow("inválido");
+  expect(await exchangeDesktop(input, "mobile")).toEqual({
+    access_token: "fake-native-session",
+  });
+});

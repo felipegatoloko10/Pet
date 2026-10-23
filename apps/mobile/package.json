@@ -1,0 +1,27 @@
+{
+  "name": "@pingo/mobile",
+  "version": "2.3.0-beta.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 1430",
+    "build": "vite build",
+    "sync": "cap sync android",
+    "android": "cap open android"
+  },
+  "dependencies": {
+    "@pingo/core": "*",
+    "@pingo/ui": "*",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/browser": "^8.0.0",
+    "@capacitor/keyboard": "^8.0.0",
+    "@capacitor/network": "^8.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}

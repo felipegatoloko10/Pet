@@ -9,6 +9,8 @@ import { mutateWorkspace, readWorkspace } from "./workspace";
 import { syncGoogle, calendarRange } from "./sync";
 import { maybeProactive } from "./ai";
 import { digest } from "./crypto";
+import { androidSubscription } from "./mobile";
+import { sendAndroidPush } from "./fcm";
 export type Job = {
   id: string;
   userId: string;
@@ -37,7 +39,9 @@ function nextWallTime(time: string, timezone: string, now: Date) {
 export function jobsFor(userId: string, w: Workspace): Job[] {
   const now = Date.now();
   const { date, time } = zonedParts(new Date(now), w.preferences.timezone);
-  const summaryPending = time >= w.preferences.summaryTime && !w.notices.some(n => n.id === `summary:${date}`);
+  const summaryPending =
+    time >= w.preferences.summaryTime &&
+    !w.notices.some((n) => n.id === `summary:${date}`);
   const nextRoutine = (w.cursor.routineLastAt ?? now - 15 * 60000) + 15 * 60000;
   return [
     {
@@ -53,7 +57,11 @@ export function jobsFor(userId: string, w: Workspace): Job[] {
               new Date(now),
             ),
           )
-        : Math.min(nextSummary(w), nextRoutine, summaryPending ? now : Infinity),
+        : Math.min(
+            nextSummary(w),
+            nextRoutine,
+            summaryPending ? now : Infinity,
+          ),
     },
     ...w.events
       .filter(
@@ -88,7 +96,11 @@ export async function indexJobs(userId: string, w: Workspace) {
       Authorization: `Bearer ${process.env.SCHEDULER_SECRET}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ userId, revision: w.revision, jobs: jobsFor(userId, w) }),
+    body: JSON.stringify({
+      userId,
+      revision: w.revision,
+      jobs: jobsFor(userId, w),
+    }),
     signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) throw new Error("O agendador não confirmou os trabalhos.");
@@ -100,10 +112,15 @@ export async function processJob(job: Job) {
       await syncGoogle(job.userId);
       // Recurring instances must be available even when nobody opens the calendar UI.
       try {
-        await calendarRange(job.userId, new Date().toISOString(), new Date(Date.now() + 48 * 3600000).toISOString());
+        await calendarRange(
+          job.userId,
+          new Date().toISOString(),
+          new Date(Date.now() + 48 * 3600000).toISOString(),
+        );
       } catch {
-        await mutateWorkspace(job.userId, w => {
-          w.connection.error = "Não consegui atualizar as ocorrências da agenda. Vou tentar novamente.";
+        await mutateWorkspace(job.userId, (w) => {
+          w.connection.error =
+            "Não consegui atualizar as ocorrências da agenda. Vou tentar novamente.";
           w.revision++;
         });
       }
@@ -131,8 +148,10 @@ export async function processJob(job: Job) {
       event &&
       job.kind === "reminder" &&
       job.id === `reminder:${job.userId}:${event.id}:${event.start}` &&
-      !event.allDay && !event.recurrence &&
-      Date.parse(event.start) - w.preferences.reminderMinutes * 60000 <= Date.now() &&
+      !event.allDay &&
+      !event.recurrence &&
+      Date.parse(event.start) - w.preferences.reminderMinutes * 60000 <=
+        Date.now() &&
       Date.parse(event.start) > Date.now() &&
       !w.notices.some((n) => n.id === job.id)
     )
@@ -155,15 +174,23 @@ export async function processJob(job: Job) {
   return jobsFor(job.userId, w);
 }
 async function sendPush(userId: string, w: Workspace) {
-  if (!process.env.VAPID_PRIVATE_KEY || !process.env.VAPID_PUBLIC_KEY) return;
+  const webConfigured =
+    !!process.env.VAPID_PRIVATE_KEY && !!process.env.VAPID_PUBLIC_KEY;
+  if (!webConfigured && !process.env.FIREBASE_FEDERATION_CONFIG) return;
   // Do not replay a backlog of old notices when cloud scheduling is first enabled.
-  const candidates = w.notices.filter(n => !n.read && !n.deliveredBy && Date.parse(n.createdAt) >= Date.now() - 1800000);
-  if (!candidates.length) return;
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT!,
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY,
+  const candidates = w.notices.filter(
+    (n) =>
+      !n.read &&
+      !n.deliveredBy &&
+      Date.parse(n.createdAt) >= Date.now() - 1800000,
   );
+  if (!candidates.length) return;
+  if (webConfigured)
+    webpush.setVapidDetails(
+      process.env.VAPID_SUBJECT!,
+      process.env.VAPID_PUBLIC_KEY!,
+      process.env.VAPID_PRIVATE_KEY!,
+    );
   const subs = await db()
     .select()
     .from(subscriptions)
@@ -171,32 +198,50 @@ async function sendPush(userId: string, w: Workspace) {
   let retry = false;
   for (const notice of candidates) {
     for (const sub of subs) {
+      const android = androidSubscription(sub.data);
+      if (android ? !process.env.FIREBASE_FEDERATION_CONFIG : !webConfigured)
+        continue;
       if (w.cursor.push?.[notice.id]?.[sub.id]?.sent) continue;
       const lease = crypto.randomUUID();
-      const claimed = await mutateWorkspace(userId, current => {
-        const n = current.notices.find(n => n.id === notice.id);
+      const claimed = await mutateWorkspace(userId, (current) => {
+        const n = current.notices.find((n) => n.id === notice.id);
         if (!n || n.read || n.deliveredBy) return null;
-        const ledger = current.cursor.push ??= {};
+        const ledger = (current.cursor.push ??= {});
         for (const id of Object.keys(ledger))
-          if (!current.notices.some(n => n.id === id && Date.parse(n.createdAt) >= Date.now() - 1800000)) delete ledger[id];
-        const deliveries = ledger[n.id] ??= {};
+          if (
+            !current.notices.some(
+              (n) =>
+                n.id === id && Date.parse(n.createdAt) >= Date.now() - 1800000,
+            )
+          )
+            delete ledger[id];
+        const deliveries = (ledger[n.id] ??= {});
         const prior = deliveries[sub.id];
         if (prior?.sent || (prior && prior.until > Date.now())) return null;
         deliveries[sub.id] = { lease, until: Date.now() + 120000 };
-        return { ...n, silent: n.silent || isQuiet(new Date(), current.preferences) };
+        return {
+          ...n,
+          silent: n.silent || isQuiet(new Date(), current.preferences),
+        };
       });
       if (!claimed) continue;
       try {
-        await webpush.sendNotification(
-          sub.data as webpush.PushSubscription,
-          JSON.stringify(claimed),
-          {
-            TTL: 1800,
-            timeout: 10000,
-            topic: digest(notice.id).slice(0, 32),
-          },
-        );
-        await mutateWorkspace(userId, current => {
+        if (androidSubscription(sub.data)) {
+          const event = w.events.find(
+            (e) => notice.id === `reminder:${userId}:${e.id}:${e.start}`,
+          );
+          await sendAndroidPush(sub.data, userId, claimed, event?.id);
+        } else
+          await webpush.sendNotification(
+            sub.data as webpush.PushSubscription,
+            JSON.stringify(claimed),
+            {
+              TTL: 1800,
+              timeout: 10000,
+              topic: digest(notice.id).slice(0, 32),
+            },
+          );
+        await mutateWorkspace(userId, (current) => {
           const delivery = current.cursor.push?.[notice.id]?.[sub.id];
           if (delivery?.lease === lease) delivery.sent = true;
         });
@@ -212,12 +257,13 @@ async function sendPush(userId: string, w: Workspace) {
               ),
             );
         else retry = true;
-        await mutateWorkspace(userId, current => {
+        await mutateWorkspace(userId, (current) => {
           const deliveries = current.cursor.push?.[notice.id];
           if (deliveries?.[sub.id]?.lease === lease) delete deliveries[sub.id];
         });
       }
     }
   }
-  if (retry) throw new Error("Não foi possível confirmar todas as entregas push.");
+  if (retry)
+    throw new Error("Não foi possível confirmar todas as entregas push.");
 }

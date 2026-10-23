@@ -1,6 +1,6 @@
 {
   "name": "pingo",
-  "version": "2.2.0-beta.1",
+  "version": "2.3.0-beta.1",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -15,6 +15,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "desktop": "npm run tauri -w @pingo/desktop",
+    "mobile:build": "npm run build -w @pingo/mobile && npm run sync -w @pingo/mobile",
     "invite": "tsx scripts/invite.ts",
     "test:browser": "playwright test",
     "test:backend": "tsx scripts/verify-backend.ts",
@@ -35,6 +36,7 @@
     "@tauri-apps/plugin-sql": "latest",
     "@tauri-apps/plugin-stronghold": "latest",
     "@vercel/functions": "latest",
+    "@vercel/oidc": "4.0.3",
     "ai": "7.0.149",
     "better-auth": "1.7.12",
     "date-fns": "^4.1.0",

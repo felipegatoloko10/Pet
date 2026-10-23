@@ -8,6 +8,12 @@ import {
 } from "../../../../server/desktop-auth";
 import { and, eq } from "drizzle-orm";
 import { cors } from "../../../../server/cors";
+import {
+  registerMobile,
+  unregisterMobile,
+  startWorkspace,
+  authorizeWorkspace,
+} from "../../../../server/mobile";
 import { inspectConflict, resolveConflict } from "../../../../server/conflicts";
 import { operationSchema, sanitizeWorkspace, DomainError } from "@pingo/core";
 import { requireUser } from "../../../../server/auth";
@@ -55,11 +61,12 @@ async function handler(r: Request) {
     const path = url.pathname.replace("/api/v1/", "");
     if (path === "health")
       return Response.json({
-        version: "2.2.0-beta.1",
+        version: "2.3.0-beta.1",
         configured: !!(
           process.env.DATABASE_URL && process.env.GOOGLE_CLIENT_ID
         ),
         scheduler: !!process.env.SCHEDULER_URL,
+        androidPush: !!process.env.FIREBASE_FEDERATION_CONFIG,
       });
     if (path === "scheduler/run" && r.method === "POST") {
       if (
@@ -103,7 +110,12 @@ async function handler(r: Request) {
       return new Response(null, { status: 204 });
     }
     if (
-      (path === "desktop-auth/start" || path === "desktop-auth/exchange") &&
+      [
+        "desktop-auth/start",
+        "desktop-auth/exchange",
+        "mobile-auth/start",
+        "mobile-auth/exchange",
+      ].includes(path) &&
       r.method === "POST"
     )
       await limitDesktop(
@@ -118,6 +130,15 @@ async function handler(r: Request) {
       );
     if (path === "desktop-auth/exchange" && r.method === "POST")
       return Response.json(await exchangeDesktop(await body(r)), {
+        headers: { "Cache-Control": "no-store" },
+      });
+    if (path === "mobile-auth/start" && r.method === "POST")
+      return Response.json(
+        await startDesktop(desktopStartInput.parse(await body(r)), "mobile"),
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    if (path === "mobile-auth/exchange" && r.method === "POST")
+      return Response.json(await exchangeDesktop(await body(r), "mobile"), {
         headers: { "Cache-Control": "no-store" },
       });
     const user = await requireUser(r);
@@ -136,6 +157,27 @@ async function handler(r: Request) {
         { headers: { "Cache-Control": "no-store" } },
       );
     }
+    if (path === "mobile-auth/authorize" && r.method === "POST") {
+      const input = z
+        .object({ id: z.uuid(), state: z.string() })
+        .parse(await body(r));
+      return Response.json(
+        await authorizeDesktop(user.id, input.id, input.state, "mobile"),
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
+    if (path === "mobile/devices" && r.method === "POST")
+      return Response.json(await registerMobile(user.id, await body(r)));
+    if (path === "mobile/devices" && r.method === "DELETE")
+      return Response.json(await unregisterMobile(user.id, await body(r)));
+    if (path === "mobile/workspace" && r.method === "POST")
+      return Response.json(await startWorkspace(user.id), {
+        headers: { "Cache-Control": "no-store" },
+      });
+    if (path === "mobile/workspace/authorize" && r.method === "POST")
+      return Response.json(await authorizeWorkspace(user.id, await body(r)), {
+        headers: { "Cache-Control": "no-store" },
+      });
     if (path === "workspace" && r.method === "GET")
       return Response.json({
         workspace: sanitizeWorkspace(await readWorkspace(user.id)),
@@ -173,7 +215,7 @@ async function handler(r: Request) {
     if (path === "operations" && r.method === "POST") {
       const op = operationSchema.parse(await body(r));
       let w = await runOperation(user.id, op);
-      w = await syncGoogle(user.id);
+      if (op.command.type !== "pet.care") w = await syncGoogle(user.id);
       await indexJobs(user.id, w).catch(() => {});
       return Response.json({ workspace: sanitizeWorkspace(w) });
     }
@@ -185,9 +227,11 @@ async function handler(r: Request) {
     if (path === "google/connect" && r.method === "POST")
       return Response.json({ url: await beginGoogle(user.id) });
     if (path === "google/callback" && r.method === "GET") {
-      await finishGoogle(user.id, url);
+      const client = await finishGoogle(user.id, url);
       await indexJobs(user.id, await syncGoogle(user.id));
-      return Response.redirect(`${process.env.BETTER_AUTH_URL}/?connected=1`);
+      return Response.redirect(
+        `${process.env.BETTER_AUTH_URL}/${client === "mobile" ? "mobile/connected" : "?connected=1"}`,
+      );
     }
     if (path === "google/disconnect" && r.method === "POST") {
       await disconnectGoogle(user.id);

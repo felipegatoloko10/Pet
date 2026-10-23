@@ -1,15 +1,15 @@
-Pingo 2.2.0-beta.1 — avatar recortado, mais vivo e com conversa.
+Pingo 2.3.0-beta.1 — Android e cuidados com o companheiro.
 
-O avatar Windows agora tem fundo transparente desde a raiz da página e no WebView, sem painel retangular. Apenas o personagem, os balões e a barra flutuante aparecem. A área vazia permite passagem do mouse para o desktop.
+Novo aplicativo Android 7 ou superior, com as mesmas contas e dados do site e do Windows. Kanban na primeira página, agenda diária/semanal/mensal/anual, sessões de conversa e ajustes ganham navegação inferior e adaptação ao toque e ao teclado.
 
-São 24 estados animados locais: os gestos anteriores mais espreguiçar, acenar, dançar, se limpar, ficar curioso, pular, espiar, ouvir, rolar, sentar, se surpreender e girar. Olhos acompanham o cursor, braços e orelhas têm articulações próprias. Movimento reduzido, pausa ao ocultar, silêncio e preferências de áudio continuam respeitados.
+A aba Pingo permite alimentar, fazer carinho, brincar e cochilar. Saciedade, humor e energia evoluem pelo tempo decorrido, sem chamadas de IA nem penalidades às tarefas. Os cuidados são compartilhados entre dispositivos, preservando a compatibilidade com clientes anteriores.
 
-Converse pela barra abaixo do avatar usando Enter (Shift+Enter faz uma nova linha). A conversa pertence à sua conta, fica no histórico do painel e usa a chave de IA já configurada. Propostas que precisam de aprovação abrem a sessão correspondente para revisão. Mensagens com resposta incerta mantêm o mesmo identificador para repetição segura.
+Login Google pelo navegador com retorno automático ao app, PKCE e código de uso único. Sessão protegida com Android Keystore; cache e fila offline em SQLite nativo. A autorização Workspace continua separada da entrada na conta.
 
-Passe o mouse no Pingo para revelar os controles: arrastar, diminuir, aumentar, brincar, abrir o painel e sair. Também é possível redimensionar pelo canto. O tamanho é lembrado neste computador e se ajusta à área disponível do monitor.
+Notificações Android combinam FCM e lembretes locais, com deduplicação, silêncio, privacidade na tela bloqueada e restauração após reinício. A integração Google usa identidade temporária da Vercel, sem chave privada permanente e sem ativação de faturamento. O agendador Cloudflare existente continua ativo.
 
-Validação: testes unitários/simulados, testes de navegador incluindo PNG com canal alfa, balões, conversa, dimensões e acessibilidade, builds web/desktop e verificação nativa Windows. Não foram feitas chamadas pagas de IA. Mais detalhes em `docs/AVATAR.md`.
+O APK é assinado com uma chave própria do beta, com checksum no arquivo SHA256SUMS-Android.txt. Confira o checksum, instale e entre com sua conta convidada. Instruções e limites de distribuição/homologação em docs/ANDROID.md.
 
-Encerre a versão anterior antes de instalar. Sessões e dados da conta são preservados. A versão `v2.1.0-beta.2` permanece recuperável no histórico de releases.
+Instale sobre a versão anterior para preservar os dados locais. Sessões e dados da conta são preservados. A versão 2.2 permanece recuperável no histórico de releases.
 
-O beta continua por convite, com OAuth Google em modo de teste. O agendador Cloudflare segue inativo; esta revisão não altera a ativação de infraestrutura. O instalador é fornecido sem assinatura comercial.
+O beta é gratuito, não comercial e por convite. Notificações são de melhor esforço. A homologação em aparelho físico e eventuais verificações pessoais do cadastro Android dependem dos titulares; não foram substituídas pelos testes automatizados/emulador. Nenhuma chamada paga de IA foi usada na validação. O instalador Windows continua sem assinatura comercial.

@@ -1,0 +1,209 @@
+.pet-room {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 22px;
+  text-align: center;
+  background: linear-gradient(150deg, #f5faf7, #fff5ed 65%, #f5effb);
+  border: 1px solid #fff;
+  border-radius: 30px;
+}
+.pet-room-heading h2 {
+  margin: 18px 0 10px;
+  font-size: clamp(24px, 5vw, 36px);
+  letter-spacing: -0.045em;
+}
+.pet-room-heading p,
+.pet-care-note {
+  color: #6b827b;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.pet-room-stage {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+.pet-room-stage .pet-scene {
+  width: min(100%, 330px);
+  height: 280px;
+}
+.pet-meters {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 12px 0 24px;
+}
+.pet-meter {
+  text-align: left;
+  background: #ffffffbb;
+  padding: 14px;
+  border-radius: 18px;
+}
+.pet-meter span {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  gap: 5px;
+}
+.pet-meter progress {
+  appearance: none;
+  width: 100%;
+  height: 7px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.pet-meter progress::-webkit-progress-bar {
+  background: #e9eeeb;
+}
+.pet-meter progress::-webkit-progress-value {
+  background: #77bca2;
+  border-radius: 8px;
+}
+.pet-meter.peach progress::-webkit-progress-value {
+  background: #e6ad81;
+}
+.pet-meter.pink progress::-webkit-progress-value {
+  background: #dc98b5;
+}
+.pet-care-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 16px 0 24px;
+}
+.pet-care-actions button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 4px;
+  color: #456d60;
+  border: 1px solid #ffffff;
+  background: #ffffffb0;
+  border-radius: 20px;
+  font: inherit;
+  font-size: 12px;
+  min-height: 80px;
+}
+.pet-care-actions button:active {
+  transform: scale(0.96);
+  background: #e0eee5;
+}
+.pet-care-note {
+  display: block;
+  margin: 18px auto 0;
+  max-width: 370px;
+}
+.mobile-app {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  min-height: 100dvh;
+}
+.native-paused *,
+.native-paused *::before,
+.native-paused *::after {
+  animation-play-state: paused !important;
+}
+.mobile-app .sidebar {
+  position: fixed;
+  inset: auto 0 0;
+  width: 100%;
+  height: auto;
+  padding: 10px 8px calc(10px + env(safe-area-inset-bottom));
+  z-index: 60;
+  border-radius: 24px 24px 0 0;
+  background: #fafffcf5;
+  border-top: 1px solid #dbe9e2;
+  box-shadow: 0 -8px 32px #37664b0a;
+  backdrop-filter: blur(16px);
+}
+.mobile-app .sidebar .brand,
+.mobile-app .space-label,
+.mobile-app .sidebar-bottom {
+  display: none;
+}
+.mobile-app nav {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3px;
+  padding: 0;
+  margin: 0;
+}
+.mobile-app .nav-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 0;
+  border-radius: 16px;
+  min-width: 0;
+  height: auto;
+}
+.mobile-app .nav-item span {
+  display: block;
+  font-size: 10px;
+}
+.mobile-app .nav-item.selected {
+  background: #d8eee0;
+  color: #266451;
+}
+.mobile-app .main-area {
+  margin: 0;
+  width: 100%;
+  min-width: 0;
+}
+.mobile-app .topbar {
+  padding: calc(12px + env(safe-area-inset-top)) 18px 12px;
+}
+.mobile-app .workspace {
+  padding: 20px 16px;
+}
+.mobile-app .workspace-footer {
+  padding-bottom: 10px;
+}
+.mobile-app input,
+.mobile-app textarea,
+.mobile-app select {
+  font-size: 16px;
+}
+.mobile-app button {
+  -webkit-tap-highlight-color: transparent;
+}
+.mobile-app .chat-app {
+  height: calc(100dvh - 220px - env(safe-area-inset-bottom));
+  min-height: 300px;
+}
+.mobile-app .chat-composer {
+  padding-bottom: 8px;
+}
+.mobile-app .modal-backdrop {
+  padding: calc(12px + env(safe-area-inset-top)) 12px
+    calc(12px + env(safe-area-inset-bottom));
+  z-index: 100;
+}
+.mobile-app .pet-room {
+  padding: 22px 14px;
+}
+.mobile-app .pet-meters {
+  gap: 6px;
+}
+.mobile-app .pet-meter {
+  padding: 12px 8px;
+}
+.mobile-app .pet-care-actions {
+  gap: 6px;
+}
+.mobile-app .board-toolbar {
+  flex-wrap: wrap;
+}
+@media (max-width: 400px) {
+  .mobile-app .pet-meter span {
+    font-size: 10px;
+  }
+  .mobile-app .topbar {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}

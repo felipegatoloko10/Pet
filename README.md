@@ -1,8 +1,10 @@
-# Pingo 2.2
+# Pingo 2.3
 
 Um pequeno companheiro para organizar tarefas, agenda e rotina. Beta não comercial por convite, com espaços individuais e até 10 convidados.
 
 [Abrir o Pingo](https://pingo-gilt.vercel.app)
+
+O [Android beta](docs/ANDROID.md) reúne tarefas, agenda, conversas e um espaço para cuidar do Pingo. APK assinado, login Google com retorno automático, SQLite offline e notificações FCM com lembretes locais.
 
 O [avatar 2.2](docs/AVATAR.md) é recortado, tem 24 estados animados, conversa pela barra abaixo do personagem e permite ajustar e guardar seu tamanho. As animações são locais e não consomem IA.
 
@@ -12,6 +14,7 @@ Veja as [mudanças da revisão 2.1](docs/REVISION-2.1.md): Kanban inicial, etiqu
 
 - `apps/web`: Next.js 16, Better Auth e API `/api/v1`.
 - `apps/desktop`: Tauri 2, Windows, avatar transparente e painel compartilhado.
+- `apps/mobile`: Capacitor 8, Android 7+, interface incorporada e integração nativa.
 - `packages/core`: contratos, revisões, Kanban, reconciliação e rotina.
 - `packages/ui`: React, painel responsivo, pet SVG animado e cache offline.
 - `workers/scheduler`: cron Cloudflare + índice D1, sem consultar Neon em minutos vazios.
@@ -52,4 +55,4 @@ Gmail alimenta somente a caixa estática de e-mails de hoje, com metadados de li
 
 As animações são locais. Som e voz começam desligados. Notificações em nuvem são de melhor esforço e dependem das cotas e permissões do dispositivo.
 
-Não há aplicativo móvel nativo, quadros compartilhados, Drive, Docs ou cobrança nesta versão. As integrações reais precisam de homologação Google antes de abrir o beta a convidados.
+Quadros compartilhados, Drive, Docs, iPhone e cobrança ficam fora desta versão. A homologação em aparelho Android físico e as verificações pessoais de distribuição limitada dependem dos titulares.

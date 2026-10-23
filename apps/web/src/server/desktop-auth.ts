@@ -7,6 +7,8 @@ import { verification } from "./schema";
 import { auth } from "./auth";
 import { digest, secretEqual } from "./crypto";
 const secret = z.string().regex(/^[A-Za-z0-9_-]{43,128}$/);
+export type NativeClient = "desktop" | "mobile";
+const identifier = (client: NativeClient) => `pingo-${client}`;
 export const desktopStartInput = z.object({ state: secret, challenge: secret });
 export async function limitDesktop(source: string) {
   const key =
@@ -39,12 +41,15 @@ export async function limitDesktop(source: string) {
       ),
     );
 }
-export async function startDesktop(input: z.infer<typeof desktopStartInput>) {
+export async function startDesktop(
+  input: z.infer<typeof desktopStartInput>,
+  client: NativeClient = "desktop",
+) {
   await db()
     .delete(verification)
     .where(
       and(
-        eq(verification.identifier, "pingo-desktop"),
+        eq(verification.identifier, identifier(client)),
         lt(verification.expiresAt, new Date()),
       ),
     );
@@ -53,18 +58,19 @@ export async function startDesktop(input: z.infer<typeof desktopStartInput>) {
     .insert(verification)
     .values({
       id,
-      identifier: "pingo-desktop",
-      value: JSON.stringify(input),
+      identifier: identifier(client),
+      value: JSON.stringify({ ...input, client }),
       expiresAt: new Date(Date.now() + 600000),
     });
   return {
-    url: `${process.env.BETTER_AUTH_URL}/desktop/login?id=${id}&state=${input.state}`,
+    url: `${process.env.BETTER_AUTH_URL}/${client}/login?id=${id}&state=${input.state}`,
   };
 }
 export async function authorizeDesktop(
   userId: string,
   id: string,
   state: string,
+  client: NativeClient = "desktop",
 ) {
   return db().transaction(async (tx) => {
     const [row] = await tx
@@ -73,7 +79,7 @@ export async function authorizeDesktop(
       .where(
         and(
           eq(verification.id, id),
-          eq(verification.identifier, "pingo-desktop"),
+          eq(verification.identifier, identifier(client)),
         ),
       )
       .for("update");
@@ -84,7 +90,11 @@ export async function authorizeDesktop(
         409,
       );
     const value = JSON.parse(row.value);
-    if (!secretEqual(value.state, state) || value.codeHash)
+    if (
+      (value.client && value.client !== client) ||
+      !secretEqual(value.state, state) ||
+      value.codeHash
+    )
       throw new DomainError(
         "state",
         "Tentativa inválida ou já autorizada.",
@@ -99,11 +109,14 @@ export async function authorizeDesktop(
       })
       .where(eq(verification.id, id));
     return {
-      url: `pingo://auth/callback?id=${id}&state=${state}&code=${code}`,
+      url: `${client === "mobile" ? "app.pingo.mobile" : "pingo"}://auth/callback?id=${id}&state=${state}&code=${code}`,
     };
   });
 }
-export async function exchangeDesktop(raw: unknown) {
+export async function exchangeDesktop(
+  raw: unknown,
+  client: NativeClient = "desktop",
+) {
   const input = z
     .object({ id: z.uuid(), state: secret, code: secret, verifier: secret })
     .parse(raw);
@@ -114,7 +127,7 @@ export async function exchangeDesktop(raw: unknown) {
       .where(
         and(
           eq(verification.id, input.id),
-          eq(verification.identifier, "pingo-desktop"),
+          eq(verification.identifier, identifier(client)),
         ),
       )
       .for("update");
@@ -125,6 +138,7 @@ export async function exchangeDesktop(raw: unknown) {
         .update(input.verifier)
         .digest("base64url");
     if (
+      (value.client && value.client !== client) ||
       !value.userId ||
       !value.codeHash ||
       !secretEqual(value.state, input.state) ||

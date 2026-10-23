@@ -40,7 +40,7 @@ export class GoogleError extends Error {
   }
 }
 const redirect = () => `${process.env.BETTER_AUTH_URL}/api/v1/google/callback`;
-export async function beginGoogle(userId: string) {
+export async function beginGoogle(userId: string, client?: "mobile") {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET)
     throw new DomainError(
       "configuration",
@@ -55,7 +55,7 @@ export async function beginGoogle(userId: string) {
     .values({
       id: state,
       userId,
-      verifier,
+      verifier: client ? JSON.stringify({ verifier, client }) : verifier,
       expiresAt: new Date(Date.now() + 600000),
     });
   const params = new URLSearchParams({
@@ -85,9 +85,12 @@ export async function finishGoogle(userId: string, url: URL) {
       "oauth",
       "Autorização expirada. Tente conectar novamente.",
     );
+  const saved = row.verifier.startsWith("{")
+    ? JSON.parse(row.verifier)
+    : { verifier: row.verifier };
   const token = await tokenRequest({
     code: url.searchParams.get("code")!,
-    code_verifier: row.verifier,
+    code_verifier: saved.verifier,
     grant_type: "authorization_code",
     redirect_uri: redirect(),
   });
@@ -119,6 +122,7 @@ export async function finishGoogle(userId: string, url: URL) {
     w.cursor = {};
     w.revision++;
   });
+  return saved.client === "mobile" ? "mobile" : undefined;
 }
 async function tokenRequest(params: Record<string, string>): Promise<Tokens> {
   const response = await fetch("https://oauth2.googleapis.com/token", {

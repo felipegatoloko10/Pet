@@ -3,6 +3,7 @@
 @import "./avatar-base.css";
 @import "./pet-motion.css";
 @import "./pastel.css";
+@import "./mobile.css";
 :root {
   font-family: "DM Sans", system-ui, sans-serif;
   color: #293c34;

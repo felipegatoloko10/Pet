@@ -25,6 +25,7 @@ function createAuth() {
       process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
       "tauri://localhost",
       "http://tauri.localhost",
+      "https://localhost",
     ],
     plugins: [
       bearer(),
@@ -61,7 +62,13 @@ export function auth() {
   return instance ?? (instance = createAuth());
 }
 export async function requireUser(request: Request) {
-  if(!request.headers.has('authorization')&&!request.headers.get('cookie')?.includes('session_token='))throw new APIError('UNAUTHORIZED',{message:'Entre no Pingo para continuar.'});
+  if (
+    !request.headers.has("authorization") &&
+    !request.headers.get("cookie")?.includes("session_token=")
+  )
+    throw new APIError("UNAUTHORIZED", {
+      message: "Entre no Pingo para continuar.",
+    });
   const session = await auth().api.getSession({ headers: request.headers });
   if (!session)
     throw new APIError("UNAUTHORIZED", {

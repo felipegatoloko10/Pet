@@ -1,5 +1,16 @@
 # Verificação do Pingo 2
 
+## Android 2.3 — executado em 23/10/2026
+
+- 84 testes unitários/simulados: domínio, sincronização, cuidados, login e FCM.
+- 15 testes de navegador: web, avatar Windows e interface móvel.
+- 15 verificações no runtime Workers/D1 local.
+- Testes nativos Robolectric de notificações, isolamento e SQLite; instrumentação Android 16 de Keystore, SQLite após reabertura, protocolo e interface real do APK.
+- Envio FCM real do backend de produção, autenticado por OIDC/WIF, recebido como notificação do sistema Android sem Activity aberta. Conta temporária e evento artificial exclusivos; dados de teste removidos ao terminar.
+- Build de produção assinado com chave do beta; checksum publicado junto ao APK.
+
+Não equivalem a homologação em telefone físico: ainda é necessário conferir login Google e Workspace no aparelho dos titulares, permissões/bateria específicas do fabricante, atualização após reinício e registro de distribuição quando exigido. Nenhuma chamada paga de IA nem alteração de calendário real foi feita nestes testes. Consulte [ANDROID.md](ANDROID.md).
+
 Os testes de `tests/` usam respostas Google simuladas e regras locais. Execute `npm test`, `npm run check` e `npm run build`. O CI também valida e compila o instalador Windows.
 
 ## Homologação obrigatória com Google real

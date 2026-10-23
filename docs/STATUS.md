@@ -1,5 +1,13 @@
 # Estado da entrega
 
+## Android 2.3
+
+Aplicativo Android nativo com Capacitor 8, interface compartilhada, login PKCE pelo navegador, SQLite por conta, sessão protegida no Keystore, FCM com coordenador único de notificações e cuidados sincronizados do pet. Firebase está configurado no projeto Pingo sem Analytics ou faturamento; Vercel usa Workload Identity Federation e uma permissão exclusiva de envio, sem chave privada Google.
+
+Validação local: 84 testes unitários/simulados, 15 testes de interface web/desktop/móvel, 15 verificações Workers/D1, testes nativos Android de persistência, proteção de sessão, protocolo e interface em emulador Android 16. APK de produção assinado com chave própria preservada em armazenamento privado e segredos do CI. Detalhes em [ANDROID.md](ANDROID.md). Homologação em telefone físico e cadastro pessoal de distribuição Android permanecem etapas dos titulares.
+
+Envio FCM real confirmado em 23/10/2026: backend de produção → identidade Vercel/Google → Firebase → notificação do Android 16 sem Activity aberta. Teste opt-in com conta temporária e evento artificial, sem Google Workspace ou IA; cadastro, sessão e trabalhos dessa conta foram removidos ao terminar. Health do backend confirma versão 2.3.0-beta.1 e notificações Android habilitadas.
+
 ## Agendador em nuvem — ativo
 
 O protocolo 2 está publicado com índice D1 por revisão, proteção contra confirmações antigas, lease e repetição, status autenticado, expansão de recorrências em segundo plano e deduplicação de push por assinatura. O horário da rotina é ancorado na última execução para que sincronizações do app aberto não o adiem. A base tem 71 testes unitários/simulados, além de 15 verificações no runtime Workers/D1 local com backend simulado.
@@ -50,7 +58,7 @@ Kanban inicial com ordenação, etiquetas, checklists e arquivamento; conversas 
 O beta continua por convite. Ainda são necessários os passos abaixo para homologação completa:
 
 1. OAuth Google configurado no projeto exclusivo `pingo-512421`, com APIs habilitadas, redirects e dois usuários de teste. Login real e primeira importação Workspace verificados na conta autorizada. Nenhum token do WPF foi transferido.
-2. Autenticar a conta Cloudflare para criar o D1 e publicar o Worker. O pacote foi validado por tipos e dry-run; o serviço em nuvem ainda não está ativo.
+2. Cloudflare e D1 já estão ativos, conforme a evidência de produção acima. Autorizar notificações em cada dispositivo e homologar a exibição real.
 3. Executar a homologação com contas Google reais e chaves reais dos provedores. Não foram feitas chamadas de IA cobradas durante o desenvolvimento.
 4. Verificar no Windows as interações nativas de bandeja, sono/retomada e sons, e testar Push em dispositivos reais com o desktop fechado.
 

@@ -3,7 +3,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { emit, emitTo } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Api, type Storage } from "@pingo/ui/client";
-import { defaultPreferences, type PetState } from "@pingo/core";
+import {
+  defaultPreferences,
+  advancePetCare,
+  petSleeping,
+  type PetState,
+} from "@pingo/core";
 import { Companion } from "./Companion";
 import { PetChat, PendingPetMessageError, type PetReply } from "./pet-chat";
 import { useDesktopPet } from "./pet-service";
@@ -119,7 +124,26 @@ function CompanionSession({
     <Companion
       preferences={service.workspace.preferences}
       message={reply?.text ?? service.bubble}
-      activity={reply ? (busy ? "think" : "speak") : service.activity}
+      activity={
+        reply
+          ? busy
+            ? "think"
+            : "speak"
+          : (service.activity ??
+            (service.workspace.petCare
+              ? petSleeping(
+                  service.workspace.petCare,
+                  service.workspace.preferences,
+                )
+                ? "sleep"
+                : advancePetCare(
+                      service.workspace.petCare,
+                      service.workspace.preferences,
+                    ).energy < 25
+                  ? "yawn"
+                  : undefined
+              : undefined))
+      }
       busy={busy}
       review={!!reply?.suggestions?.length}
       retryText={retryText}

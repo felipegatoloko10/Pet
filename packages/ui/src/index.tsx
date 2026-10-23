@@ -59,6 +59,7 @@ import {
   type Storage,
 } from "./client";
 import { Pet } from "./Pet";
+import { PetRoom } from "./PetRoom";
 import { Board } from "./Board";
 const Calendar = lazy(() =>
   import("./Calendar").then((m) => ({ default: m.Calendar })),
@@ -68,7 +69,20 @@ import { Routine } from "./Routine";
 import { demoWorkspace } from "./demo";
 export { Pet, PingoClient, Api };
 export type { Storage };
-type Platform = {
+export type Platform = {
+  kind?: "web" | "desktop" | "android";
+  notifications?: {
+    enable: () => Promise<void>;
+    settings: () => Promise<void>;
+    privacy: () => Promise<boolean>;
+    setPrivacy: (hidden: boolean) => Promise<void>;
+  };
+  connectWorkspace?: () => Promise<void>;
+  speak?: (text: string) => () => void;
+  onBack?: (handler: () => boolean) => () => void;
+  onNotice?: (
+    handler: (value: { eventId?: string; noticeId?: string }) => void,
+  ) => () => void;
   api?: Api;
   login?: () => Promise<void>;
   logout?: () => Promise<void>;
@@ -81,6 +95,7 @@ type Platform = {
 const nav = [
   { id: "day", label: "Meu dia", icon: Sun },
   { id: "calendar", label: "Agenda", icon: CalendarDays },
+  { id: "pet", label: "Pingo", icon: Heart },
   { id: "chat", label: "Conversa", icon: MessageCircle },
   { id: "settings", label: "Ajustes", icon: Settings },
 ] as const;
@@ -130,6 +145,7 @@ function download(name: string, value: string) {
 export function PingoApp({ platform = {} }: { platform?: Platform }) {
   const apiRef = useRef(platform.api ?? new Api());
   const api = apiRef.current;
+  const soundEnabled = platform.kind === "android" || !platform.api;
   const [client, setClient] = useState<PingoClient>();
   const [user, setUser] = useState<User>();
   const [boot, setBoot] = useState(true);
@@ -153,6 +169,54 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   } | null>(null);
   const [focus, setFocus] = useState(false);
   const [toast, setToast] = useState("");
+  useEffect(
+    () =>
+      platform.onBack?.(() => {
+        if (taskEditor) {
+          setTaskEditor(null);
+          return true;
+        }
+        if (eventEditor) {
+          setEventEditor(null);
+          return true;
+        }
+        if (noticesOpen) {
+          setNoticesOpen(false);
+          return true;
+        }
+        if (conflict) {
+          setConflict(null);
+          return true;
+        }
+        const dialog =
+          document.querySelector<HTMLDialogElement>("dialog[open]");
+        if (dialog) {
+          dialog.dispatchEvent(new Event("cancel", { cancelable: true }));
+          return true;
+        }
+        if (screen !== "day") {
+          setScreen("day");
+          return true;
+        }
+        return false;
+      }),
+    [platform.onBack, taskEditor, eventEditor, noticesOpen, conflict, screen],
+  );
+  useEffect(() => {
+    if (!client) return;
+    return platform.onNotice?.(({ eventId, noticeId }) => {
+      if (eventId) {
+        const event = client?.workspace.events.find(
+          (e) => e.id === eventId && !e.deleted,
+        );
+        if (event) setEventEditor(event);
+        else setScreen("calendar");
+      } else setScreen("day");
+      if (noticeId && client?.workspace.notices.some((n) => n.id === noticeId))
+        void client.command({ type: "notice.read", id: noticeId });
+      if (client) void client.refresh();
+    });
+  }, [platform.onNotice, client]);
   async function attach(u: User, demo = false) {
     const storage = await (platform.storage ?? webStorage)(
       demo ? "demo" : u.id,
@@ -207,15 +271,16 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
       active = false;
     };
   }, []);
-  useEffect(
-    () =>
-      client?.subscribe(() => {
-        render((n) => n + 1);
-        if (user && user.id !== "demo")
-          platform.onWorkspace?.(client.workspace, user.id);
-      }),
-    [client, user],
-  );
+  useEffect(() => {
+    if (!client) return;
+    if (user && user.id !== "demo")
+      platform.onWorkspace?.(client.workspace, user.id);
+    return client.subscribe(() => {
+      render((n) => n + 1);
+      if (user && user.id !== "demo")
+        platform.onWorkspace?.(client.workspace, user.id);
+    });
+  }, [client, user]);
   useEffect(
     () =>
       platform.onOpenConversation?.((id) => {
@@ -310,6 +375,13 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     }
   }
   async function logout() {
+    if (
+      client?.pending.length &&
+      !confirm(
+        "Há alterações ainda não sincronizadas. Sair agora apagará a cópia local. Deseja sair mesmo assim?",
+      )
+    )
+      return;
     setRequestedConversation(undefined);
     if (!platform.api && "serviceWorker" in navigator) {
       const registration = await navigator.serviceWorker.getRegistration();
@@ -395,7 +467,8 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
           </div>
           <div className="welcome-pet">
             <Pet
-              soundEnabled={!platform.api}
+              soundEnabled={soundEnabled}
+              speak={platform.speak}
               preferences={prefs}
               message="Oi! Vamos deixar seu dia mais leve?"
             />
@@ -425,7 +498,9 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     else window.open(url, "_blank", "noopener,noreferrer");
   };
   return (
-    <div className="app-shell">
+    <div
+      className={`app-shell ${platform.kind === "android" ? "mobile-app" : ""}`}
+    >
       <aside className="sidebar">
         <a
           className="brand"
@@ -447,7 +522,11 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
           {nav.map((n) => (
             <button
               key={n.id}
-              aria-label={n.label}
+              aria-label={
+                platform.kind === "android" && n.id === "chat"
+                  ? "Conversas"
+                  : n.label
+              }
               title={n.label}
               className={screen === n.id ? "nav-item selected" : "nav-item"}
               onClick={() => {
@@ -456,7 +535,11 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
               }}
             >
               <n.icon size={19} />
-              <span>{n.label}</span>
+              <span>
+                {platform.kind === "android" && n.id === "chat"
+                  ? "Conversas"
+                  : n.label}
+              </span>
             </button>
           ))}
         </nav>
@@ -606,8 +689,10 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
                   </button>
                 </div>
                 <Pet
-                  soundEnabled={!platform.api}
+                  soundEnabled={soundEnabled}
+                  speak={platform.speak}
                   preferences={prefs}
+                  care={w.petCare}
                   message={
                     pending.length
                       ? "Estou aqui para ajudar. ♡"
@@ -780,6 +865,15 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
               <Calendar w={w} client={client} onEdit={setEventEditor} />
             </Suspense>
           )}
+          {screen === "pet" && (
+            <PetRoom
+              w={w}
+              act={act}
+              onChat={() => setScreen("chat")}
+              soundEnabled={soundEnabled}
+              speak={platform.speak}
+            />
+          )}
           {screen === "chat" && (
             <Suspense fallback={<p role="status">Abrindo suas conversas…</p>}>
               <Chat
@@ -794,6 +888,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
           )}
           {screen === "settings" && (
             <SettingsPage
+              platform={platform}
               w={w}
               client={client}
               act={act}
@@ -1539,12 +1634,14 @@ function SuggestionPreview({
   return <p>Revise esta alteração antes de aprovar.</p>;
 }
 function SettingsPage({
+  platform,
   w,
   client,
   act,
   openExternal,
   onToast,
 }: {
+  platform: Platform;
   w: Workspace;
   client: PingoClient;
   act: (c: Command) => Promise<void>;
@@ -1554,6 +1651,13 @@ function SettingsPage({
   const [p, setP] = useState(w.preferences);
   const [key, setKey] = useState("");
   const [status, setStatus] = useState("");
+  const [hiddenDetails, setHiddenDetails] = useState(false);
+  useEffect(() => {
+    void platform.notifications
+      ?.privacy()
+      .then(setHiddenDetails)
+      .catch(() => {});
+  }, [platform.notifications]);
   const [migration, setMigration] = useState<{
     tasks: Record<string, unknown>[];
     events: Record<string, unknown>[];
@@ -1820,6 +1924,8 @@ function SettingsPage({
               disabled={client.demo}
               onClick={() =>
                 void run(async () => {
+                  if (platform.connectWorkspace)
+                    return platform.connectWorkspace();
                   const r = await client.api.post<{ url: string }>(
                     "google/connect",
                   );
@@ -1935,19 +2041,45 @@ function SettingsPage({
           <section className="panel editor-form">
             <h2>Não perder o momento</h2>
             <p>
-              Receba avisos neste navegador mesmo com o painel fechado. A
+              Receba avisos neste dispositivo mesmo com o painel fechado. A
               entrega depende da conexão e do dispositivo.
             </p>
             <button
               className="button"
               onClick={() =>
-                client.api.base
-                  ? void openExternal(`${client.api.base}/?page=settings`)
-                  : void run(push)
+                platform.notifications
+                  ? void run(platform.notifications.enable)
+                  : client.api.base
+                    ? void openExternal(`${client.api.base}/?page=settings`)
+                    : void run(push)
               }
             >
               <Bell size={16} /> Ativar notificações
             </button>
+            {platform.notifications && (
+              <>
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={hiddenDetails}
+                    onChange={(e) => {
+                      const hidden = e.target.checked;
+                      void run(async () => {
+                        await platform.notifications!.setPrivacy(hidden);
+                        setHiddenDetails(hidden);
+                      });
+                    }}
+                  />{" "}
+                  Ocultar detalhes na tela bloqueada
+                </label>
+                <button
+                  className="text-link"
+                  onClick={() => void run(platform.notifications!.settings)}
+                >
+                  Precisão dos lembretes e permissões Android
+                </button>
+              </>
+            )}
           </section>
           <section className="panel editor-form">
             <h2>Trazer minha rotina antiga</h2>

@@ -15,3 +15,7 @@ playwright-report
 **/GoogleOAuth.local.json
 **/*.enc
 legacy
+apps/mobile/android
+**/*.jks
+**/*.keystore
+**/google-services.json

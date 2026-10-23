@@ -2,6 +2,9 @@
 import { useEffect, useState, useRef, type CSSProperties } from "react";
 import {
   petState,
+  petSleeping,
+  advancePetCare,
+  type PetCare,
   isQuiet,
   type PetState,
   type Preferences,
@@ -14,6 +17,8 @@ export function Pet({
   onClick,
   activity,
   soundEnabled = false,
+  speak,
+  care,
 }: {
   preferences: Preferences;
   message?: string;
@@ -22,6 +27,8 @@ export function Pet({
   onClick?: () => void;
   activity?: PetState;
   soundEnabled?: boolean;
+  speak?: (text: string) => () => void;
+  care?: PetCare;
 }) {
   const [naturalState, setState] = useState<PetState>("idle");
   const [petted, setPetted] = useState(false);
@@ -49,6 +56,8 @@ export function Pet({
       isQuiet(new Date(), p)
     )
       return;
+    if (speak) return speak(message);
+    if (!("speechSynthesis" in window)) return;
     const text = new SpeechSynthesisUtterance(message);
     text.lang = "pt-BR";
     speechSynthesis.speak(text);
@@ -61,6 +70,7 @@ export function Pet({
     p.quietStart,
     p.quietEnd,
     p.timezone,
+    speak,
   ]);
   useEffect(() => {
     if (
@@ -122,7 +132,15 @@ export function Pet({
     if (!visible) return;
     let wakeTimer: ReturnType<typeof setTimeout> | undefined;
     const tick = () => {
-      const next = petState(new Date(), p, focus);
+      const now = new Date();
+      const currentCare = care ? advancePetCare(care, p, now) : undefined;
+      const next = care
+        ? petSleeping(care, p, now)
+          ? "sleep"
+          : focus
+            ? "focus"
+            : "idle"
+        : petState(now, p, focus);
       if (activity && activity !== "idle") setState(activity);
       else if (previous.current === "sleep" && next !== "sleep") {
         setState("wake");
@@ -146,7 +164,11 @@ export function Pet({
         setState(
           message
             ? "speak"
-            : choices[Math.floor(Math.random() * choices.length)],
+            : currentCare && currentCare.energy < 25
+              ? "yawn"
+              : currentCare && currentCare.mood < 25
+                ? "sit"
+                : choices[Math.floor(Math.random() * choices.length)],
         );
       }
       previous.current = next;
@@ -157,7 +179,7 @@ export function Pet({
       clearInterval(timer);
       if (wakeTimer) clearTimeout(wakeTimer);
     };
-  }, [p, focus, visible, message, activity]);
+  }, [p, focus, visible, message, activity, care]);
   function affection() {
     setPetted(true);
     clearTimeout(affectionTimer.current);

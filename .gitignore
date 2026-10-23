@@ -6,7 +6,7 @@ client_secret*.json
 *.user
 
 # Publicação local e artefatos de verificação (não são fontes)
-Pingo/
+/Pingo/
 dist/
 .verification/
 *.enc
@@ -27,3 +27,7 @@ test-results/
 .neon*.env
 .dev.vars*
 .codex-attachments/
+*.jks
+*.keystore
+**/google-services.json
+**/signing.properties

@@ -1,7 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "tests",
-  testMatch: ["browser/**/*.spec.ts", "desktop/**/*.spec.ts"],
+  testMatch: [
+    "browser/**/*.spec.ts",
+    "desktop/**/*.spec.ts",
+    "mobile/**/*.spec.ts",
+  ],
   fullyParallel: false,
   use: {
     baseURL: process.env.PINGO_TEST_URL ?? "http://127.0.0.1:3210",
@@ -9,6 +13,12 @@ export default defineConfig({
     channel: process.env.CI ? "chrome" : undefined,
   },
   webServer: [
+    {
+      command: "npm run dev -w @pingo/mobile",
+      url: "http://127.0.0.1:1430",
+      reuseExistingServer: !process.env.CI,
+      timeout: 30000,
+    },
     ...(process.env.PINGO_TEST_URL
       ? []
       : [

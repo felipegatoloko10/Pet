@@ -1,5 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use tauri::{Manager, Emitter, menu::{MenuBuilder, MenuItemBuilder},tray::TrayIconBuilder};
+use tauri::{Manager, menu::{MenuBuilder, MenuItemBuilder},tray::TrayIconBuilder};
 
 #[tauri::command]
 fn read_session() -> Result<String, String> {

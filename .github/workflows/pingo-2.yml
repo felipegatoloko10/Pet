@@ -52,6 +52,7 @@ jobs:
         if: always()
         with:
           name: Pingo-Windows-diagnostico
+          include-hidden-files: true
           path: |
             apps/desktop/src-tauri/target/release/pingo.exe
             .verification/native-shutdown.log

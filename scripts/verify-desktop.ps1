@@ -47,6 +47,17 @@ public static class PingoWindows {
 function Get-PingoInstances {
     @(Get-Process -Name pingo -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $binary })
 }
+function Wait-PingoWindows($process) {
+    $deadline = (Get-Date).AddSeconds(30)
+    do {
+        if ($process.HasExited) { throw "O Pingo encerrou durante a inicialização (código $($process.ExitCode))." }
+        $panel = [PingoWindows]::Find($process.Id, 'Pingo — meu dia')
+        $avatar = [PingoWindows]::Find($process.Id, 'Pingo')
+        if ($panel -ne [IntPtr]::Zero -and $avatar -ne [IntPtr]::Zero) { return $avatar }
+        Start-Sleep -Milliseconds 250
+    } until ((Get-Date) -gt $deadline)
+    throw "As duas janelas não abriram em 30 segundos. Painel: $panel; avatar: $avatar."
+}
 function Close-PingoWindow($process, [string]$title) {
     $handle = [PingoWindows]::Find($process.Id, $title)
     if ($handle -eq [IntPtr]::Zero) { throw "Janela não encontrada: $title" }
@@ -59,13 +70,8 @@ $originalCursor = New-Object PingoWindows+Point
 $hasCursor = [PingoWindows]::GetCursorPos([ref]$originalCursor)
 try {
     $started = Start-Process -FilePath $binary -WindowStyle Hidden -PassThru
-    $deadline = (Get-Date).AddSeconds(30)
-    do {
-        Start-Sleep -Milliseconds 500
-        $instances = Get-PingoInstances
-        $window = $instances | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
-    } until ($window -or (Get-Date) -gt $deadline)
-    if (-not $window) { throw 'O painel nativo não abriu.' }
+    $petHandle = Wait-PingoWindows $started
+    $window = $started
     1..3 | ForEach-Object {
         $duplicate = Start-Process -FilePath $binary -WindowStyle Hidden -PassThru
         if (-not $duplicate.WaitForExit(10000)) { throw "A segunda abertura não encerrou seu processo auxiliar: $($duplicate.Id)." }
@@ -75,8 +81,7 @@ try {
         $details = ($instances | ForEach-Object { "$($_.Id):$($_.MainWindowTitle)" }) -join ', '
         throw "A instância original não permaneceu sozinha após as reaberturas. Processos: [$details]."
     }
-    $petHandle = [PingoWindows]::Find($window.Id, 'Pingo')
-    if ($petHandle -eq [IntPtr]::Zero) { throw 'O avatar não abriu.' }
+    Start-Sleep -Seconds 2
     $bounds = [PingoWindows]::Rectangle($petHandle)
     $expectedWidth = $bounds.Right - $bounds.Left + 60
     [PingoWindows]::Resize($petHandle, $expectedWidth, $bounds.Bottom - $bounds.Top + 60)
@@ -106,9 +111,10 @@ try {
     } else { Write-Warning 'Desktop sem cursor interativo: a passagem do mouse não pôde ser verificada neste host.' }
     Close-PingoWindow $window 'Pingo — meu dia'
     $started = Start-Process -FilePath $binary -WindowStyle Hidden -PassThru
+    $petHandle = Wait-PingoWindows $started
     Start-Sleep -Seconds 3
     if ((Get-PingoInstances).Count -ne 1) { throw 'A reabertura criou instâncias incorretas.' }
-    $restored = [PingoWindows]::Rectangle([PingoWindows]::Find($started.Id,'Pingo'))
+    $restored = [PingoWindows]::Rectangle($petHandle)
     if ([Math]::Abs(($restored.Right - $restored.Left) - $expectedWidth) -gt 2) { throw 'O tamanho do avatar não foi preservado na reabertura.' }
     Close-PingoWindow $started 'Pingo'
     Write-Output 'Instância única, redimensionamento persistente, fechamento do painel/avatar e reabertura verificados no Windows.'

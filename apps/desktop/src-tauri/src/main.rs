@@ -26,7 +26,7 @@ fn open_panel(app:tauri::AppHandle){if let Some(window)=app.get_webview_window("
 fn show_device_code(app:tauri::AppHandle,code:String){if let Some(window)=app.get_webview_window("main"){let _=window.set_title(&format!("Pingo — confirme o código {} no navegador",code));}}
 fn main(){tauri::Builder::default()
  .plugin(tauri_plugin_single_instance::init(|app,_,_|open_panel(app.clone())))
- .plugin(tauri::plugin::Builder::new("shutdown-observer").on_event(|_,event|match event{
+ .plugin(tauri::plugin::Builder::<_, ()>::new("shutdown-observer").on_event(|_,event|match event{
  tauri::RunEvent::ExitRequested{..}=>trace_shutdown("exit requested: before plugin cleanup"),
  tauri::RunEvent::Exit=>trace_shutdown("exit: before plugin cleanup"),_=>()
  }).build())

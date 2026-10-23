@@ -9,7 +9,7 @@
 - Envio FCM real do backend de produção, autenticado por OIDC/WIF, recebido como notificação do sistema Android sem Activity aberta. Conta temporária e evento artificial exclusivos; dados de teste removidos ao terminar.
 - Build de produção assinado com chave do beta; checksum publicado junto ao APK.
 
-Não equivalem a homologação em telefone físico: ainda é necessário conferir login Google e Workspace no aparelho dos titulares, permissões/bateria específicas do fabricante, atualização após reinício e registro de distribuição quando exigido. Nenhuma chamada paga de IA nem alteração de calendário real foi feita nestes testes. Consulte [ANDROID.md](ANDROID.md).
+Teste inicial em telefone físico confirmado pelo titular em 23/10/2026: instalação e tarefa criada no aplicativo sincronizada com Google Tasks. O primeiro aparelho está autorizado no registro de distribuição limitada. Permanecem sem confirmação física o caminho inverso, notificações, permissões/bateria específicas do fabricante e reinício offline. Nenhuma chamada paga de IA nem alteração de calendário real foi feita nos testes automatizados. Consulte [ANDROID.md](ANDROID.md).
 
 Os testes de `tests/` usam respostas Google simuladas e regras locais. Execute `npm test`, `npm run check` e `npm run build`. O CI também valida e compila o instalador Windows.
 

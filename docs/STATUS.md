@@ -4,11 +4,13 @@
 
 Aplicativo Android nativo com Capacitor 8, interface compartilhada, login PKCE pelo navegador, SQLite por conta, sessão protegida no Keystore, FCM com coordenador único de notificações e cuidados sincronizados do pet. Firebase está configurado no projeto Pingo sem Analytics ou faturamento; Vercel usa Workload Identity Federation e uma permissão exclusiva de envio, sem chave privada Google.
 
-Validação local: 84 testes unitários/simulados, 15 testes de interface web/desktop/móvel, 15 verificações Workers/D1, testes nativos Android de persistência, proteção de sessão, protocolo e interface em emulador Android 16. APK de produção assinado com chave própria preservada em armazenamento privado e segredos do CI. Detalhes em [ANDROID.md](ANDROID.md). Homologação em telefone físico e cadastro pessoal de distribuição Android permanecem etapas dos titulares.
+Validação local: 84 testes unitários/simulados, 15 testes de interface web/desktop/móvel, 15 verificações Workers/D1, testes nativos Android de persistência, proteção de sessão, protocolo e interface em emulador Android 16. APK de produção assinado com chave própria preservada em armazenamento privado e segredos do CI. Detalhes em [ANDROID.md](ANDROID.md).
 
 Envio FCM real confirmado em 23/10/2026: backend de produção → identidade Vercel/Google → Firebase → notificação do Android 16 sem Activity aberta. Teste opt-in com conta temporária e evento artificial, sem Google Workspace ou IA; cadastro, sessão e trabalhos dessa conta foram removidos ao terminar. Health do backend confirma versão 2.3.0-beta.1 e notificações Android habilitadas.
 
-Conta gratuita de distribuição limitada criada no Android Developer Console com autorização do titular. Pacote `app.pingo.mobile` Registrado e certificado Verificado pelo Google. Primeiro aparelho autorizado pelo titular via código gerado no celular (1 de 20 dispositivos). Homologação física pendente; instaladores preparados em rascunho de release, preservando a versão 2.2 pública até a homologação.
+Conta gratuita de distribuição limitada criada no Android Developer Console com autorização do titular. Pacote `app.pingo.mobile` Registrado e certificado Verificado pelo Google. Primeiro aparelho autorizado pelo titular via código gerado no celular (1 de 20 dispositivos).
+
+Em 23/10/2026, o titular confirmou a instalação e o teste em seu celular: uma tarefa criada no aplicativo apareceu no Google Tasks. Esse teste inicial em aparelho físico libera a pré-release 2.3.0-beta.1, com APK, instalador Windows e checksum. A versão 2.2 permanece recuperável. Notificações no telefone físico, fluxo inverso de sincronização, reinício offline e comportamento específico de bateria ainda precisam de confirmação; o teste de tarefa não comprova esses cenários.
 
 ## Agendador em nuvem — ativo
 

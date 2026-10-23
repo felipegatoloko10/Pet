@@ -12,4 +12,6 @@ O APK é assinado com uma chave própria do beta, com checksum no arquivo SHA256
 
 Instale sobre a versão anterior para preservar os dados locais. Sessões e dados da conta são preservados. A versão 2.2 permanece recuperável no histórico de releases.
 
-O beta é gratuito, não comercial e por convite. Notificações são de melhor esforço. A homologação em aparelho físico e eventuais verificações pessoais do cadastro Android dependem dos titulares; não foram substituídas pelos testes automatizados/emulador. Nenhuma chamada paga de IA foi usada na validação. O instalador Windows continua sem assinatura comercial.
+Teste inicial em aparelho físico confirmado pelo titular: instalação e tarefa criada no celular sincronizada com Google Tasks. O pacote Android está registrado, o certificado verificado e o primeiro aparelho autorizado. Notificações no telefone físico, sincronização inversa, reinício offline e restrições de bateria ainda precisam de confirmação.
+
+O beta é gratuito, não comercial e por convite. Notificações são de melhor esforço. Outros aparelhos precisam da própria autorização de distribuição limitada. Nenhuma chamada paga de IA foi usada na validação. O instalador Windows continua sem assinatura comercial.

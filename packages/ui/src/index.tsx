@@ -211,28 +211,42 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   );
   useEffect(() => {
     if (!client) return;
-    return platform.onNotice?.(async ({ eventId, noticeId, taskId }) => {
-      if (taskId) {
-        let t = client.workspace.tasks.find(
-          (t) => t.id === taskId && !t.deleted,
-        );
-        if (!t && navigator.onLine) {
-          await client.refresh();
-          t = client.workspace.tasks.find((t) => t.id === taskId && !t.deleted);
-        }
-        if (t) setTaskEditor(t);
-        else setScreen("day");
-      } else if (eventId) {
-        const event = client?.workspace.events.find(
-          (e) => e.id === eventId && !e.deleted,
-        );
-        if (event) setEventEditor(event);
-        else setScreen("calendar");
-      } else setScreen("day");
-      if (noticeId && client?.workspace.notices.some((n) => n.id === noticeId))
-        void client.command({ type: "notice.read", id: noticeId });
-      if (client) void client.refresh();
-    });
+    let active = true;
+    const unsubscribe = platform.onNotice?.(
+      async ({ eventId, noticeId, taskId }) => {
+        if (!active) return;
+        if (taskId) {
+          let t = client.workspace.tasks.find(
+            (t) => t.id === taskId && !t.deleted,
+          );
+          if (!t && navigator.onLine) {
+            await client.refresh();
+            if (!active) return;
+            t = client.workspace.tasks.find(
+              (t) => t.id === taskId && !t.deleted,
+            );
+          }
+          if (t) setTaskEditor(t);
+          else setScreen("day");
+        } else if (eventId) {
+          const event = client?.workspace.events.find(
+            (e) => e.id === eventId && !e.deleted,
+          );
+          if (event) setEventEditor(event);
+          else setScreen("calendar");
+        } else setScreen("day");
+        if (
+          noticeId &&
+          client?.workspace.notices.some((n) => n.id === noticeId)
+        )
+          void client.command({ type: "notice.read", id: noticeId });
+        if (client) void client.refresh();
+      },
+    );
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
   }, [platform.onNotice, client]);
   async function attach(u: User, demo = false) {
     const storage = await (platform.storage ?? webStorage)(

@@ -211,11 +211,15 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   );
   useEffect(() => {
     if (!client) return;
-    return platform.onNotice?.(({ eventId, noticeId, taskId }) => {
+    return platform.onNotice?.(async ({ eventId, noticeId, taskId }) => {
       if (taskId) {
-        const t = client.workspace.tasks.find(
+        let t = client.workspace.tasks.find(
           (t) => t.id === taskId && !t.deleted,
         );
+        if (!t && navigator.onLine) {
+          await client.refresh();
+          t = client.workspace.tasks.find((t) => t.id === taskId && !t.deleted);
+        }
         if (t) setTaskEditor(t);
         else setScreen("day");
       } else if (eventId) {

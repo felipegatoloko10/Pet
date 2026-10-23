@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Api, type Storage } from "@pingo/ui/client";
+import { cachedPetUser, petSessionHash } from "./pet-cache";
 import {
   emptyWorkspace,
   localNotices,
@@ -41,13 +42,18 @@ export function useDesktopPet(
       }, 15000);
     }
     async function display(w: Workspace, userId: string, online: boolean) {
-      if (!live) return;
+      const token = api.token;
+      if (!live || !token) return;
+      const signedApi = new Api(api.base, token);
+      const storage = await storageFor(userId);
+      const sessionHash = await petSessionHash(token);
+      if (!live || api.token !== token) return;
       cached = w;
       cachedUser = userId;
       setWorkspace(w);
-      const storage = await storageFor(userId);
       await storage.set("pet-cache", JSON.stringify(w));
-      localStorage.setItem("pingo:pet-user", userId);
+      if (!live || api.token !== token) return;
+      localStorage.setItem("pingo:pet-identity", JSON.stringify({ userId, sessionHash }));
       const candidates = [
         ...w.notices.filter((n) => !n.read),
         ...localNotices(w, userId),
@@ -55,6 +61,7 @@ export function useDesktopPet(
         (n, index, all) => all.findIndex((x) => x.id === n.id) === index,
       );
       for (const n of candidates) {
+        if (!live || api.token !== token) return;
         if (await storage.get(n.id)) continue;
         if (n.deliveredBy) {
           await storage.set(n.id, "1");
@@ -63,7 +70,7 @@ export function useDesktopPet(
         const serverNotice = w.notices.some((x) => x.id === n.id);
         if (serverNotice && online) {
           try {
-            const claim = await api.post<{ claimed: boolean }>(
+            const claim = await signedApi.post<{ claimed: boolean }>(
               "notifications/claim",
               { id: n.id, deviceId },
             );
@@ -99,7 +106,8 @@ export function useDesktopPet(
           return;
         }
         if (!cached) {
-          const id = localStorage.getItem("pingo:pet-user");
+          const id = cachedPetUser(localStorage.getItem("pingo:pet-identity"), await petSessionHash(token));
+          if (!live) return;
           if (id) {
             const storage = await storageFor(id),
               raw = await storage.get("pet-cache");
@@ -139,6 +147,7 @@ export function useDesktopPet(
     refresh.current = () => tick(true);
     const interval = setInterval(() => void tick(), 30000);
     const unsubSession = listen("session-changed", () => {
+      live = false;
       setWorkspace(emptyWorkspace());
       setBubble("");
       setActivity(undefined);

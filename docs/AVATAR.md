@@ -20,7 +20,7 @@ Repouso, piscar, observar, andar, pensar, falar, focar, comemorar, carinho, boce
 
 O login Google e a chave de IA são os mesmos do painel. Sem chave, o backend mantém seu resumo básico e informa como ativar a conversa com IA. A barra não coleta credenciais nem acessa e-mails.
 
-O avatar guarda a identificação de sua conversa e de mensagens com resultado incerto em chaves SQLite próprias, isoladas por conta. Não sobrescreve o cache nem a fila offline do painel. Reenviar uma mensagem após falha reutiliza seu identificador. Se houver um pedido anterior sem confirmação, a barra permite recuperar seu texto antes de continuar. Sair ou trocar de conta limpa a conversa exibida na janela.
+O avatar guarda a identificação de sua conversa e de mensagens com resultado incerto em chaves SQLite próprias, isoladas por conta. A descoberta do cache offline fica vinculada a um hash da sessão protegida, sem salvar o token no navegador; uma nova sessão precisa validar sua conta online antes de usar esse cache. Não sobrescreve o cache nem a fila offline do painel. Reenviar uma mensagem após falha reutiliza seu identificador. Se houver um pedido anterior sem confirmação, a barra permite recuperar seu texto antes de continuar. Sair ou trocar de conta limpa a conversa exibida na janela.
 
 As alterações entram na mesma fila de sincronização Google existente, inclusive com o painel minimizado. A resposta da IA não significa confirmação do Google; os estados e avisos da integração continuam sendo a referência.
 

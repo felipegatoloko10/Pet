@@ -4,7 +4,7 @@
 
 Avatar recortado com transparência de documento e WebView, barra de conversa, 24 estados vetoriais animados, redimensionamento persistente, passagem do cursor no espaço vazio e revisão de propostas na sessão correspondente do painel. A conversa usa a API existente, com identificadores persistentes para retentar respostas incertas sem duplicar operações, sem compartilhar a fila offline do painel.
 
-59 testes unitários/simulados e 13 testes de navegador cobrem a base e o novo avatar. A homologação com chave real de IA continua pendente; os testes não usam créditos de provedores. Os testes nativos Windows verificam instância única, tamanho persistente e fechamento das duas janelas; transparência do compositor e passagem do cursor são conferidas quando o runner fornece desktop interativo.
+61 testes unitários/simulados e 13 testes de navegador cobrem a base e o novo avatar, incluindo isolamento do cache offline após troca de sessão. A homologação com chave real de IA continua pendente; os testes não usam créditos de provedores. Os testes nativos Windows verificam instância única, tamanho persistente e fechamento das duas janelas; transparência do compositor e passagem do cursor são conferidas quando o runner fornece desktop interativo.
 
 ## Revisão 2.1
 

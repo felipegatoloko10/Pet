@@ -29,6 +29,8 @@ Configure segredos por ambiente. Não reutilize a branch de desenvolvimento em p
 
 ## Cloudflare
 
+O ambiente atual está publicado: Worker `pingo-scheduler`, D1 `pingo-jobs`, endpoint `https://pingo-scheduler.pingo-feh-38dc10.workers.dev`. O cron por minuto foi observado processando um lembrete real de teste em 23/10/2026. O backend já possui as duas variáveis privadas necessárias. Os comandos abaixo documentam a configuração e manutenção; não criam uma segunda infraestrutura neste ambiente.
+
 Autentique `npx wrangler login` deliberadamente. Não use conta temporária para dados do produto.
 
 ```sh
@@ -44,6 +46,8 @@ Defina `BACKEND_URL` no Worker, `SCHEDULER_URL` no backend e o mesmo `SCHEDULER_
 O protocolo privado do agendador é a versão 2. Publique este backend e este Worker juntos. A migração `0002_index_versions.sql` adiciona proteção contra índices antigos e um registro mínimo da última execução. `/health` é público e não consulta o banco; `/status` exige o segredo e retorna apenas contagens e a última execução. O cron roda por minuto e usa apenas D1 em minutos vazios. O backend republica o índice canônico antes de confirmar um trabalho; uma execução antiga não pode apagar nem adiar um índice substituído.
 
 Depois de ativar, publique os índices das contas já existentes usando o backend e suas contas autenticadas (o botão de sincronização faz isso), ou uma ferramenta administrativa restrita às contas do beta. Verifique o avanço de `lastRun.last_run_at` e processe um lembrete de teste antes de considerar a infraestrutura ativa. Autorização do Google e permissão de notificações continuam necessárias.
+
+Para as contas existentes deste ambiente, `npx tsx scripts/bootstrap-scheduler.ts CAMINHO_PRIVADO` usa a conexão privada de produção e publica somente os índices de usuários convidados que já possuem um espaço. O arquivo informado contém apenas `SCHEDULER_URL` e `SCHEDULER_SECRET`. A ferramenta não grava no Neon e não chama Google ou IA. Novas conexões Google e alterações no app publicam seus índices automaticamente.
 
 O backend atualiza as ocorrências recorrentes das próximas 48 horas durante a rotina; os lembretes revalidam o horário e ignoram compromissos alterados ou excluídos. Push usa um registro privado de tentativas por assinatura, evitando repetir entregas já confirmadas. Não reproduz avisos com mais de 30 minutos quando o serviço é ativado. Conteúdo de tarefas e e-mails não fica no D1.
 

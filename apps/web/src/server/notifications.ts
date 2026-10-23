@@ -36,6 +36,9 @@ function nextWallTime(time: string, timezone: string, now: Date) {
 }
 export function jobsFor(userId: string, w: Workspace): Job[] {
   const now = Date.now();
+  const { date, time } = zonedParts(new Date(now), w.preferences.timezone);
+  const summaryPending = time >= w.preferences.summaryTime && !w.notices.some(n => n.id === `summary:${date}`);
+  const nextRoutine = (w.cursor.routineLastAt ?? now - 15 * 60000) + 15 * 60000;
   return [
     {
       id: `routine:${userId}`,
@@ -50,7 +53,7 @@ export function jobsFor(userId: string, w: Workspace): Job[] {
               new Date(now),
             ),
           )
-        : Math.min(nextSummary(w), now + 15 * 60000),
+        : Math.min(nextSummary(w), nextRoutine, summaryPending ? now : Infinity),
     },
     ...w.events
       .filter(
@@ -142,6 +145,7 @@ export async function processJob(job: Job) {
         silent: isQuiet(now, w.preferences),
       });
     w.notices = w.notices.slice(0, 200);
+    if (job.kind === "routine") w.cursor.routineLastAt = +now;
     w.revision++;
   });
   if (job.kind === "routine") await maybeProactive(job.userId);

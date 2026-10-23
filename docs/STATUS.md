@@ -1,10 +1,12 @@
 # Estado da entrega
 
-## Agendador em nuvem — preparação para ativação
+## Agendador em nuvem — ativo
 
-O protocolo 2 está preparado com índice D1 por revisão, proteção contra confirmações antigas, lease e repetição, status autenticado, expansão de recorrências em segundo plano e deduplicação de push por assinatura. A base tem 69 testes unitários/simulados, além de 15 verificações no runtime Workers/D1 local com backend simulado.
+O protocolo 2 está publicado com índice D1 por revisão, proteção contra confirmações antigas, lease e repetição, status autenticado, expansão de recorrências em segundo plano e deduplicação de push por assinatura. O horário da rotina é ancorado na última execução para que sincronizações do app aberto não o adiem. A base tem 71 testes unitários/simulados, além de 15 verificações no runtime Workers/D1 local com backend simulado.
 
-A produção ainda depende de autenticar a Cloudflare, criar o D1 exclusivo, configurar o Worker e publicar `SCHEDULER_URL` no backend. A conexão MCP foi observada expirada e o Wrangler sem sessão. É necessário conferir o cron real e um lembrete de teste antes de considerar o agendador ativo. Nenhum plano pago foi ativado.
+Ativado em 23/10/2026: Worker `pingo-scheduler` em `https://pingo-scheduler.pingo-feh-38dc10.workers.dev`, D1 exclusivo `pingo-jobs`, cron por minuto e backend `pingo-gilt.vercel.app` com `SCHEDULER_URL` configurado. Uma conta convidada existente foi indexada; novas conexões e alterações publicam seus índices automaticamente. Nenhum plano pago foi ativado.
+
+Homologação de infraestrutura em produção: em **2026-10-23 15:06:20 UTC**, o cron processou um lembrete de conta temporária, chamou o backend e criou o aviso, com uma conclusão e zero repetições. A conta de teste e seus trabalhos foram removidos. O teste não usou Google ou IA; não criou compromissos nas contas reais. A confirmação de exibição do Web Push em cada dispositivo ainda depende de sua permissão e ambiente.
 
 ## Avatar 2.2
 

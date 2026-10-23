@@ -1,9 +1,10 @@
 {
  "$schema":"../../node_modules/wrangler/config-schema.json",
+ "account_id":"38dc10587b3a2745cc514ef573c5b0d2",
  "name":"pingo-scheduler","main":"src/index.ts","compatibility_date":"2026-10-23","compatibility_flags":["nodejs_compat"],
  "upload_source_maps":true,"secrets":{"required":["SCHEDULER_SECRET"]},
  "triggers":{"crons":["* * * * *"]},
  "observability":{"enabled":true,"head_sampling_rate":0.1},
- "d1_databases":[{"binding":"DB","database_name":"pingo-jobs","database_id":"00000000-0000-0000-0000-000000000000","migrations_dir":"migrations"}],
+ "d1_databases":[{"binding":"DB","database_name":"pingo-jobs","database_id":"7b95f3d4-081a-4f7b-96fc-0e33829586c0","migrations_dir":"migrations"}],
  "vars":{"BACKEND_URL":"https://pingo-gilt.vercel.app"}
 }

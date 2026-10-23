@@ -47,6 +47,19 @@ const taskUrl = (list: string, id?: string) =>
 const eventUrl = (cal: string, id?: string) =>
   `${calendarBase}/calendars/${encodeURIComponent(cal)}/events${id ? `/${encodeURIComponent(id)}` : ""}`;
 const marker = (id: string) => `[Pingo:${id}]`;
+function matchingEvent(w: Workspace, calendarId: string, g: GEvent) {
+  return (
+    w.events.find((e) => e.calendarId === calendarId && e.googleId === g.id) ??
+    (!g.recurringEventId && g.extendedProperties?.private?.pingoId
+      ? w.events.find(
+          (e) =>
+            e.calendarId === calendarId &&
+            e.id === g.extendedProperties!.private!.pingoId &&
+            (!e.googleId || e.googleId === g.id),
+        )
+      : undefined)
+  );
+}
 function notice(w: Workspace, id: string, title: string, body: string) {
   if (!w.notices.some((n) => n.id === id))
     w.notices.unshift({
@@ -441,12 +454,34 @@ export async function syncGoogle(userId: string) {
               id: string;
               summary: string;
               accessRole: string;
+              primary?: boolean;
             }>(
               `${calendarBase}/users/me/calendarList?minAccessRole=reader`,
               "items",
             )
           : [{ id: "primary", summary: "Principal", accessRole: "owner" }];
         await mutateWorkspace(userId, (w) => {
+          const primary = calendars.find(
+            (c) => "primary" in c && c.primary,
+          )?.id;
+          if (primary) {
+            if (w.preferences.defaultCalendarId === "primary")
+              w.preferences.defaultCalendarId = primary;
+            for (const e of w.events)
+              if (e.calendarId === "primary") e.calendarId = primary;
+            const unique = new Map<string, CalendarEvent>();
+            for (const e of w.events) {
+              const prior = unique.get(e.id);
+              if (!prior || prior.revision < e.revision)
+                unique.set(e.id, {
+                  ...prior,
+                  ...e,
+                  columnId: e.columnId ?? prior?.columnId,
+                  position: e.position ?? prior?.position,
+                });
+            }
+            w.events = [...unique.values()];
+          }
           w.calendars = calendars.map((c) => ({
             id: c.id,
             title: c.summary,
@@ -614,10 +649,13 @@ async function pullCalendar(
       }
     }
     for (const g of events) {
-      const old = current.events.find(
-        (e) => e.googleId === g.id && e.calendarId === calId,
-      );
+      const old = matchingEvent(current, calId, g);
       if (old && current.outbox.some((j) => j.entityId === old.id)) {
+        if (!old.googleId) {
+          old.googleId = g.id;
+          old.googleEtag = g.etag;
+          continue;
+        }
         if (old.googleEtag !== g.etag) {
           old.syncState = "conflict";
           old.error = "Compromisso alterado no Google. Revise as mudanças.";
@@ -636,12 +674,7 @@ async function pullCalendar(
       if (!g.start || !g.end) continue;
       const e: CalendarEvent = {
         ...old,
-        id:
-          old?.id ??
-          (g.recurringEventId
-            ? undefined
-            : g.extendedProperties?.private?.pingoId) ??
-          crypto.randomUUID(),
+        id: old?.id ?? crypto.randomUUID(),
         title: g.summary ?? "Sem título",
         start: g.start.dateTime ?? g.start.date!,
         end: g.end.dateTime ?? g.end.date!,
@@ -704,9 +737,7 @@ async function pullOccurrences(
       }
     }
     for (const g of expanded) {
-      const old = w.events.find(
-        (e) => e.calendarId === calendarId && e.googleId === g.id,
-      );
+      const old = matchingEvent(w, calendarId, g);
       if (old && w.outbox.some((j) => j.entityId === old.id)) continue;
       if (g.status === "cancelled") {
         if (old) {

@@ -2,7 +2,7 @@
 
 ## Revisão 2.4 — 23/10/2026
 
-- 102 testes unitários/simulados de domínio/backend e 18 testes de navegador passaram.
+- 103 testes unitários/simulados de domínio/backend e 18 testes de navegador passaram.
 - 15 verificações do agendador no runtime Workers/D1 local passaram.
 - Android: migração SQLite 1 → 2 preservando fila/cache, recibos contra reintrodução de operações e ações nativas de notificação.
 - Instrumentação Android 16: cinco testes passaram; um teste FCM de produção opt-in foi omitido nessa execução local. Comecei e Concluir funcionaram sem WebView, sem sessão de rede, preservando a agenda e a fila após reabrir SQLite.

@@ -41,6 +41,7 @@ public class MobileCloudInstrumentedTest {
         NotificationCoordinator.prefs(c).edit().putString("userId", userId).putBoolean("enabled", true).commit();
         String installation = UUID.randomUUID().toString();
         secure.put("session", fixture.getString("token")); secure.put("installation", installation);
+        if(fixture.has("workspace")) PingoDatabase.get(c).write(userId,"snapshot",new JSONObject().put("workspace",fixture.getJSONObject("workspace")).put("pending",new org.json.JSONArray()).toString());
         try {
             if (FirebaseApp.getApps(c).isEmpty()) FirebaseApp.initializeApp(c);
             String push = Tasks.await(FirebaseMessaging.getInstance().getToken(), 45, TimeUnit.SECONDS);
@@ -53,9 +54,22 @@ public class MobileCloudInstrumentedTest {
                 SystemClock.sleep(1000);
             }
             assertTrue("O lembrete FCM precisa aparecer mesmo sem Activity aberta.", received);
+            if(fixture.optBoolean("checkIn")) {
+                android.app.Notification shown=null;
+                for(android.service.notification.StatusBarNotification n:c.getSystemService(NotificationManager.class).getActiveNotifications())if(fixture.getString("noticeId").equals(n.getTag()))shown=n.getNotification();
+                assertNotNull(shown);assertEquals(3,shown.actions.length);assertEquals("Comecei",shown.actions[0].title.toString());shown.actions[0].actionIntent.send();
+                boolean synced=false;
+                for(int i=0;i<90;i++){
+                    String saved=PingoDatabase.get(c).read(userId,"snapshot");
+                    if(saved!=null){JSONObject s=new JSONObject(saved);JSONObject t=TaskActions.task(s.getJSONObject("workspace"),"fixture-task");synced=t!=null&&"fixture:active".equals(t.optString("columnId"))&&s.getJSONArray("pending").length()==0;}
+                    if(synced)break;SystemClock.sleep(1000);
+                }
+                assertTrue("Comecei deve chegar à API real e confirmar a fila nativa.",synced);
+            }
         } finally {
             try { TokenRegistrationWorker.send("DELETE", fixture.getString("token"), installation, null); } catch (Exception ignored) {}
             secure.put("session", null); secure.put("installation", null); NotificationCoordinator.clear(c);
+            PingoDatabase.get(c).clear(userId);
             new File(c.getFilesDir(), "pingo-e2e-ready").delete();
             new File(path).delete();
         }

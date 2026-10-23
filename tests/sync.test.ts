@@ -47,6 +47,62 @@ beforeEach(() => {
   process.env.BETTER_AUTH_URL = "http://localhost:3000";
 });
 afterEach(() => vi.unstubAllGlobals());
+it("o alias primary e o ID real da agenda não duplicam o evento vinculado", async () => {
+  let w = memory.workspace!;
+  w.connection.scopes = [
+    "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+  ];
+  w = applyCommand(
+    w,
+    {
+      type: "task.upsert",
+      task: { ...w.tasks[0], dueDate: "2026-10-23" },
+      expectedRevision: 1,
+    },
+    crypto.randomUUID(),
+  );
+  const e = w.events[0];
+  e.googleId = "same-google-event";
+  e.googleEtag = "tag";
+  e.syncState = "synced";
+  w.events.push({ ...e, calendarId: "real-primary", revision: e.revision + 1 });
+  w.outbox = [];
+  memory.workspace = w;
+  const transport = vi.fn(async (input: string, init?: RequestInit) => {
+    if (input.includes("calendarList"))
+      return Response.json({
+        items: [
+          {
+            id: "real-primary",
+            summary: "Principal",
+            accessRole: "owner",
+            primary: true,
+          },
+        ],
+      });
+    return Response.json({
+      items: [
+        {
+          id: e.googleId,
+          etag: "tag",
+          summary: e.title,
+          start: { date: e.start },
+          end: { date: e.end },
+          extendedProperties: {
+            private: { pingoId: e.id, pingoTaskId: "local" },
+          },
+        },
+      ],
+    });
+  });
+  vi.stubGlobal("fetch", transport);
+  await syncGoogle("alice");
+  expect(memory.workspace!.preferences.defaultCalendarId).toBe("real-primary");
+  expect(memory.workspace!.events).toHaveLength(1);
+  expect(memory.workspace!.events[0].calendarId).toBe("real-primary");
+  expect(transport.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+});
 it("tarefa com data confirma Tasks e Agenda antes de avisar e não duplica na repetição", async () => {
   let w = memory.workspace!;
   w.preferences.defaultBoardId = "b";

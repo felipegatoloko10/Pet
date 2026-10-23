@@ -2,6 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 const config: CapacitorConfig = {
   appId: "app.pingo.mobile",
   appName: "Pingo",
+  loggingBehavior: "none",
   webDir: "dist",
   server: { androidScheme: "https", hostname: "localhost", cleartext: false },
   android: { allowMixedContent: false, backgroundColor: "#edf7f4" },

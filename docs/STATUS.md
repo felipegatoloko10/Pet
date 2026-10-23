@@ -8,6 +8,8 @@ Validação local: 84 testes unitários/simulados, 15 testes de interface web/de
 
 Envio FCM real confirmado em 23/10/2026: backend de produção → identidade Vercel/Google → Firebase → notificação do Android 16 sem Activity aberta. Teste opt-in com conta temporária e evento artificial, sem Google Workspace ou IA; cadastro, sessão e trabalhos dessa conta foram removidos ao terminar. Health do backend confirma versão 2.3.0-beta.1 e notificações Android habilitadas.
 
+Conta gratuita de distribuição limitada criada no Android Developer Console com autorização do titular. Pacote `app.pingo.mobile` e certificado enviados, com status Em análise pelo Google. Autorização no celular e homologação física pendentes; instaladores preparados em rascunho de release, preservando a versão 2.2 pública até a homologação.
+
 ## Agendador em nuvem — ativo
 
 O protocolo 2 está publicado com índice D1 por revisão, proteção contra confirmações antigas, lease e repetição, status autenticado, expansão de recorrências em segundo plano e deduplicação de push por assinatura. O horário da rotina é ancorado na última execução para que sincronizações do app aberto não o adiem. A base tem 71 testes unitários/simulados, além de 15 verificações no runtime Workers/D1 local com backend simulado.

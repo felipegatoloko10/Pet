@@ -25,7 +25,11 @@ fn main(){tauri::Builder::default()
  let mut tray=TrayIconBuilder::new().tooltip("Pingo — um passo de cada vez").menu(&menu).on_menu_event(|app,event|match event.id().as_ref(){"open"=>open_panel(app.clone()),"pet"=>{if let Some(w)=app.get_webview_window("pet"){if w.is_visible().unwrap_or(false){let _=w.hide();}else{let _=w.show();}}},"quit"=>app.exit(0),_=>()});if let Some(icon)=app.default_window_icon(){tray=tray.icon(icon.clone());}tray.build(app)?;
  if let Some(w)=app.get_webview_window("pet"){if let Ok(Some(monitor))=w.current_monitor(){if let Ok(window_size)=w.outer_size(){let size=monitor.size();let origin=monitor.position();let _=w.set_position(tauri::PhysicalPosition::new(origin.x+size.width as i32-window_size.width as i32-16,origin.y+size.height as i32-window_size.height as i32-60));}}}
  Ok(())})
- .on_window_event(|window,event|{if let tauri::WindowEvent::CloseRequested{..}=event{window.app_handle().exit(0);}})
+ .on_window_event(|window,event|{if let tauri::WindowEvent::CloseRequested{api,..}=event{
+ // Let the application exit own both webviews instead of destroying one while exit is queued.
+ api.prevent_close();
+ window.app_handle().exit(0);
+ }})
  .run(tauri::generate_context!()).expect("Não foi possível iniciar o Pingo");}
 
 #[tauri::command]

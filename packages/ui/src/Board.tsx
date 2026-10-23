@@ -524,6 +524,13 @@ function Card({
         >
           ⠿
         </button>
+        <span className={`priority priority-${t.priority}`}>
+          {t.priority === "high"
+            ? "Alta prioridade"
+            : t.priority === "low"
+              ? "Baixa prioridade"
+              : "Rotina"}
+        </span>
         <button
           className="text-link"
           onClick={onDetails}
@@ -535,14 +542,7 @@ function Card({
       <button className="card-main" onClick={onEdit}>
         <h3>{t.title}</h3>
         {t.notes && <p>{t.notes}</p>}
-        <small>
-          {t.dueDate ?? "Sem prazo"} ·{" "}
-          {t.priority === "high"
-            ? "Alta prioridade"
-            : t.priority === "low"
-              ? "Baixa prioridade"
-              : "Rotina"}
-        </small>
+        <small className="card-due">{t.dueDate ?? "Sem prazo"}</small>
         {!!t.checklist?.length && (
           <small>
             ☑ {t.checklist.filter((i) => i.done).length}/{t.checklist.length}

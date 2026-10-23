@@ -26,3 +26,4 @@ test-results/
 
 .neon*.env
 .dev.vars*
+.codex-attachments/

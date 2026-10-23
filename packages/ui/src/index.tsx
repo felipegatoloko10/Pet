@@ -422,6 +422,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
             <button
               key={n.id}
               aria-label={n.label}
+              title={n.label}
               className={screen === n.id ? "nav-item selected" : "nav-item"}
               onClick={() => {
                 setToast("");
@@ -486,6 +487,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
               {w.notices.some((n) => !n.read) && <i />}
             </button>
             <span className="top-avatar">{user.name[0]}</span>
+            <span className="top-account-name">{user.name.split(" ")[0]}</span>
           </div>
         </header>
         <main className="workspace">

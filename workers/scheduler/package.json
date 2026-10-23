@@ -1,1 +1,1 @@
-{"name":"@pingo/scheduler","version":"2.1.0-beta.1","private":true,"scripts":{"types":"wrangler types","check":"tsc --noEmit -p tsconfig.json","deploy":"wrangler deploy"}}
+{"name":"@pingo/scheduler","version":"2.1.0-beta.2","private":true,"scripts":{"types":"wrangler types","check":"tsc --noEmit -p tsconfig.json","deploy":"wrangler deploy"}}

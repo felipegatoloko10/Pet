@@ -2,6 +2,8 @@
 
 ## Revisão 2.1
 
+A revisão visual `2.1.0-beta.2` traz fundo verde suave, navegação compacta, colunas pastel, cartões brancos e ações em amarelo. Agenda, conversas, ajustes e painel desktop compartilham a aparência. A revisão preserva os fluxos, contratos de API e dados da versão anterior.
+
 Kanban inicial com ordenação, etiquetas, checklists e arquivamento; conversas separadas, rotina semanal, caixa estática de e-mails de hoje, calendário mensal/anual e retorno automático do login desktop. Detalhes e compatibilidade em [REVISION-2.1.md](REVISION-2.1.md).
 
 ## Implementado

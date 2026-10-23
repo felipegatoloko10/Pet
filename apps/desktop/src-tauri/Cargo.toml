@@ -1,6 +1,6 @@
 [package]
 name = "pingo"
-version = "2.1.0-beta.1"
+version = "2.1.0-beta.2"
 description = "Pingo, seu pequeno assistente pessoal"
 authors = ["Pingo"]
 edition = "2021"

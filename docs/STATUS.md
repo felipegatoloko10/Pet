@@ -8,7 +8,7 @@ Validação local: 84 testes unitários/simulados, 15 testes de interface web/de
 
 Envio FCM real confirmado em 23/10/2026: backend de produção → identidade Vercel/Google → Firebase → notificação do Android 16 sem Activity aberta. Teste opt-in com conta temporária e evento artificial, sem Google Workspace ou IA; cadastro, sessão e trabalhos dessa conta foram removidos ao terminar. Health do backend confirma versão 2.3.0-beta.1 e notificações Android habilitadas.
 
-Conta gratuita de distribuição limitada criada no Android Developer Console com autorização do titular. Pacote `app.pingo.mobile` Registrado e certificado Verificado pelo Google. Homologação física pendente; instaladores preparados em rascunho de release, preservando a versão 2.2 pública até a homologação.
+Conta gratuita de distribuição limitada criada no Android Developer Console com autorização do titular. Pacote `app.pingo.mobile` Registrado e certificado Verificado pelo Google. Primeiro aparelho autorizado pelo titular via código gerado no celular (1 de 20 dispositivos). Homologação física pendente; instaladores preparados em rascunho de release, preservando a versão 2.2 pública até a homologação.
 
 ## Agendador em nuvem — ativo
 

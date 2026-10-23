@@ -1,6 +1,7 @@
 import { openDB } from "idb";
 import {
   applyCommand,
+  normalizeWorkspace,
   emptyWorkspace,
   type Workspace,
   type Operation,
@@ -97,7 +98,10 @@ export class PingoClient {
     const snapshot = await this.storage.get("snapshot");
     if (snapshot) {
       const saved = JSON.parse(snapshot);
-      this.workspace = { ...emptyWorkspace(), ...saved.workspace };
+      this.workspace = normalizeWorkspace({
+        ...emptyWorkspace(),
+        ...saved.workspace,
+      });
       this.pending = saved.pending;
       this.emit();
       await this.refresh();
@@ -105,7 +109,11 @@ export class PingoClient {
     }
     const cached = await this.storage.get("workspace");
     const queue = await this.storage.get("pending");
-    if (cached) this.workspace = { ...emptyWorkspace(), ...JSON.parse(cached) };
+    if (cached)
+      this.workspace = normalizeWorkspace({
+        ...emptyWorkspace(),
+        ...JSON.parse(cached),
+      });
     if (queue) this.pending = JSON.parse(queue);
     this.emit();
     await this.refresh();
@@ -125,7 +133,10 @@ export class PingoClient {
       await this.flush();
       if (this.pending.some((p) => p.error)) return;
       const r = await this.api.request<{ workspace: Workspace }>("workspace");
-      this.workspace = { ...emptyWorkspace(), ...r.workspace };
+      this.workspace = normalizeWorkspace({
+        ...emptyWorkspace(),
+        ...r.workspace,
+      });
       this.error = "";
       await this.persist();
     } catch (e) {
@@ -207,7 +218,10 @@ export class PingoClient {
     this.emit();
     try {
       const r = await this.api.post<{ workspace: Workspace }>("sync");
-      this.workspace = { ...emptyWorkspace(), ...r.workspace };
+      this.workspace = normalizeWorkspace({
+        ...emptyWorkspace(),
+        ...r.workspace,
+      });
       await this.persist();
       this.error = "";
     } catch (e) {

@@ -36,15 +36,6 @@ export function useDesktopPet(
         setBubble("");
         setActivity("idle");
       }, 15000);
-      if (
-        !n.silent &&
-        !isQuiet(new Date(), w.preferences) &&
-        w.preferences.voice
-      ) {
-        const utterance = new SpeechSynthesisUtterance(n.body);
-        utterance.lang = "pt-BR";
-        speechSynthesis.speak(utterance);
-      }
     }
     async function display(w: Workspace, userId: string, online: boolean) {
       cached = w;

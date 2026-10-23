@@ -1,8 +1,10 @@
-# Pingo 2.0
+# Pingo 2.1
 
 Um pequeno companheiro para organizar tarefas, agenda e rotina. Beta não comercial por convite, com espaços individuais e até 10 convidados.
 
-[Abrir demonstração web](https://pingo-gilt.vercel.app)
+[Abrir o Pingo](https://pingo-gilt.vercel.app)
+
+Veja as [mudanças da revisão 2.1](docs/REVISION-2.1.md): Kanban inicial, etiquetas/checklists, conversas separadas, calendário mensal/anual e login desktop sem códigos manuais. Fechar o painel ou o avatar encerra o programa; minimizar mantém a companhia.
 
 ## Aplicativos
 
@@ -43,7 +45,7 @@ As credenciais de IA são individuais e criptografadas com AES-256-GCM e AAD por
 
 O servidor é a referência compartilhada. Alterações offline mantêm identificadores persistentes de operação. Conflitos exigem revisão. Criações com resultado incerto no Google são reconciliadas antes de qualquer repetição. Google Tasks não guarda colunas intermediárias nem horário de prazo; esses dados pertencem ao Pingo.
 
-Gmail é consultado por cabeçalhos; o corpo só é lido ou enviado à IA quando solicitado. O produto não envia e-mails. Exclusões, convites e sugestões da IA pedem confirmação.
+Gmail alimenta somente a caixa estática de e-mails de hoje, com metadados de lidos e não lidos. O corpo não é buscado nem encaminhado à IA. As conversas têm sessões separadas e consideram a rotina semanal. Pedidos claros ou concordância com um horário agendam diretamente; exclusões, convites e mudanças na rotina pedem confirmação.
 
 As animações são locais. Som e voz começam desligados. Notificações em nuvem são de melhor esforço e dependem das cotas e permissões do dispositivo.
 

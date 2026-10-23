@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import {
   emptyWorkspace,
+  normalizeWorkspace,
   applyCommand,
   DomainError,
   type Workspace,
@@ -14,7 +15,7 @@ export async function readWorkspace(userId: string) {
     .select()
     .from(workspaces)
     .where(eq(workspaces.userId, userId));
-  return rows[0]?.data ?? emptyWorkspace();
+  return normalizeWorkspace(rows[0]?.data ?? emptyWorkspace());
 }
 export async function mutateWorkspace<T>(
   userId: string,
@@ -30,6 +31,7 @@ export async function mutateWorkspace<T>(
       .from(workspaces)
       .where(eq(workspaces.userId, userId))
       .for("update");
+    normalizeWorkspace(row.data);
     const result = await fn(row.data);
     await tx
       .update(workspaces)

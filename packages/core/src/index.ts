@@ -1,4 +1,51 @@
 import { z } from "zod";
+import { TZDate } from "@date-fns/tz";
+
+export function taskOrder(a: Task, b: Task) {
+  return (a.position ?? 1e9) - (b.position ?? 1e9) || a.id.localeCompare(b.id);
+}
+export function normalizeWorkspace(w: Workspace): Workspace {
+  w.preferences = { ...defaultPreferences, ...w.preferences };
+  if (!w.conversations || (!w.conversations.length && w.conversation?.length))
+    w.conversations = w.conversation?.length
+      ? [
+          {
+            id: "legacy-conversation",
+            title: "Conversa anterior",
+            archived: false,
+            messages: w.conversation,
+            updatedAt: "2026-01-01T00:00:00Z",
+          },
+        ]
+      : [];
+  w.notices = w.notices.filter((n) => !n.id.startsWith("mail:"));
+  const positions = new Map<string, number>();
+  for (const task of w.tasks) {
+    const group = task.boardId + ":" + task.columnId;
+    const next = positions.get(group) ?? 0;
+    task.position ??= next;
+    positions.set(group, Math.max(next, task.position + 1));
+  }
+  return w;
+}
+export function dayBounds(date: string, timezone: string) {
+  const [y, m, d] = date.split("-").map(Number);
+  return {
+    start: new Date(new TZDate(y, m - 1, d, timezone).getTime()).toISOString(),
+    end: new Date(
+      new TZDate(y, m - 1, d + 1, timezone).getTime(),
+    ).toISOString(),
+  };
+}
+export function overlaps(a: CalendarEvent, b: CalendarEvent, timezone: string) {
+  const bounds = (e: CalendarEvent) =>
+    e.allDay
+      ? [dayBounds(e.start, timezone).start, dayBounds(e.end, timezone).start]
+      : [e.start, e.end];
+  const [as, ae] = bounds(a),
+    [bs, be] = bounds(b);
+  return Date.parse(as) < Date.parse(be) && Date.parse(bs) < Date.parse(ae);
+}
 
 export const syncStates = [
   "pending",
@@ -21,6 +68,10 @@ export type Board = {
   revision: number;
 };
 export type Task = {
+  position?: number;
+  labels?: { id: string; name: string; color: string }[];
+  checklist?: { id: string; text: string; done: boolean }[];
+  archivedAt?: string | null;
   id: string;
   boardId: string;
   columnId: string;
@@ -66,7 +117,8 @@ export type Mail = {
   from: string;
   subject: string;
   date: string;
-  url: string;
+  url?: string;
+  isRead?: boolean;
 };
 export type Notice = {
   id: string;
@@ -78,6 +130,7 @@ export type Notice = {
   silent?: boolean;
 };
 export type Preferences = {
+  routine?: RoutineDay[];
   name: string;
   color: string;
   accent: string;
@@ -96,6 +149,30 @@ export type Preferences = {
   aiProvider: "openai" | "google" | "anthropic";
   aiModel: string;
   proactiveAI: boolean;
+};
+export type RoutineDay = {
+  day: number;
+  work: { start: string; end: string }[];
+  personal: { start: string; end: string }[];
+};
+export type ChatMessage = {
+  id?: string;
+  role: "user" | "assistant";
+  text: string;
+  suggestions?: { approvalId: string; command: Command }[];
+};
+export type Conversation = {
+  id: string;
+  title: string;
+  archived: boolean;
+  messages: ChatMessage[];
+  updatedAt: string;
+  pendingMessage?: string;
+  pendingAt?: string;
+  responses?: Record<
+    string,
+    { text: string; suggestions: { approvalId: string; command: Command }[] }
+  >;
 };
 export const defaultPreferences: Preferences = {
   name: "Pingo",
@@ -129,6 +206,7 @@ export type SyncJob = {
   sentAt?: string;
 };
 export type Workspace = {
+  conversations?: Conversation[];
   conversation?: {
     role: "user" | "assistant";
     text: string;
@@ -194,6 +272,24 @@ const id = z.string().min(1).max(200);
 const date = z.iso.date();
 const datetime = z.iso.datetime({ offset: true });
 export const taskInput = z.object({
+  position: z.number().optional(),
+  labels: z
+    .array(
+      z.object({
+        id,
+        name: z.string().min(1).max(40),
+        color: z.string().regex(/^#[0-9a-f]{6}$/i),
+      }),
+    )
+    .max(30)
+    .optional(),
+  checklist: z
+    .array(
+      z.object({ id, text: z.string().min(1).max(500), done: z.boolean() }),
+    )
+    .max(100)
+    .optional(),
+  archivedAt: datetime.nullable().optional(),
   id,
   boardId: id,
   columnId: id,
@@ -238,7 +334,31 @@ export const eventInput = z
           "Intervalo inválido; eventos de dia inteiro usam data e fim exclusivo.",
       });
   });
+const timeInput = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+export const routineInput = z
+  .array(
+    z.object({
+      day: z.number().int().min(0).max(6),
+      work: z
+        .array(
+          z
+            .object({ start: timeInput, end: timeInput })
+            .refine((x) => x.end > x.start),
+        )
+        .max(6),
+      personal: z
+        .array(
+          z
+            .object({ start: timeInput, end: timeInput })
+            .refine((x) => x.end > x.start),
+        )
+        .max(6),
+    }),
+  )
+  .max(7)
+  .refine((days) => new Set(days.map((d) => d.day)).size === days.length);
 export const preferenceInput = z.object({
+  routine: routineInput.optional(),
   name: z.string().trim().min(1).max(30),
   color: z.string().regex(/^#[0-9a-f]{6}$/i),
   accent: z.string().regex(/^#[0-9a-f]{6}$/i),
@@ -267,6 +387,42 @@ export const preferenceInput = z.object({
 });
 export const commandSchema = z.discriminatedUnion("type", [
   z.object({
+    type: z.literal("column.update"),
+    boardId: id,
+    columnId: id,
+    title: z.string().trim().min(1).max(100),
+    index: z.number().int().min(0),
+    expectedRevision: z.number().int(),
+  }),
+  z.object({
+    type: z.literal("task.move"),
+    id,
+    columnId: id,
+    beforeId: id.nullable(),
+    expectedRevision: z.number().int(),
+  }),
+  z.object({
+    type: z.literal("task.metadata"),
+    id,
+    expectedRevision: z.number().int(),
+    metadata: taskInput.pick({
+      labels: true,
+      checklist: true,
+      archivedAt: true,
+    }),
+  }),
+  z.object({
+    type: z.literal("routine.update"),
+    routine: routineInput,
+    confirmed: z.literal(true),
+  }),
+  z.object({
+    type: z.literal("conversation.update"),
+    id,
+    title: z.string().trim().min(1).max(100),
+    archived: z.boolean(),
+  }),
+  z.object({
     type: z.literal("board.create"),
     id,
     title: z.string().trim().min(1).max(200),
@@ -291,6 +447,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("event.upsert"),
+    requireAvailable: z.boolean().optional(),
     event: eventInput,
     expectedRevision: z.number().int().min(0),
     confirmed: z.boolean().default(false),
@@ -340,7 +497,7 @@ export function applyCommand(
   operationId: string,
   now = new Date().toISOString(),
 ): Workspace {
-  const w = structuredClone(original);
+  const w = normalizeWorkspace(structuredClone(original));
   const c = commandSchema.parse(command);
   const enqueue = (
     kind: "task" | "event",
@@ -373,6 +530,87 @@ export function applyCommand(
     });
   };
   switch (c.type) {
+    case "conversation.update": {
+      normalizeWorkspace(w);
+      const old = w.conversations!.find((x) => x.id === c.id);
+      if (old)
+        Object.assign(old, {
+          title: c.title,
+          archived: c.archived,
+          updatedAt: now,
+        });
+      else
+        w.conversations!.push({
+          id: c.id,
+          title: c.title,
+          archived: c.archived,
+          messages: [],
+          updatedAt: now,
+        });
+      break;
+    }
+    case "routine.update":
+      w.preferences.routine = c.routine;
+      break;
+    case "column.update": {
+      const b = w.boards.find((x) => x.id === c.boardId);
+      if (!b) throw new DomainError("missing", "Quadro não encontrado.");
+      checkRevision(b, c.expectedRevision);
+      const col = b.columns.find((x) => x.id === c.columnId);
+      if (!col) throw new DomainError("missing", "Coluna não encontrada.");
+      col.title = c.title;
+      b.columns = b.columns.filter((x) => x.id !== col.id);
+      b.columns.splice(Math.min(c.index, b.columns.length), 0, col);
+      b.revision++;
+      break;
+    }
+    case "task.metadata": {
+      const t = w.tasks.find((x) => x.id === c.id && !x.deleted);
+      if (!t) throw new DomainError("missing", "Tarefa não encontrada.");
+      checkRevision(t, c.expectedRevision);
+      Object.assign(t, c.metadata);
+      t.revision++;
+      break;
+    }
+    case "task.move": {
+      const t = w.tasks.find((x) => x.id === c.id && !x.deleted);
+      if (!t) throw new DomainError("missing", "Tarefa não encontrada.");
+      checkRevision(t, c.expectedRevision);
+      const b = w.boards.find((x) => x.id === t.boardId)!,
+        col = b.columns.find((x) => x.id === c.columnId);
+      if (!col) throw new DomainError("missing", "Coluna não encontrada.");
+      const cards = w.tasks
+        .filter(
+          (x) =>
+            !x.deleted &&
+            x.boardId === t.boardId &&
+            x.columnId === col.id &&
+            x.id !== t.id,
+        )
+        .sort(taskOrder);
+      const index = c.beforeId
+        ? cards.findIndex((x) => x.id === c.beforeId)
+        : cards.length;
+      if (index < 0)
+        throw new DomainError(
+          "conflict",
+          "O destino mudou. Tente novamente.",
+          409,
+        );
+      const changed = t.completed !== (col.kind === "done");
+      t.columnId = col.id;
+      t.completed = col.kind === "done";
+      t.revision++;
+      cards.splice(index, 0, t);
+      cards.forEach((x, i) => {
+        x.position = i;
+      });
+      if (changed) {
+        t.syncState = "pending";
+        enqueue("task", t.id, "upsert");
+      }
+      break;
+    }
     case "board.create":
       if (w.boards.some((b) => b.id === c.id))
         throw new DomainError("exists", "Quadro já existe.");
@@ -417,6 +655,15 @@ export function applyCommand(
       const t: Task = {
         ...old,
         ...c.task,
+        position:
+          old?.position ??
+          c.task.position ??
+          Math.max(
+            -1,
+            ...w.tasks
+              .filter((x) => x.columnId === col.id)
+              .map((x) => x.position ?? 0),
+          ) + 1,
         completed: col.kind === "done",
         revision: (old?.revision ?? 0) + 1,
         syncState: "pending",
@@ -445,6 +692,21 @@ export function applyCommand(
     case "event.upsert": {
       const old = w.events.find((e) => e.id === c.event.id);
       checkRevision(old, c.expectedRevision);
+      if (
+        c.requireAvailable &&
+        w.events.some(
+          (other) =>
+            !other.deleted &&
+            !other.recurrence &&
+            other.id !== c.event.id &&
+            overlaps(other, c.event as CalendarEvent, w.preferences.timezone),
+        )
+      )
+        throw new DomainError(
+          "busy_slot",
+          "Esse horário ficou ocupado. Escolha outro horário.",
+          409,
+        );
       if (c.event.attendees?.length && !c.confirmed)
         throw new DomainError("confirmation", "Confirme o envio de convites.");
       if (
@@ -505,7 +767,7 @@ export function applyCommand(
       break;
     }
     case "preferences.update":
-      w.preferences = c.preferences;
+      w.preferences = { ...w.preferences, ...c.preferences };
       break;
     case "notice.read": {
       const n = w.notices.find((n) => n.id === c.id);
@@ -605,7 +867,9 @@ export function dailySummary(w: Workspace, now = new Date()) {
   const events = w.events.filter((e) =>
     eventOnDate(e, today, w.preferences.timezone),
   );
-  const pending = w.tasks.filter((t) => !t.deleted && !t.completed);
+  const pending = w.tasks.filter(
+    (t) => !t.deleted && !t.completed && !t.archivedAt,
+  );
   const overdue = pending.filter((t) => t.dueDate && t.dueDate < today);
   return `Você tem ${events.length} compromisso(s), ${pending.filter((t) => t.dueDate === today).length} tarefa(s) para hoje e ${overdue.length} atrasada(s). Vamos cuidar de uma coisa por vez?`;
 }

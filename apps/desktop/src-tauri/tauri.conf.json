@@ -1,8 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Pingo",
-  "version": "2.0.0-beta.2",
+  "version": "2.1.0-beta.1",
   "identifier": "app.pingo.companion",
+  "plugins": { "deep-link": { "desktop": { "schemes": ["pingo"] } } },
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://127.0.0.1:1420",

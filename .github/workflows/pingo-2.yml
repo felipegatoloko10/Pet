@@ -44,6 +44,9 @@ jobs:
         run: npm run desktop -- build
         env:
           VITE_API_URL: https://pingo-gilt.vercel.app
+      - name: Verificar instância única e fechamento nativo
+        shell: pwsh
+        run: ./scripts/verify-desktop.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: Pingo-Windows-instalador

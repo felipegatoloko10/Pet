@@ -1,6 +1,11 @@
 "use client";
 import { useEffect, useState, useRef, type CSSProperties } from "react";
-import { petState, type PetState, type Preferences } from "@pingo/core";
+import {
+  petState,
+  isQuiet,
+  type PetState,
+  type Preferences,
+} from "@pingo/core";
 export function Pet({
   preferences: p,
   message,
@@ -8,6 +13,7 @@ export function Pet({
   interactive = true,
   onClick,
   activity,
+  soundEnabled = false,
 }: {
   preferences: Preferences;
   message?: string;
@@ -15,9 +21,89 @@ export function Pet({
   interactive?: boolean;
   onClick?: () => void;
   activity?: PetState;
+  soundEnabled?: boolean;
 }) {
   const [state, setState] = useState<PetState>("idle");
   const [visible, setVisible] = useState(true);
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const query = matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  useEffect(() => {
+    if (
+      !soundEnabled ||
+      !visible ||
+      !p.voice ||
+      !message ||
+      isQuiet(new Date(), p)
+    )
+      return;
+    const text = new SpeechSynthesisUtterance(message);
+    text.lang = "pt-BR";
+    speechSynthesis.speak(text);
+    return () => speechSynthesis.cancel();
+  }, [
+    soundEnabled,
+    visible,
+    p.voice,
+    message,
+    p.quietStart,
+    p.quietEnd,
+    p.timezone,
+  ]);
+  useEffect(() => {
+    if (
+      !soundEnabled ||
+      !visible ||
+      !p.snore ||
+      state !== "sleep" ||
+      isQuiet(new Date(), p)
+    )
+      return;
+    let context: AudioContext | undefined;
+    const timer = setInterval(() => {
+      try {
+        context ??= new AudioContext();
+        if (context.state !== "running") return;
+        const oscillator = context.createOscillator(),
+          gain = context.createGain();
+        oscillator.frequency.value = 85;
+        gain.gain.setValueAtTime(0.012, context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(
+          0.001,
+          context.currentTime + 0.65,
+        );
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start();
+        oscillator.stop(context.currentTime + 0.7);
+      } catch {
+        /* Audio may require a local browser interaction. */
+      }
+    }, 6000);
+    const resume = () => {
+      context ??= new AudioContext();
+      void context.resume().catch(() => {});
+    };
+    window.addEventListener("pointerdown", resume, { once: true });
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("pointerdown", resume);
+      void context?.close();
+    };
+  }, [
+    soundEnabled,
+    visible,
+    p.snore,
+    state,
+    p.quietStart,
+    p.quietEnd,
+    p.timezone,
+  ]);
   const previous = useRef<PetState>("idle");
   useEffect(() => {
     const onVisibility = () => setVisible(!document.hidden);
@@ -65,7 +151,7 @@ export function Pet({
   }
   return (
     <div
-      className={`pet-scene ${p.reducedMotion ? "reduced" : ""} ${!visible ? "paused" : ""}`}
+      className={`pet-scene ${reduced ? "reduced" : ""} ${!visible ? "paused" : ""}`}
       style={
         { "--pet-color": p.color, "--pet-accent": p.accent } as CSSProperties
       }

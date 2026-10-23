@@ -26,19 +26,19 @@ test("demonstração permite editar, mover e persistir tarefas sem Google", asyn
   await expect(
     page.getByRole("button", { name: /^Tarefa persistente do teste/ }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Quadros", exact: true }).click();
+
   await page
     .getByLabel("Mover Tarefa persistente do teste")
     .selectOption({ label: "Em andamento" });
   // Simulate restart after the app acknowledges that the local transaction committed.
-  await expect(page.getByRole("status")).toHaveText(
+  await expect(page.locator(".toast")).toHaveText(
     "Modificação salva na demonstração local.",
   );
   await page.reload();
   await page
     .getByRole("button", { name: "Explorar demonstração local" })
     .click();
-  await page.getByRole("button", { name: "Quadros", exact: true }).click();
+
   await expect(
     page.getByLabel("Mover Tarefa persistente do teste"),
   ).toHaveValue("demo:active");
@@ -65,7 +65,8 @@ test("painel móvel e preferências do pet", async ({ page }) => {
   ).toBe(true);
   await page.getByRole("button", { name: "Ajustes", exact: true }).click();
   await page.getByLabel("Nome", { exact: true }).fill("Gotinha");
-  await page.getByLabel("Reduzir movimentos").check();
+  await expect(page.getByLabel("Reduzir movimentos")).toHaveCount(0);
+  await page.getByLabel("Ler balões em voz alta", { exact: true }).check();
   await page.getByRole("button", { name: "Salvar meu jeito" }).click();
   await expect(
     page.getByRole("button", { name: "Gotinha:", exact: false }).first(),
@@ -112,13 +113,29 @@ test("aprovação da IA mostra ação compreensível e exige clique", async ({
       },
     };
     if (path.endsWith("/health")) data = { configured: false };
-    if (path.endsWith("/chat"))
+    if (path.endsWith("/operations")) {
+      const op = route.request().postDataJSON();
+      w = applyCommand(w, op.command, op.operationId);
+      data = { workspace: w };
+    }
+    if (path.endsWith("/chat")) {
       data = {
         text: "Podemos começar por esta tarefa.",
         suggestions: [
           { approvalId: "12345678-1234-4234-8234-123456789abc", command },
         ],
       };
+      const input = route.request().postDataJSON();
+      w.conversations!.find(
+        (c) => c.id === input.conversationId,
+      )!.messages.push({
+        role: "assistant",
+        text: "Podemos começar por esta tarefa.",
+        suggestions: [
+          { approvalId: "12345678-1234-4234-8234-123456789abc", command },
+        ],
+      });
+    }
     if (path.endsWith("/approvals")) {
       approved = true;
       w = applyCommand(w, command, crypto.randomUUID());
@@ -128,8 +145,9 @@ test("aprovação da IA mostra ação compreensível e exige clique", async ({
   await page.goto("/");
   await page.getByRole("button", { name: "Conversa", exact: true }).click();
   await page
-    .getByRole("button", { name: "Sugira como encaixar minhas tarefas" })
-    .click();
+    .getByLabel("Mensagem para Pingo")
+    .fill("Sugira como encaixar minhas tarefas");
+  await page.getByRole("button", { name: "Enviar ↑", exact: true }).click();
   await expect(
     page.getByRole("heading", {
       name: "Criar tarefa: Organizar os documentos",
@@ -138,7 +156,7 @@ test("aprovação da IA mostra ação compreensível e exige clique", async ({
   await expect(page.locator("body")).not.toContainText("private-board-id");
   await expect(page.locator("body")).not.toContainText("expectedRevision");
   expect(approved).toBe(false);
-  await page.getByRole("button", { name: "Aprovar esta alteração" }).click();
+  await page.getByRole("button", { name: "Confirmar alteração" }).click();
   await expect.poll(() => approved).toBe(true);
 });
 test("fila offline e shell sobrevivem à recarga, depois sincronizam uma vez", async ({

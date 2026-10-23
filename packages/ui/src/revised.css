@@ -1,0 +1,516 @@
+.chat-app .history-toggle {
+  display: none;
+}
+.home-board .kanban {
+  min-height: 300px;
+  align-items: stretch;
+}
+.home-board .kanban-column {
+  flex: 0 0 275px;
+  min-width: 250px;
+}
+dialog.card-details::backdrop {
+  background: #153c2a55;
+}
+@media (max-width: 700px) {
+  .chat-app .history-toggle {
+    display: block;
+  }
+  .home-board .kanban-column {
+    flex-basis: 82vw;
+  }
+}
+.home-board {
+  margin-bottom: 36px;
+}
+.home-board .board-toolbar {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.board-toolbar input,
+.board-toolbar select {
+  padding: 10px;
+  border: 1px solid #dce5dd;
+  border-radius: 10px;
+  background: #fff;
+  max-width: 260px;
+}
+.board-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kanban {
+  align-items: stretch;
+  min-height: 280px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 18px;
+}
+.kanban-column {
+  flex: 0 0 275px;
+  min-width: 250px;
+  min-height: 260px;
+}
+.kanban-column.drop-target {
+  outline: 2px dashed #6caa8b;
+  outline-offset: -2px;
+  background: #eaf4ed;
+}
+.column-title {
+  font: inherit;
+  font-weight: 600;
+  flex: 1;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.drag-handle {
+  touch-action: none;
+  cursor: grab;
+  border: 0;
+  background: transparent;
+  font-size: 20px;
+  color: #718579;
+  padding: 4px 8px;
+}
+.card-controls {
+  display: flex;
+  justify-content: space-between;
+}
+.task-card {
+  position: relative;
+}
+.drag-preview {
+  box-shadow: 0 18px 45px #304c3b30;
+  cursor: grabbing;
+  padding: 20px;
+}
+.card-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.card-labels span,
+.card-labels button {
+  font-size: 11px;
+  color: #264b39;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 6px;
+}
+.task-card .card-main small {
+  display: block;
+  line-height: 1.8;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #153c2a55;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.card-details {
+  width: min(560px, 100%);
+  max-height: 90dvh;
+  overflow: auto;
+  padding: 24px;
+}
+.card-details header {
+  display: flex;
+  justify-content: space-between;
+}
+.card-details form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0;
+}
+.card-details label {
+  flex: 1;
+}
+.card-details input:not([type="checkbox"]):not([type="color"]) {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #dce5dd;
+  border-radius: 8px;
+}
+.checklist-item {
+  display: flex;
+  justify-content: space-between;
+  margin: 10px 0;
+}
+.checklist-item input {
+  margin-right: 10px;
+}
+.daily-mail-list {
+  max-height: 380px;
+  overflow-y: auto;
+}
+.mail-item.unread strong {
+  color: #244b36;
+}
+.mail-item.read {
+  opacity: 0.75;
+}
+.mail-item p {
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.mail-item small {
+  color: #718579;
+}
+.month-grid,
+.mini-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  background: #fff;
+  border: 1px solid #e0e7df;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.weekday {
+  text-align: center;
+  font-size: 11px;
+  padding: 12px 3px;
+  color: #718579;
+}
+.month-cell {
+  min-height: 120px;
+  border-top: 1px solid #edf0eb;
+  border-right: 1px solid #edf0eb;
+  padding: 6px;
+  overflow: hidden;
+}
+.month-cell.outside {
+  opacity: 0.4;
+}
+.day-number {
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  min-width: 27px;
+  min-height: 27px;
+  font: inherit;
+  cursor: pointer;
+  position: relative;
+}
+.is-today .day-number {
+  background: #bbe0ca;
+}
+.month-event {
+  display: block;
+  width: 100%;
+  font-size: 11px;
+  text-align: left;
+  border: 0;
+  background: #eaf3ed;
+  margin: 4px 0;
+  padding: 5px;
+  border-radius: 5px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.year-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.mini-month {
+  padding: 16px;
+}
+.mini-month-grid {
+  border: 0;
+  border-radius: 0;
+}
+.mini-month-grid .month-cell {
+  min-height: 30px;
+  padding: 1px;
+  border: 0;
+  text-align: center;
+}
+.mini-month-grid .weekday {
+  padding: 8px 0;
+}
+.mini-month-grid .day-number {
+  font-size: 11px;
+}
+.month-title {
+  font: inherit;
+  font-weight: 600;
+  background: transparent;
+  border: 0;
+  text-transform: capitalize;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+.busy-dot {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #4d946e;
+  border-radius: 50%;
+  bottom: 0;
+  left: 45%;
+}
+.chat-app {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  height: calc(100dvh - 145px);
+  min-height: 500px;
+  border: 1px solid #e0e7df;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #fff;
+}
+.chat-history {
+  background: #f1f5ef;
+  padding: 16px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.history-row {
+  display: flex;
+  border-radius: 9px;
+}
+.history-row.selected {
+  background: #dcebdc;
+}
+.history-row button {
+  background: transparent;
+  border: 0;
+  padding: 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.history-row button:first-child {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.chat-main > header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #edf0eb;
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+.chat-main h1 {
+  font-family: inherit;
+  font-size: 18px;
+  line-height: 1.5;
+  margin: 0;
+}
+.chat-main small {
+  font-size: 11px;
+  color: #81917f;
+}
+.chat-transcript {
+  overflow: auto;
+  flex: 1;
+  padding: 24px max(20px, calc((100% - 760px) / 2));
+}
+.chat-turn {
+  font-size: 14px;
+  line-height: 1.8;
+  margin-bottom: 28px;
+  overflow-wrap: anywhere;
+}
+.chat-turn > strong {
+  font-size: 11px;
+  color: #7a8d77;
+}
+.chat-turn.user {
+  background: #eff5ed;
+  padding: 14px 20px;
+  border-radius: 15px;
+  margin-left: 12%;
+}
+.chat-turn p {
+  margin: 8px 0;
+}
+.chat-turn ul,
+.chat-turn ol {
+  padding-left: 24px;
+}
+.chat-turn table {
+  border-collapse: collapse;
+  display: block;
+  overflow: auto;
+}
+.chat-turn td,
+.chat-turn th {
+  padding: 8px;
+  border: 1px solid #dce5dd;
+}
+.chat-empty {
+  text-align: center;
+  margin: 10% auto;
+  max-width: 460px;
+}
+.chat-empty > span {
+  font-size: 36px;
+  color: #8fb799;
+}
+.chat-empty h2 {
+  font-size: 24px;
+}
+.chat-empty p {
+  color: #718579;
+  line-height: 1.8;
+}
+.chat-composer {
+  padding: 15px 24px;
+  border-top: 1px solid #edf0eb;
+}
+.chat-composer form {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+}
+.chat-composer textarea {
+  resize: vertical;
+  min-height: 55px;
+  max-height: 200px;
+  flex: 1;
+  border: 1px solid #dce5dd;
+  border-radius: 14px;
+  padding: 14px;
+  font: inherit;
+  font-size: 14px;
+}
+.chat-composer > small {
+  display: block;
+  margin-top: 8px;
+}
+.chat-thinking {
+  color: #718579;
+  padding: 10px;
+}
+.history-toggle {
+  display: none;
+}
+.routine-editor {
+  margin: 20px 0;
+}
+.routine-editor p {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #718579;
+}
+.routine-editor details {
+  border-top: 1px solid #e0e7df;
+  padding: 12px 0;
+}
+.routine-editor summary {
+  font-size: 12px;
+  cursor: pointer;
+}
+.routine-editor details > div {
+  padding: 10px;
+}
+.routine-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+.routine-slot input {
+  max-width: 125px;
+}
+@media (max-width: 1000px) {
+  .year-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .chat-app {
+    grid-template-columns: 190px minmax(0, 1fr);
+  }
+}
+@media (max-width: 700px) {
+  .board-toolbar input,
+  .board-toolbar select {
+    max-width: 100%;
+    flex: 1;
+    min-width: 120px;
+  }
+  .kanban-column {
+    flex-basis: 82vw;
+  }
+  .year-grid {
+    grid-template-columns: 1fr;
+  }
+  .month-cell {
+    min-height: 75px;
+    padding: 2px;
+  }
+  .month-event {
+    font-size: 9px;
+    padding: 3px;
+  }
+  .month-grid .weekday {
+    font-size: 9px;
+  }
+  .month-grid .text-link {
+    font-size: 9px;
+  }
+  .calendar-toolbar {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .chat-app {
+    display: flex;
+    position: relative;
+    height: calc(100dvh - 155px);
+    min-height: 450px;
+  }
+  .chat-history {
+    display: none;
+  }
+  .chat-history.expanded {
+    display: flex;
+    position: absolute;
+    inset: 65px 15% 0 0;
+    z-index: 5;
+    box-shadow: 15px 0 40px #23442c22;
+  }
+  .chat-main {
+    width: 100%;
+  }
+  .history-toggle {
+    display: block;
+  }
+  .chat-main > header {
+    padding: 14px;
+  }
+  .chat-composer {
+    padding: 12px;
+  }
+  .chat-composer textarea {
+    width: 100px;
+  }
+  .chat-turn.user {
+    margin-left: 5%;
+  }
+  .chat-transcript {
+    padding: 20px 15px;
+  }
+  .routine-slot {
+    flex-wrap: wrap;
+  }
+}

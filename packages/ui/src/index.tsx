@@ -3,6 +3,8 @@ import {
   useState,
   useEffect,
   useRef,
+  lazy,
+  Suspense,
   type ReactNode,
   type FormEvent,
 } from "react";
@@ -57,6 +59,12 @@ import {
   type Storage,
 } from "./client";
 import { Pet } from "./Pet";
+import { Board } from "./Board";
+const Calendar = lazy(() =>
+  import("./Calendar").then((m) => ({ default: m.Calendar })),
+);
+const Chat = lazy(() => import("./Chat").then((m) => ({ default: m.Chat })));
+import { Routine } from "./Routine";
 import { demoWorkspace } from "./demo";
 export { Pet, PingoClient, Api };
 export type { Storage };
@@ -70,7 +78,6 @@ type Platform = {
 };
 const nav = [
   { id: "day", label: "Meu dia", icon: Sun },
-  { id: "boards", label: "Quadros", icon: Columns3 },
   { id: "calendar", label: "Agenda", icon: CalendarDays },
   { id: "chat", label: "Conversa", icon: MessageCircle },
   { id: "settings", label: "Ajustes", icon: Settings },
@@ -147,10 +154,10 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     const next = new PingoClient(api, storage, demo);
     if (demo && !(await storage.get("workspace")))
       await storage.set("workspace", JSON.stringify(demoWorkspace()));
-    setUser(u);
-    setClient(next);
     localStorage.setItem("pingo:user", JSON.stringify(u));
     await next.init();
+    setUser(u);
+    setClient(next);
     if (!demo && next.workspace.revision === 0)
       await next.command({
         type: "preferences.update",
@@ -163,6 +170,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   useEffect(() => {
     let active = true;
     const page = new URLSearchParams(location.search).get("page");
+    if (page === "boards") setScreen("day");
     if (nav.some((n) => n.id === page)) setScreen(page as Screen);
     if (!platform.api && "serviceWorker" in navigator)
       void navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -361,6 +369,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
           </div>
           <div className="welcome-pet">
             <Pet
+              soundEnabled={!platform.api}
               preferences={prefs}
               message="Oi! Vamos deixar seu dia mais leve?"
             />
@@ -373,7 +382,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
       </main>
     );
   const today = zonedParts(new Date(), prefs.timezone).date;
-  const tasks = w.tasks.filter((t) => !t.deleted);
+  const tasks = w.tasks.filter((t) => !t.deleted && !t.archivedAt);
   const pending = tasks.filter((t) => !t.completed);
   const completed = tasks.filter((t) => t.completed);
   const visibleError = error || client.error;
@@ -421,7 +430,6 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
             >
               <n.icon size={19} />
               <span>{n.label}</span>
-              {n.id === "boards" && <small>{w.boards.length}</small>}
             </button>
           ))}
         </nav>
@@ -551,28 +559,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
           )}
           {screen === "day" && (
             <>
-              <div className="page-heading">
-                <div>
-                  <div className="eyebrow">
-                    {format(new Date(), "EEEE, d MMMM", { locale: ptBR })}
-                  </div>
-                  <h1>
-                    Um bom dia começa
-                    <br />
-                    com um pouco de <em>calma.</em>
-                  </h1>
-                  <p>
-                    Olá, {user.name.split(" ")[0]}. Vamos dar um passo de cada
-                    vez.
-                  </p>
-                </div>
-                <button
-                  className="button primary"
-                  onClick={() => setTaskEditor({})}
-                >
-                  <Plus size={17} /> Nova tarefa
-                </button>
-              </div>
+              <Board w={w} today={today} act={act} onEdit={setTaskEditor} />
               <section className="day-hero">
                 <div>
                   <span className="pill">
@@ -591,6 +578,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
                   </button>
                 </div>
                 <Pet
+                  soundEnabled={!platform.api}
                   preferences={prefs}
                   message={
                     pending.length
@@ -645,62 +633,6 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
                 </div>
               </div>
               <div className="day-grid">
-                <section className="panel">
-                  <div className="section-heading">
-                    <h2>
-                      Seu próximo passo <span>{pending.length}</span>
-                    </h2>
-                    <button
-                      className="text-link"
-                      onClick={() => setScreen("boards")}
-                    >
-                      Ver quadro <ArrowUpRight size={14} />
-                    </button>
-                  </div>
-                  <div className="task-list">
-                    {[...pending]
-                      .sort((a, b) =>
-                        (a.dueDate ?? "9999").localeCompare(
-                          b.dueDate ?? "9999",
-                        ),
-                      )
-                      .slice(0, 5)
-                      .map((t) => (
-                        <TaskRow
-                          key={t.id}
-                          task={t}
-                          w={w}
-                          today={today}
-                          onEdit={() => setTaskEditor(t)}
-                          onComplete={() => {
-                            const b = w.boards.find((b) => b.id === t.boardId)!;
-                            void act({
-                              type: "task.upsert",
-                              task: {
-                                ...t,
-                                columnId: b.columns.find(
-                                  (c) => c.kind === "done",
-                                )!.id,
-                              },
-                              expectedRevision: t.revision,
-                            }).catch(() => {});
-                          }}
-                        />
-                      ))}
-                    {!pending.length && (
-                      <Empty
-                        title="Espaço para um novo começo"
-                        text="Adicione uma tarefa ou conecte suas listas do Google."
-                      />
-                    )}
-                  </div>
-                  <button
-                    className="add-inline"
-                    onClick={() => setTaskEditor({})}
-                  >
-                    <Plus size={16} /> Adicionar uma tarefa
-                  </button>
-                </section>
                 <section className="panel agenda-card">
                   <div className="section-heading">
                     <h2>Na sua agenda</h2>
@@ -759,44 +691,47 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
               <div className="day-grid">
                 <section className="panel mail-panel">
                   <div className="section-heading">
-                    <h2>
-                      <Mail size={17} /> Chegou na caixa de entrada
-                    </h2>
-                    <span className="muted">{w.mail.length} não lidos</span>
+                    <h2>E-mails de hoje</h2>
+                    <span>
+                      {
+                        w.mail.filter(
+                          (m) =>
+                            zonedParts(new Date(m.date), prefs.timezone)
+                              .date === today,
+                        ).length
+                      }{" "}
+                      recebidos
+                    </span>
                   </div>
-                  {w.mail.slice(0, 4).map((m) => (
-                    <div className="mail-item" key={m.id}>
-                      <span className="mail-avatar">{m.from[0]}</span>
-                      <div>
-                        <strong>{m.from}</strong>
-                        <button
-                          className="text-link"
-                          onClick={() => void openExternal(m.url)}
+                  <div className="daily-mail-list">
+                    {w.mail
+                      .filter(
+                        (m) =>
+                          zonedParts(new Date(m.date), prefs.timezone).date ===
+                          today,
+                      )
+                      .map((m) => (
+                        <div
+                          className={`mail-item ${m.isRead ? "read" : "unread"}`}
+                          key={m.id}
                         >
-                          {m.subject}
-                        </button>
-                      </div>
-                      <button
-                        className="icon-button"
-                        aria-label={`Transformar ${m.subject} em tarefa`}
-                        title="Transformar em tarefa"
-                        onClick={() =>
-                          setTaskEditor({
-                            title: m.subject,
-                            notes: `De: ${m.from}`,
-                            sourceUrl: m.url,
-                          })
-                        }
-                      >
-                        <Plus size={18} />
-                      </button>
-                    </div>
-                  ))}
-                  {!w.mail.length && (
-                    <p className="empty-inline">
-                      Sem e-mails não lidos por aqui.
-                    </p>
-                  )}
+                          <span className="mail-avatar">{m.from[0]}</span>
+                          <div>
+                            <strong>{m.from}</strong>
+                            <p>{m.subject}</p>
+                            <small>
+                              {formatTime(m.date, prefs)} ·{" "}
+                              {m.isRead ? "Lido" : "Não lido"}
+                            </small>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                  {!w.mail.some(
+                    (m) =>
+                      zonedParts(new Date(m.date), prefs.timezone).date ===
+                      today,
+                  ) && <p>Nenhum e-mail recebido hoje na caixa de entrada.</p>}
                 </section>
                 <section className="pause-card">
                   <span>UM CUIDADO PEQUENO</span>
@@ -812,15 +747,21 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
               </div>
             </>
           )}
-          {screen === "boards" && (
-            <Boards w={w} today={today} act={act} onEdit={setTaskEditor} />
+          {screen === "calendar" && (
+            <Suspense fallback={<p role="status">Abrindo sua agenda…</p>}>
+              <Calendar w={w} client={client} onEdit={setEventEditor} />
+            </Suspense>
           )}
-          {screen === "calendar" && <Agenda w={w} onEdit={setEventEditor} />}
           {screen === "chat" && (
-            <Conversation
-              client={client}
-              onUpdate={() => void client.refresh()}
-            />
+            <Suspense fallback={<p role="status">Abrindo suas conversas…</p>}>
+              <Chat
+                client={client}
+                onUpdate={() => void client.refresh()}
+                preview={(command) => (
+                  <SuggestionPreview command={command} workspace={w} />
+                )}
+              />
+            </Suspense>
           )}
           {screen === "settings" && (
             <SettingsPage
@@ -1091,236 +1032,6 @@ function TaskRow({
     </div>
   );
 }
-function Boards({
-  w,
-  today,
-  act,
-  onEdit,
-}: {
-  w: Workspace;
-  today: string;
-  act: (c: Command) => Promise<void>;
-  onEdit: (t: Partial<Task>) => void;
-}) {
-  const [selected, setSelected] = useState(
-    w.preferences.defaultBoardId || w.boards[0]?.id || "",
-  );
-  const [filter, setFilter] = useState("");
-  const b = w.boards.find((b) => b.id === selected) ?? w.boards[0];
-  const [title, setTitle] = useState("");
-  const [adding, setAdding] = useState(false);
-  return (
-    <>
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">UM LUGAR PARA CADA COISA</div>
-          <h1>
-            Suas ideias em <em>movimento.</em>
-          </h1>
-          <p>Organize o caminho. Celebre cada cartão concluído.</p>
-        </div>
-        <button
-          className="button primary"
-          onClick={() => onEdit({ boardId: b?.id })}
-          disabled={!b}
-        >
-          <Plus size={17} /> Nova tarefa
-        </button>
-      </div>
-      <div className="board-toolbar">
-        <div className="board-tabs">
-          {w.boards.map((x) => (
-            <button
-              key={x.id}
-              className={x.id === b?.id ? "active" : ""}
-              onClick={() => setSelected(x.id)}
-            >
-              {x.title}
-            </button>
-          ))}
-        </div>
-        <label className="search">
-          <Search size={16} />
-          <input
-            aria-label="Buscar tarefas"
-            placeholder="Encontrar uma tarefa"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
-        </label>
-      </div>
-      {b ? (
-        <div className="kanban">
-          {b.columns.map((col) => {
-            const cards = w.tasks.filter(
-              (t) =>
-                !t.deleted &&
-                t.boardId === b.id &&
-                t.columnId === col.id &&
-                t.title.toLowerCase().includes(filter.toLowerCase()),
-            );
-            return (
-              <section
-                className={`kanban-column col-${col.kind}`}
-                key={col.id}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const id = e.dataTransfer.getData("text/pingo-task");
-                  const t = w.tasks.find(
-                    (t) => t.id === id && t.boardId === b.id,
-                  );
-                  if (t)
-                    void act({
-                      type: "task.upsert",
-                      task: { ...t, columnId: col.id },
-                      expectedRevision: t.revision,
-                    }).catch(() => {});
-                }}
-              >
-                <header>
-                  <span className="column-dot" />
-                  <h2>{col.title}</h2>
-                  <small>{cards.length}</small>
-                  <button
-                    className="icon-button"
-                    onClick={() => onEdit({ boardId: b.id, columnId: col.id })}
-                    aria-label={`Adicionar em ${col.title}`}
-                  >
-                    <Plus size={16} />
-                  </button>
-                </header>
-                {cards.map((t) => (
-                  <article
-                    key={t.id}
-                    className="task-card"
-                    draggable
-                    onDragStart={(e) =>
-                      e.dataTransfer.setData("text/pingo-task", t.id)
-                    }
-                  >
-                    <button className="card-main" onClick={() => onEdit(t)}>
-                      <span className={`priority priority-${t.priority}`}>
-                        {t.priority === "high"
-                          ? "Prioridade"
-                          : t.priority === "low"
-                            ? "Com calma"
-                            : "Rotina"}
-                      </span>
-                      <h3>{t.title}</h3>
-                      {t.notes && <p>{t.notes}</p>}
-                      <footer>
-                        {t.dueDate && (
-                          <span className={t.dueDate < today ? "overdue" : ""}>
-                            <CalendarDays size={13} />
-                            {t.dueDate === today
-                              ? "Hoje"
-                              : format(
-                                  new Date(t.dueDate + "T12:00:00"),
-                                  "dd MMM",
-                                  { locale: ptBR },
-                                )}
-                          </span>
-                        )}
-                        <span
-                          className={`sync-state state-${t.syncState}`}
-                          title={t.error}
-                        >
-                          {stateLabel[t.syncState]}
-                        </span>
-                      </footer>
-                    </button>
-                    <select
-                      aria-label={`Mover ${t.title}`}
-                      value={t.columnId}
-                      onChange={(e) =>
-                        void act({
-                          type: "task.upsert",
-                          task: { ...t, columnId: e.target.value },
-                          expectedRevision: t.revision,
-                        }).catch(() => {})
-                      }
-                    >
-                      {b.columns.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.title}
-                        </option>
-                      ))}
-                    </select>
-                  </article>
-                ))}
-                <button
-                  className="add-inline"
-                  onClick={() => onEdit({ boardId: b.id, columnId: col.id })}
-                >
-                  <Plus size={15} /> Adicionar tarefa
-                </button>
-              </section>
-            );
-          })}
-          <div className="add-column">
-            {adding ? (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void act({
-                    type: "column.create",
-                    boardId: b.id,
-                    id: crypto.randomUUID(),
-                    title,
-                    expectedRevision: b.revision,
-                  })
-                    .then(() => {
-                      setAdding(false);
-                      setTitle("");
-                    })
-                    .catch(() => {});
-                }}
-              >
-                <input
-                  autoFocus
-                  aria-label="Nome da coluna"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                  maxLength={100}
-                />
-                <button className="button" type="submit">
-                  Criar coluna
-                </button>
-              </form>
-            ) : (
-              <button className="add-inline" onClick={() => setAdding(true)}>
-                <Plus size={16} /> Nova coluna
-              </button>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="panel">
-          <Empty
-            title="Seu quadro começa aqui"
-            text="Conecte o Google para importar suas listas ou crie um quadro local."
-          />
-          <button
-            className="button"
-            onClick={() => {
-              const title = prompt("Nome do quadro");
-              if (title)
-                void act({
-                  type: "board.create",
-                  id: crypto.randomUUID(),
-                  title,
-                }).catch(() => {});
-            }}
-          >
-            <Plus size={16} /> Criar quadro local
-          </button>
-        </div>
-      )}
-    </>
-  );
-}
 function TaskEditor({
   initial,
   w,
@@ -1448,16 +1159,6 @@ function TaskEditor({
             </select>
           </label>
         </div>
-        {initial.sourceUrl && (
-          <a
-            href={initial.sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="text-link"
-          >
-            Abrir e-mail original <ArrowUpRight size={14} />
-          </a>
-        )}
         {initial.error && <p className="error">{initial.error}</p>}
         {error && (
           <p className="error" role="alert">
@@ -1514,130 +1215,6 @@ function TaskEditor({
         )}
       </form>
     </Dialog>
-  );
-}
-function Agenda({
-  w,
-  onEdit,
-}: {
-  w: Workspace;
-  onEdit: (e: Partial<CalendarEvent>) => void;
-}) {
-  const [day, setDay] = useState(new Date());
-  const [weekly, setWeekly] = useState(true);
-  const days = weekly
-    ? Array.from({ length: 7 }, (_, i) =>
-        addDays(startOfWeek(day, { weekStartsOn: 1 }), i),
-      )
-    : [day];
-  return (
-    <>
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">TEMPO PARA O QUE IMPORTA</div>
-          <h1>
-            Abra espaço no <em>seu dia.</em>
-          </h1>
-          <p>Sua agenda, com pausas incluídas.</p>
-        </div>
-        <button className="button primary" onClick={() => onEdit({})}>
-          <Plus size={17} /> Novo compromisso
-        </button>
-      </div>
-      <div className="calendar-toolbar">
-        <div>
-          <button
-            className="icon-button"
-            aria-label="Período anterior"
-            onClick={() => setDay(addDays(day, weekly ? -7 : -1))}
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <h2>{format(day, "MMMM yyyy", { locale: ptBR })}</h2>
-          <button
-            className="icon-button"
-            aria-label="Próximo período"
-            onClick={() => setDay(addDays(day, weekly ? 7 : 1))}
-          >
-            <ChevronRight size={18} />
-          </button>
-          <button className="button small" onClick={() => setDay(new Date())}>
-            Hoje
-          </button>
-        </div>
-        <div className="segmented">
-          <button
-            className={!weekly ? "active" : ""}
-            onClick={() => setWeekly(false)}
-          >
-            Dia
-          </button>
-          <button
-            className={weekly ? "active" : ""}
-            onClick={() => setWeekly(true)}
-          >
-            Semana
-          </button>
-        </div>
-      </div>
-      <div className={`calendar-grid ${weekly ? "weekly" : "daily"}`}>
-        {days.map((d) => {
-          const key = format(d, "yyyy-MM-dd");
-          return (
-            <section
-              key={key}
-              className={
-                key === format(new Date(), "yyyy-MM-dd")
-                  ? "calendar-day is-today"
-                  : "calendar-day"
-              }
-            >
-              <header>
-                <span>{format(d, "EEE", { locale: ptBR })}</span>
-                <strong>{format(d, "dd")}</strong>
-              </header>
-              {w.events
-                .filter(
-                  (e) =>
-                    !e.deleted &&
-                    !e.recurrence &&
-                    eventOnDate(e, key, w.preferences.timezone),
-                )
-                .sort((a, b) => a.start.localeCompare(b.start))
-                .map((e) => (
-                  <button
-                    className="calendar-event"
-                    key={e.id}
-                    onClick={() => onEdit(e)}
-                  >
-                    <small>
-                      {e.allDay
-                        ? "Dia inteiro"
-                        : formatTime(e.start, w.preferences)}
-                    </small>
-                    <strong>{e.title}</strong>
-                    {e.recurringEventId && <small>↻ Recorrente</small>}
-                    <small>{stateLabel[e.syncState]}</small>
-                  </button>
-                ))}
-              <button
-                className="calendar-add"
-                aria-label={`Novo compromisso em ${key}`}
-                onClick={() =>
-                  onEdit({ start: key + "T09:00", end: key + "T10:00" })
-                }
-              >
-                <Plus size={16} />
-              </button>
-            </section>
-          );
-        })}
-      </div>
-      <p className="muted calendar-note">
-        Horários em {w.preferences.timezone}. Um horário reservado para tarefa
-        vira um compromisso na agenda.
-      </p>
-    </>
   );
 }
 function EventEditor({
@@ -1843,190 +1420,6 @@ function EventEditor({
     </Dialog>
   );
 }
-function Conversation({
-  client,
-  onUpdate,
-}: {
-  client: PingoClient;
-  onUpdate: () => void;
-}) {
-  const [message, setMessage] = useState("");
-  const [items, setItems] = useState<
-    {
-      role: string;
-      text: string;
-      suggestions?: { approvalId: string; command: Command }[];
-    }[]
-  >(client.workspace.conversation ?? []);
-  const [busy, setBusy] = useState(false);
-  const [mailId, setMailId] = useState("");
-  async function send(value: string) {
-    if (!value.trim()) return;
-    setMessage("");
-    setBusy(true);
-    setItems((i) => [...i, { role: "user", text: value }]);
-    try {
-      if (client.demo) {
-        setItems((i) => [
-          ...i,
-          {
-            role: "pet",
-            text: "Esta é uma demonstração local. Na sua conta, escolha um provedor e conecte sua chave em Ajustes para conversarmos.",
-          },
-        ]);
-        return;
-      }
-      const result = await client.api.post<{
-        text: string;
-        suggestions: { approvalId: string; command: Command }[];
-      }>("chat", { message: value, ...(mailId ? { mailBodyId: mailId } : {}) });
-      setItems((i) => [...i, { role: "pet", ...result }]);
-      onUpdate();
-    } catch (e) {
-      setItems((i) => [...i, { role: "pet", text: (e as Error).message }]);
-    } finally {
-      setBusy(false);
-      setMailId("");
-    }
-  }
-  return (
-    <>
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">COMPANHIA PARA PENSAR MELHOR</div>
-          <h1>
-            Vamos <em>conversar?</em>
-          </h1>
-          <p>
-            Um lugar para organizar as ideias e encontrar seu próximo passo.
-          </p>
-        </div>
-      </div>
-      <section className="conversation panel">
-        <div className="chat-messages">
-          {!items.length && (
-            <div className="chat-welcome">
-              <Pet preferences={client.workspace.preferences} />
-              <h2>Oi! O que vamos cuidar hoje?</h2>
-              <div className="prompt-chips">
-                {[
-                  "O que tenho hoje?",
-                  "Sugira como encaixar minhas tarefas",
-                  "Adicione comprar remédio para amanhã",
-                ].map((p) => (
-                  <button key={p} onClick={() => void send(p)}>
-                    {p} <ArrowUpRight size={14} />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {items.map((item, index) => (
-            <div className={`chat-message ${item.role}`} key={index}>
-              <span>
-                {item.role === "user"
-                  ? "Você"
-                  : client.workspace.preferences.name}
-              </span>
-              <p>{item.text}</p>
-              {item.suggestions?.map((s) => (
-                <div className="suggestion" key={s.approvalId}>
-                  <strong>Sugestão para sua aprovação</strong>
-                  <SuggestionPreview
-                    command={s.command}
-                    workspace={client.workspace}
-                  />
-                  <button
-                    className="button"
-                    disabled={busy}
-                    onClick={() => {
-                      setBusy(true);
-                      void client.api
-                        .post("approvals", { id: s.approvalId })
-                        .then(() => {
-                          setItems((items) =>
-                            items.map((x) => ({
-                              ...x,
-                              suggestions: x.suggestions?.filter(
-                                (a) => a.approvalId !== s.approvalId,
-                              ),
-                            })),
-                          );
-                          onUpdate();
-                        })
-                        .catch((e) =>
-                          setItems((i) => [
-                            ...i,
-                            { role: "pet", text: e.message },
-                          ]),
-                        )
-                        .finally(() => setBusy(false));
-                    }}
-                  >
-                    Aprovar esta alteração
-                  </button>
-                </div>
-              ))}
-            </div>
-          ))}
-          {busy && (
-            <p className="thinking">
-              Pingo está pensando <span>•••</span>
-            </p>
-          )}
-        </div>
-        <form
-          className="chat-input"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void send(message);
-          }}
-        >
-          {client.workspace.mail.length > 0 && (
-            <label className="mail-consent">
-              Enviar o corpo de um e-mail nesta conversa
-              <select
-                value={mailId}
-                onChange={(e) => setMailId(e.target.value)}
-              >
-                <option value="">Nenhum e-mail</option>
-                {client.workspace.mail.map((m) => (
-                  <option value={m.id} key={m.id}>
-                    {m.subject}
-                  </option>
-                ))}
-              </select>
-              <small>
-                Ao selecionar, você autoriza enviar o corpo ao provedor de IA.
-              </small>
-            </label>
-          )}
-          <div>
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Peça uma mão ao Pingo…"
-              aria-label="Mensagem para o Pingo"
-              rows={2}
-              maxLength={6000}
-            />
-            <button
-              className="button primary"
-              disabled={busy || !message.trim()}
-              aria-label="Enviar mensagem"
-            >
-              <ArrowUpRight size={20} />
-            </button>
-          </div>
-          <small>
-            A IA pode errar. Exclusões, convites e sugestões precisam da sua
-            aprovação.
-          </small>
-        </form>
-      </section>
-    </>
-  );
-}
 function SuggestionPreview({
   command: c,
   workspace: w,
@@ -2034,6 +1427,33 @@ function SuggestionPreview({
   command: Command;
   workspace: Workspace;
 }) {
+  if (c.type === "routine.update")
+    return (
+      <div className="suggestion-preview">
+        <h3>Salvar sua rotina semanal</h3>
+        {c.routine.map((d) => (
+          <p key={d.day}>
+            {
+              [
+                "Domingo",
+                "Segunda",
+                "Terça",
+                "Quarta",
+                "Quinta",
+                "Sexta",
+                "Sábado",
+              ][d.day]
+            }
+            : trabalho{" "}
+            {d.work.map((x) => `${x.start}–${x.end}`).join(", ") ||
+              "não informado"}
+            ; pessoal{" "}
+            {d.personal.map((x) => `${x.start}–${x.end}`).join(", ") ||
+              "não informado"}
+          </p>
+        ))}
+      </div>
+    );
   if (c.type === "task.upsert") {
     const board = w.boards.find((b) => b.id === c.task.boardId);
     return (
@@ -2328,18 +1748,10 @@ function SettingsPage({
           <label className="toggle">
             <input
               type="checkbox"
-              checked={p.reducedMotion}
-              onChange={(e) => setP({ ...p, reducedMotion: e.target.checked })}
-            />{" "}
-            Reduzir movimentos
-          </label>
-          <label className="toggle">
-            <input
-              type="checkbox"
               checked={p.voice}
               onChange={(e) => setP({ ...p, voice: e.target.checked })}
             />{" "}
-            Ler balões em voz alta no PC
+            Ler balões em voz alta
           </label>
           <label className="toggle">
             <input
@@ -2347,8 +1759,12 @@ function SettingsPage({
               checked={p.snore}
               onChange={(e) => setP({ ...p, snore: e.target.checked })}
             />{" "}
-            Ronquinho ao dormir no PC
+            Ronquinho ao dormir
           </label>
+          <Routine
+            value={p.routine ?? []}
+            onChange={(routine) => setP({ ...p, routine })}
+          />
           <button className="button primary" type="submit">
             Salvar meu jeito
           </button>

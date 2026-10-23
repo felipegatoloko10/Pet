@@ -1,3 +1,4 @@
+import { dayBounds, zonedParts } from "@pingo/core";
 import {
   newBoard,
   mergeGoogleTask,
@@ -351,38 +352,45 @@ export async function syncGoogle(userId: string) {
       });
     if (current.connection.scopes.some((s) => s.endsWith("/gmail.readonly")))
       await attempt("Gmail", async () => {
-        const list = await client.request<{ messages?: { id: string }[] }>(
-          "https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&labelIds=UNREAD&maxResults=15",
+        const bounds = dayBounds(
+          zonedParts(new Date(), current.preferences.timezone).date,
+          current.preferences.timezone,
         );
-        const mail = await Promise.all(
-          (list.messages ?? []).map(async (m) => {
-            const data = await client.request<{
-              payload?: { headers?: { name: string; value: string }[] };
-            }>(
-              `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
-            );
-            const h = (name: string) =>
-              data.payload?.headers?.find((h) => h.name.toLowerCase() === name)
-                ?.value ?? "";
-            return {
-              id: m.id,
-              from: h("from"),
-              subject: h("subject") || "(sem assunto)",
-              date: h("date"),
-              url: `https://mail.google.com/mail/?authuser=${encodeURIComponent(current.connection.email ?? "0")}#inbox/${m.id}`,
-            };
-          }),
+        const ids = await client.pages<{ id: string }>(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=100&q=${encodeURIComponent(`after:${Math.floor(Date.parse(bounds.start) / 1000)} before:${Math.floor(Date.parse(bounds.end) / 1000)}`)}`,
+          "messages",
         );
-        await mutateWorkspace(userId, (w) => {
-          for (const m of mail)
-            if (w.cursor.gmail && !w.mail.some((x) => x.id === m.id))
-              notice(
-                w,
-                `mail:${m.id}`,
-                "Novo e-mail",
-                `${m.from}: ${m.subject}`,
+        const mail: Workspace["mail"] = [];
+        for (let offset = 0; offset < ids.length; offset += 8) {
+          const batch = await Promise.all(
+            ids.slice(offset, offset + 8).map(async (m) => {
+              const data = await client.request<{
+                internalDate: string;
+                labelIds?: string[];
+                payload?: { headers?: { name: string; value: string }[] };
+              }>(
+                `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&fields=id,internalDate,labelIds,payload/headers`,
               );
-          w.mail = mail;
+              const h = (name: string) =>
+                data.payload?.headers?.find(
+                  (h) => h.name.toLowerCase() === name,
+                )?.value ?? "";
+              return {
+                id: m.id,
+                from: h("from"),
+                subject: h("subject") || "(sem assunto)",
+                date: new Date(Number(data.internalDate)).toISOString(),
+                isRead: !data.labelIds?.includes("UNREAD"),
+              };
+            }),
+          );
+          mail.push(...batch);
+        }
+        await mutateWorkspace(userId, (w) => {
+          w.mail = mail
+            .filter((m) => m.date >= bounds.start && m.date < bounds.end)
+            .sort((a, b) => b.date.localeCompare(a.date));
+          w.notices = w.notices.filter((n) => !n.id.startsWith("mail:"));
           w.cursor.gmail = new Date().toISOString();
         });
       });
@@ -493,7 +501,7 @@ async function pullCalendar(
         attendees: g.attendees?.map((a) => a.email),
         revision: (old?.revision ?? 0) + 1,
         syncState: "synced",
-        deleted:false,
+        deleted: false,
       };
       if (old) Object.assign(old, e);
       else current.events.push(e);
@@ -508,9 +516,9 @@ async function pullOccurrences(
   userId: string,
   client: GoogleClient,
   calendarId: string,
+  start = new Date(Date.now() - 30 * 86400000).toISOString(),
+  end = new Date(Date.now() + 90 * 86400000).toISOString(),
 ) {
-  const start = new Date(Date.now() - 30 * 86400000).toISOString(),
-    end = new Date(Date.now() + 90 * 86400000).toISOString();
   const expanded = await client.pages<GEvent>(
     `${eventUrl(calendarId)}?singleEvents=true&showDeleted=true&maxResults=250&timeMin=${encodeURIComponent(start)}&timeMax=${encodeURIComponent(end)}`,
     "items",
@@ -521,8 +529,12 @@ async function pullOccurrences(
       if (
         e.calendarId === calendarId &&
         e.recurringEventId &&
-        e.start >= start &&
-        e.start < end &&
+        Date.parse(
+          e.allDay ? dayBounds(e.start, w.preferences.timezone).start : e.start,
+        ) >= Date.parse(start) &&
+        Date.parse(
+          e.allDay ? dayBounds(e.start, w.preferences.timezone).start : e.start,
+        ) < Date.parse(end) &&
         !seen.has(e.googleId ?? "") &&
         !w.outbox.some((j) => j.entityId === e.id)
       ) {
@@ -531,13 +543,15 @@ async function pullOccurrences(
       }
     }
     for (const g of expanded) {
-      if (!g.recurringEventId) continue;
       const old = w.events.find(
         (e) => e.calendarId === calendarId && e.googleId === g.id,
       );
       if (old && w.outbox.some((j) => j.entityId === old.id)) continue;
       if (g.status === "cancelled") {
-        if (old) old.deleted = true;
+        if (old) {
+          old.deleted = true;
+          old.revision++;
+        }
         continue;
       }
       if (!g.start || !g.end) continue;
@@ -611,19 +625,33 @@ async function ensureCalendarWatch(
       expiresAt: new Date(Number(response.expiration)),
     });
 }
-export async function getMailBody(userId: string, id: string) {
+
+export async function calendarRange(
+  userId: string,
+  start: string,
+  end: string,
+) {
+  if (
+    !Number.isFinite(Date.parse(start)) ||
+    !Number.isFinite(Date.parse(end)) ||
+    Date.parse(end) <= Date.parse(start) ||
+    Date.parse(end) - Date.parse(start) > 370 * 86400000
+  )
+    throw new Error("Período inválido (máximo 370 dias).");
   const w = await readWorkspace(userId);
-  if (!w.mail.some((m) => m.id === id))
-    throw new Error("Mensagem não encontrada nesta conta.");
-  const client = new GoogleClient(await googleToken(userId));
-  type Part = { mimeType?: string; body?: { data?: string }; parts?: Part[] };
-  const data = await client.request<{ payload?: Part }>(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`,
-  );
-  function plain(p: Part): string {
-    return p.mimeType === "text/plain" && p.body?.data
-      ? Buffer.from(p.body.data, "base64url").toString("utf8")
-      : (p.parts ?? []).map(plain).join("\n");
+  if (w.connection.connected) {
+    const client = new GoogleClient(await googleToken(userId));
+    for (const cal of w.calendars)
+      await pullOccurrences(userId, client, cal.id, start, end);
   }
-  return plain(data.payload ?? {}).slice(0, 30000);
+  return (await readWorkspace(userId)).events.filter(
+    (e) =>
+      !e.deleted &&
+      !e.recurrence &&
+      (e.allDay
+        ? e.start < zonedParts(new Date(end), w.preferences.timezone).date &&
+          e.end > zonedParts(new Date(start), w.preferences.timezone).date
+        : Date.parse(e.start) < Date.parse(end) &&
+          Date.parse(e.end) > Date.parse(start)),
+  );
 }

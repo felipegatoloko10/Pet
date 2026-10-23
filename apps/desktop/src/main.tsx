@@ -1,3 +1,4 @@
+import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { createRoot } from "react-dom/client";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -16,8 +17,7 @@ import {
 } from "@pingo/core";
 import "@pingo/ui/styles.css";
 import "./pet.css";
-const base =
-  import.meta.env.VITE_API_URL ?? "https://pingo-gilt.vercel.app";
+const base = import.meta.env.VITE_API_URL ?? "https://pingo-gilt.vercel.app";
 const api = new Api(base);
 const platform = {
   api,
@@ -76,48 +76,104 @@ async function sqliteStorage(userId: string): Promise<Storage> {
     },
   };
 }
-async function deviceLogin() {
-  const codeResponse = await fetch(`${base}/api/auth/device/code`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ client_id: "pingo-desktop" }),
+let loginInProgress: Promise<void> | undefined;
+function deviceLogin(): Promise<void> {
+  if (loginInProgress) return loginInProgress;
+  loginInProgress = browserLogin().finally(() => {
+    loginInProgress = undefined;
   });
-  const code = await codeResponse.json();
-  if (!codeResponse.ok)
-    throw new Error("O servidor não iniciou a autorização.");
-  await invoke("show_device_code", { code: code.user_code });
-  const verify = new URL(code.verification_uri_complete);
-  if (verify.origin !== new URL(base).origin)
-    throw new Error("Página de autorização inválida.");
-  await openUrl(verify.toString());
-  let interval = Math.max(5, code.interval ?? 5);
-  const expires = Date.now() + Math.min(code.expires_in, 600) * 1000;
-  while (Date.now() < expires) {
-    await new Promise((r) => setTimeout(r, interval * 1000));
-    const r = await fetch(`${base}/api/auth/device/token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        grant_type: "urn:ietf:params:oauth:grant-type:device_code",
-        device_code: code.device_code,
-        client_id: "pingo-desktop",
-      }),
+  return loginInProgress;
+}
+async function browserLogin() {
+  const random = () => {
+    const b = crypto.getRandomValues(new Uint8Array(32));
+    return btoa(String.fromCharCode(...b))
+      .replaceAll("+", "-")
+      .replaceAll("/", "_")
+      .replaceAll("=", "");
+  };
+  const verifier = random(),
+    state = random();
+  const hash = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(verifier),
+  );
+  const challenge = btoa(String.fromCharCode(...new Uint8Array(hash)))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+  let stop: (() => void) | undefined,
+    timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      void (async () => {
+        let redeem = false;
+        stop = await onOpenUrl((urls) => {
+          for (const raw of urls) {
+            void (async () => {
+              try {
+                const u = new URL(raw);
+                if (
+                  u.protocol !== "pingo:" ||
+                  u.hostname !== "auth" ||
+                  u.pathname !== "/callback" ||
+                  u.searchParams.get("state") !== state ||
+                  redeem
+                )
+                  return;
+                redeem = true;
+                const r = await fetch(`${base}/api/v1/desktop-auth/exchange`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    id: u.searchParams.get("id"),
+                    code: u.searchParams.get("code"),
+                    state,
+                    verifier,
+                  }),
+                });
+                const d = await r.json();
+                if (!r.ok)
+                  throw new Error(
+                    d.error ?? "Não foi possível concluir o login.",
+                  );
+                api.token = d.access_token;
+                await invoke("save_session", { token: api.token });
+                await emit("session-changed");
+                await invoke("open_panel");
+                resolve();
+              } catch (e) {
+                reject(e);
+              }
+            })();
+          }
+        });
+        const r = await fetch(`${base}/api/v1/desktop-auth/start`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ state, challenge }),
+        });
+        const d = await r.json();
+        if (!r.ok)
+          throw new Error(d.error ?? "Não foi possível iniciar o login.");
+        if (new URL(d.url).origin !== new URL(base).origin)
+          throw new Error("Destino de login inválido.");
+        timer = setTimeout(
+          () =>
+            reject(
+              new Error(
+                "O login expirou. Clique em Entrar com Google para tentar novamente.",
+              ),
+            ),
+          600000,
+        );
+        await openUrl(d.url);
+      })().catch(reject);
     });
-    const data = await r.json();
-    if (r.ok) {
-      api.token = data.access_token;
-      await invoke("save_session", { token: api.token });
-      await emit("session-changed");
-      return;
-    }
-    if (data.error === "slow_down") {
-      interval += 5;
-      continue;
-    }
-    if (data.error !== "authorization_pending")
-      throw new Error("Autorização recusada ou expirada.");
+  } finally {
+    stop?.();
+    clearTimeout(timer);
   }
-  throw new Error("O código expirou. Inicie o login novamente.");
 }
 function PetWindow() {
   const {
@@ -126,29 +182,6 @@ function PetWindow() {
     setBubble,
     activity,
   } = useDesktopPet(api, sqliteStorage);
-  useEffect(() => {
-    if (
-      !w.preferences.snore ||
-      isQuiet(new Date(), w.preferences) ||
-      petState(new Date(), w.preferences) !== "sleep"
-    )
-      return;
-    const timer = setInterval(() => {
-      const audio = new AudioContext();
-      const oscillator = audio.createOscillator();
-      const volume = audio.createGain();
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(85, audio.currentTime);
-      volume.gain.setValueAtTime(0.015, audio.currentTime);
-      volume.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.65);
-      oscillator.connect(volume);
-      volume.connect(audio.destination);
-      oscillator.start();
-      oscillator.stop(audio.currentTime + 0.7);
-      oscillator.onended = () => void audio.close();
-    }, 6000);
-    return () => clearInterval(timer);
-  }, [w.preferences]);
   return (
     <div
       className="desktop-pet"
@@ -157,6 +190,13 @@ function PetWindow() {
         void invoke("open_panel");
       }}
     >
+      <button
+        className="pet-close"
+        aria-label="Sair do Pingo"
+        onClick={() => void invoke("quit_pingo")}
+      >
+        ×
+      </button>
       <div
         className="pet-drag-handle"
         data-tauri-drag-region
@@ -165,6 +205,7 @@ function PetWindow() {
         ⠿
       </div>
       <Pet
+        soundEnabled
         activity={activity}
         preferences={w.preferences}
         message={bubble}

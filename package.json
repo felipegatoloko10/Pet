@@ -1,6 +1,6 @@
 {
   "name": "pingo",
-  "version": "2.0.0-beta.2",
+  "version": "2.1.0-beta.1",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -24,7 +24,11 @@
     "@ai-sdk/google": "latest",
     "@ai-sdk/openai": "latest",
     "@date-fns/tz": "^1.4.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@tauri-apps/api": "2.12.4",
+    "@tauri-apps/plugin-deep-link": "^2.6.2",
     "@tauri-apps/plugin-notification": "latest",
     "@tauri-apps/plugin-opener": "latest",
     "@tauri-apps/plugin-sql": "latest",
@@ -40,6 +44,8 @@
     "pg": "^8.16.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "web-push": "^3.6.7",
     "zod": "^4.0.0"
   },

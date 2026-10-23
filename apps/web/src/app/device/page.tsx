@@ -11,17 +11,31 @@ export default function Device() {
       .then((s) => setLogged(!!s?.user));
   }, []);
   async function approve(allow: boolean) {
+    const claim = await fetch(
+      `/api/auth/device?user_code=${encodeURIComponent(code)}`,
+    );
+    if (!claim.ok) {
+      const error = await claim.json();
+      setStatus(
+        error.error_description ??
+          "Não foi possível validar o computador. Inicie novamente no aplicativo.",
+      );
+      return;
+    }
     const r = await fetch(`/api/auth/device/${allow ? "approve" : "deny"}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userCode: code }),
     });
+    const result = await r.json();
     setStatus(
       r.ok
         ? allow
           ? "Computador autorizado. Você pode voltar ao Pingo."
           : "Autorização recusada."
-        : "Código inválido ou expirado.",
+        : (result.error_description ??
+            result.message ??
+            "Não foi possível autorizar. Inicie novamente no aplicativo."),
     );
   }
   return (

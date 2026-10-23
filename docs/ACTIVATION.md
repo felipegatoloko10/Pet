@@ -2,6 +2,8 @@
 
 ## Google
 
+O ambiente publicado já usa o projeto exclusivo **Pingo** (`pingo-512421`), em teste, com os dois convidados autorizados. As credenciais foram configuradas apenas no backend. Os passos abaixo documentam a configuração para outros ambientes.
+
 1. Crie um projeto Google Cloud exclusivo e habilite Tasks API, Calendar API e Gmail API.
 2. Configure a tela de consentimento em teste, com os usuários convidados autorizados. A autorização Workspace é separada do login e poderá expirar periodicamente no modo teste.
 3. Crie um cliente OAuth **Web**. Cadastre os redirects `https://SEU_DOMINIO/api/auth/callback/google` e `https://SEU_DOMINIO/api/v1/google/callback`. Use os mesmos caminhos em localhost para desenvolvimento, em um cliente separado.

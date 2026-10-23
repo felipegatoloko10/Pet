@@ -59,6 +59,8 @@ it.each(["openai", "google", "anthropic"] as const)(
     );
     expect(Object.keys(tools)).toEqual([
       "consultarDia",
+      "salvarRotina",
+      "consultarPeriodo",
       "salvarTarefa",
       "salvarCompromisso",
       "sugerirExclusao",

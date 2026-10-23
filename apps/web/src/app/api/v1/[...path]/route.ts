@@ -1,4 +1,11 @@
 import { z } from "zod";
+import {
+  startDesktop,
+  authorizeDesktop,
+  exchangeDesktop,
+  desktopStartInput,
+  limitDesktop,
+} from "../../../../server/desktop-auth";
 import { and, eq } from "drizzle-orm";
 import { cors } from "../../../../server/cors";
 import { inspectConflict, resolveConflict } from "../../../../server/conflicts";
@@ -17,7 +24,7 @@ import {
   GoogleClient,
   googleToken,
 } from "../../../../server/google";
-import { syncGoogle, getMailBody } from "../../../../server/sync";
+import { syncGoogle, calendarRange } from "../../../../server/sync";
 import { chat, approve } from "../../../../server/ai";
 import {
   indexJobs,
@@ -48,7 +55,7 @@ async function handler(r: Request) {
     const path = url.pathname.replace("/api/v1/", "");
     if (path === "health")
       return Response.json({
-        version: "2.0.0-beta.2",
+        version: "2.1.0-beta.1",
         configured: !!(
           process.env.DATABASE_URL && process.env.GOOGLE_CLIENT_ID
         ),
@@ -94,12 +101,39 @@ async function handler(r: Request) {
         await syncGoogle(channel.userId);
       return new Response(null, { status: 204 });
     }
+    if (
+      (path === "desktop-auth/start" || path === "desktop-auth/exchange") &&
+      r.method === "POST"
+    )
+      await limitDesktop(
+        r.headers.get("x-vercel-forwarded-for") ??
+          r.headers.get("x-forwarded-for") ??
+          "local",
+      );
+    if (path === "desktop-auth/start" && r.method === "POST")
+      return Response.json(
+        await startDesktop(desktopStartInput.parse(await body(r))),
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    if (path === "desktop-auth/exchange" && r.method === "POST")
+      return Response.json(await exchangeDesktop(await body(r)), {
+        headers: { "Cache-Control": "no-store" },
+      });
     const user = await requireUser(r);
     // Cookie mutations require the app's origin. Native bearer calls carry no ambient cookie authority.
     if (r.method !== "GET" && !r.headers.has("authorization")) {
       const origin = r.headers.get("origin");
       if (origin !== process.env.BETTER_AUTH_URL)
         throw new DomainError("origin", "Origem não autorizada.", 403);
+    }
+    if (path === "desktop-auth/authorize" && r.method === "POST") {
+      const input = z
+        .object({ id: z.uuid(), state: z.string() })
+        .parse(await body(r));
+      return Response.json(
+        await authorizeDesktop(user.id, input.id, input.state),
+        { headers: { "Cache-Control": "no-store" } },
+      );
     }
     if (path === "workspace" && r.method === "GET")
       return Response.json({
@@ -158,12 +192,14 @@ async function handler(r: Request) {
       await disconnectGoogle(user.id);
       return Response.json({ ok: true });
     }
-    if (path === "mail/body" && r.method === "POST") {
-      const input = z
-        .object({ id: z.string(), requested: z.literal(true) })
-        .parse(await body(r));
-      return Response.json({ body: await getMailBody(user.id, input.id) });
-    }
+    if (path === "calendar/range" && r.method === "GET")
+      return Response.json({
+        events: await calendarRange(
+          user.id,
+          z.iso.datetime({ offset: true }).parse(url.searchParams.get("start")),
+          z.iso.datetime({ offset: true }).parse(url.searchParams.get("end")),
+        ),
+      });
     if (path === "ai/key" && r.method === "POST") {
       const input = z
         .object({
@@ -192,16 +228,24 @@ async function handler(r: Request) {
       const input = z
         .object({
           message: z.string().trim().min(1).max(6000),
-          mailBodyId: z.string().optional(),
+          conversationId: z.string().max(200).optional(),
+          messageId: z.uuid().optional(),
         })
         .parse(await body(r));
       return Response.json(
-        await chat(user.id, input.message, input.mailBodyId),
+        await chat(
+          user.id,
+          input.message,
+          input.conversationId,
+          input.messageId,
+        ),
       );
     }
     if (path === "approvals" && r.method === "POST") {
-      const { id } = z.object({ id: z.uuid() }).parse(await body(r));
-      await approve(user.id, id);
+      const { id, conversationId } = z
+        .object({ id: z.uuid(), conversationId: z.string().optional() })
+        .parse(await body(r));
+      await approve(user.id, id, conversationId);
       return Response.json({
         workspace: sanitizeWorkspace(await syncGoogle(user.id)),
       });

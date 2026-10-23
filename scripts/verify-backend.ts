@@ -2,6 +2,7 @@ import { config } from "dotenv";
 config({ path: "apps/web/.env.local", quiet: true });
 import { Pool } from "pg";
 import assert from "node:assert/strict";
+import { createHash, randomBytes } from "node:crypto";
 import { emptyWorkspace, newBoard } from "../packages/core/src/index";
 // This fixture can only run against the dedicated development branch.
 if (!process.env.DATABASE_URL_UNPOOLED?.includes("ep-tiny-sound-b4yhrd2q"))
@@ -13,6 +14,7 @@ const alice = crypto.randomUUID(),
   tokenA = crypto.randomUUID(),
   tokenB = crypto.randomUUID();
 let assertions = 0;
+const desktopTickets: string[] = [];
 const check = (condition: unknown) => {
   assert.ok(condition);
   assertions++;
@@ -166,10 +168,121 @@ try {
     preflight.headers.get("Access-Control-Allow-Origin") ===
       "http://tauri.localhost",
   );
+  const conversationA = crypto.randomUUID(),
+    conversationB = crypto.randomUUID(),
+    messageId = crypto.randomUUID();
+  check(
+    (
+      await call(tokenA, "chat", {
+        conversationId: conversationA,
+        messageId,
+        message: "Organizar sábado",
+      })
+    ).status === 200,
+  );
+  check(
+    (
+      await call(tokenA, "chat", {
+        conversationId: conversationA,
+        messageId,
+        message: "Organizar sábado",
+      })
+    ).status === 200,
+  );
+  check(
+    (
+      await call(tokenA, "chat", {
+        conversationId: conversationA,
+        messageId,
+        message: "Outro conteúdo",
+      })
+    ).status === 409,
+  );
+  check(
+    (
+      await call(tokenA, "chat", {
+        conversationId: conversationB,
+        messageId: crypto.randomUUID(),
+        message: "Organizar trabalho",
+      })
+    ).status === 200,
+  );
+  const histories = await (await call(tokenA, "workspace")).json();
+  check(
+    histories.workspace.conversations.find(
+      (c: { id: string }) => c.id === conversationA,
+    ).messages.length === 2,
+  );
+  check(
+    histories.workspace.conversations.find(
+      (c: { id: string }) => c.id === conversationB,
+    ).messages[0].text === "Organizar trabalho",
+  );
+  const otherHistories = await (await call(tokenB, "workspace")).json();
+  check(otherHistories.workspace.conversations.length === 0);
+  check(
+    (await call(tokenA, "mail/body", { id: "any", requested: true })).status ===
+      404,
+  );
+  const verifier = randomBytes(32).toString("base64url"),
+    state = randomBytes(32).toString("base64url"),
+    challenge = createHash("sha256").update(verifier).digest("base64url");
+  const start = await call("", "desktop-auth/start", { state, challenge });
+  check(start.status === 200);
+  const login = new URL((await start.json()).url),
+    ticket = login.searchParams.get("id")!;
+  desktopTickets.push(ticket);
+  check(
+    login.pathname === "/desktop/login" && !login.searchParams.has("token"),
+  );
+  check(
+    (
+      await call(tokenA, "desktop-auth/authorize", {
+        id: ticket,
+        state: "wrong",
+      })
+    ).status === 409,
+  );
+  const granted = await call(tokenA, "desktop-auth/authorize", {
+    id: ticket,
+    state,
+  });
+  check(granted.status === 200);
+  const callback = new URL((await granted.json()).url);
+  check(
+    callback.protocol === "pingo:" &&
+      callback.hostname === "auth" &&
+      !callback.searchParams.has("access_token"),
+  );
+  const redemption = {
+    id: ticket,
+    state,
+    code: callback.searchParams.get("code"),
+    verifier,
+  };
+  check(
+    (
+      await call("", "desktop-auth/exchange", {
+        ...redemption,
+        verifier: randomBytes(32).toString("base64url"),
+      })
+    ).status === 403,
+  );
+  const exchanged = await call("", "desktop-auth/exchange", redemption);
+  check(exchanged.status === 200);
+  const nativeToken = (await exchanged.json()).access_token;
+  check(
+    (await (await call(nativeToken, "workspace")).json()).user.id === alice,
+  );
+  check((await call("", "desktop-auth/exchange", redemption)).status === 409);
   console.log(
     `${assertions} verificações reais de API/Neon passaram: sessões, isolamento, idempotência, revisão e aprovação.`,
   );
 } finally {
+  if (desktopTickets.length)
+    await pool.query("DELETE FROM auth_verification WHERE id=ANY($1::text[])", [
+      desktopTickets,
+    ]);
   await pool.query("DELETE FROM auth_user WHERE id=ANY($1::text[])", [
     [alice, bob],
   ]);

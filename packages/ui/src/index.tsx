@@ -75,6 +75,8 @@ type Platform = {
   storage?: (userId: string) => Promise<Storage>;
   openExternal?: (url: string) => Promise<void>;
   onWorkspace?: (w: Workspace, userId: string) => void;
+  onOpenConversation?: (handler: (id: string) => void) => () => void;
+  onRemoteUpdate?: (handler: () => void) => () => void;
 };
 const nav = [
   { id: "day", label: "Meu dia", icon: Sun },
@@ -136,6 +138,10 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   const [loginBusy, setLoginBusy] = useState(false);
   const [, render] = useState(0);
   const [screen, setScreen] = useState<Screen>("day");
+  const [requestedConversation, setRequestedConversation] = useState<{
+    id: string;
+    requestId: number;
+  }>();
   const [taskEditor, setTaskEditor] = useState<Partial<Task> | null>(null);
   const [eventEditor, setEventEditor] = useState<Partial<CalendarEvent> | null>(
     null,
@@ -209,6 +215,25 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
           platform.onWorkspace?.(client.workspace, user.id);
       }),
     [client, user],
+  );
+  useEffect(
+    () =>
+      platform.onOpenConversation?.((id) => {
+        setRequestedConversation((previous) => ({
+          id,
+          requestId: (previous?.requestId ?? 0) + 1,
+        }));
+        setScreen("chat");
+        if (client) void client.refresh();
+      }),
+    [client, platform.onOpenConversation],
+  );
+  useEffect(
+    () =>
+      platform.onRemoteUpdate?.(() => {
+        if (client) void client.refresh();
+      }),
+    [client, platform.onRemoteUpdate],
   );
   useEffect(() => {
     if (!client) return;
@@ -285,6 +310,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     }
   }
   async function logout() {
+    setRequestedConversation(undefined);
     if (!platform.api && "serviceWorker" in navigator) {
       const registration = await navigator.serviceWorker.getRegistration();
       const subscription = await registration?.pushManager.getSubscription();
@@ -758,6 +784,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
             <Suspense fallback={<p role="status">Abrindo suas conversas…</p>}>
               <Chat
                 client={client}
+                requestedConversation={requestedConversation}
                 onUpdate={() => void client.refresh()}
                 preview={(command) => (
                   <SuggestionPreview command={command} workspace={w} />

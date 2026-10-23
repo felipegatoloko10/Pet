@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Api, type Storage } from "@pingo/ui";
+import { Api, type Storage } from "@pingo/ui/client";
 import {
   emptyWorkspace,
   localNotices,
@@ -16,7 +16,9 @@ export function useDesktopPet(
 ) {
   const [workspace, setWorkspace] = useState(emptyWorkspace());
   const [bubble, setBubble] = useState("");
-  const [activity, setActivity] = useState<PetState>("idle");
+  const [activity, setActivity] = useState<PetState>();
+  const [sessionVersion, setSessionVersion] = useState(0);
+  const refresh = useRef<() => Promise<void>>(async () => {});
   useEffect(() => {
     let live = true,
       busy = false,
@@ -24,6 +26,7 @@ export function useDesktopPet(
     let hideTimer: ReturnType<typeof setTimeout> | undefined;
     let cached: Workspace | undefined;
     let cachedUser = "";
+    let signInHintShown = false;
     const deviceId =
       localStorage.getItem("pingo:device") ?? crypto.randomUUID();
     localStorage.setItem("pingo:device", deviceId);
@@ -34,10 +37,11 @@ export function useDesktopPet(
       clearTimeout(hideTimer);
       hideTimer = setTimeout(() => {
         setBubble("");
-        setActivity("idle");
+        setActivity(undefined);
       }, 15000);
     }
     async function display(w: Workspace, userId: string, online: boolean) {
+      if (!live) return;
       cached = w;
       cachedUser = userId;
       setWorkspace(w);
@@ -80,12 +84,18 @@ export function useDesktopPet(
       if (busy) return;
       busy = true;
       try {
-        api.token = await invoke<string>("read_session");
+        const token = await invoke<string>("read_session");
+        if (!live) return;
+        api.token = token;
         if (!api.token) {
           cached = undefined;
           cachedUser = "";
           setWorkspace(emptyWorkspace());
-          setBubble("Abra meu painel para entrar.");
+          if (!signInHintShown) {
+            signInHintShown = true;
+            setBubble("Oi! Entre com Google no meu painel para conversarmos.");
+            hideTimer = setTimeout(() => setBubble(""), 7000);
+          }
           return;
         }
         if (!cached) {
@@ -126,10 +136,13 @@ export function useDesktopPet(
       }
     }
     void tick(true);
+    refresh.current = () => tick(true);
     const interval = setInterval(() => void tick(), 30000);
     const unsubSession = listen("session-changed", () => {
-      cached = undefined;
-      void tick(true);
+      setWorkspace(emptyWorkspace());
+      setBubble("");
+      setActivity(undefined);
+      setSessionVersion((value) => value + 1);
     });
     const unsubWorkspace = listen<{ workspace: Workspace; userId: string }>(
       "workspace-updated",
@@ -155,6 +168,13 @@ export function useDesktopPet(
       document.removeEventListener("visibilitychange", visibility);
       speechSynthesis.cancel();
     };
-  }, []);
-  return { workspace, bubble, setBubble, activity };
+  }, [sessionVersion]);
+  return {
+    workspace,
+    bubble,
+    setBubble,
+    activity,
+    sessionVersion,
+    refresh: () => refresh.current(),
+  };
 }

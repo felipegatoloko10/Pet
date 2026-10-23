@@ -929,7 +929,19 @@ export type PetState =
   | "affection"
   | "yawn"
   | "sleep"
-  | "wake";
+  | "wake"
+  | "stretch"
+  | "wave"
+  | "dance"
+  | "groom"
+  | "curious"
+  | "hop"
+  | "peek"
+  | "listen"
+  | "roll"
+  | "sit"
+  | "surprised"
+  | "spin";
 export function petState(now: Date, p: Preferences, focused = false): PetState {
   const time = zonedParts(now, p.timezone).time;
   return inWindow(time, p.sleepStart, p.wakeTime)

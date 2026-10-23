@@ -23,9 +23,16 @@ export function Pet({
   activity?: PetState;
   soundEnabled?: boolean;
 }) {
-  const [state, setState] = useState<PetState>("idle");
+  const [naturalState, setState] = useState<PetState>("idle");
+  const [petted, setPetted] = useState(false);
+  const state = petted ? "affection" : naturalState;
   const [visible, setVisible] = useState(true);
   const [reduced, setReduced] = useState(false);
+  const scene = useRef<HTMLDivElement>(null);
+  const affectionTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  useEffect(() => () => clearTimeout(affectionTimer.current), []);
   useEffect(() => {
     const query = matchMedia("(prefers-reduced-motion: reduce)");
     const update = () => setReduced(query.matches);
@@ -107,6 +114,7 @@ export function Pet({
   const previous = useRef<PetState>("idle");
   useEffect(() => {
     const onVisibility = () => setVisible(!document.hidden);
+    onVisibility();
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
@@ -115,7 +123,8 @@ export function Pet({
     let wakeTimer: ReturnType<typeof setTimeout> | undefined;
     const tick = () => {
       const next = petState(new Date(), p, focus);
-      if (previous.current === "sleep" && next !== "sleep") {
+      if (activity && activity !== "idle") setState(activity);
+      else if (previous.current === "sleep" && next !== "sleep") {
         setState("wake");
         wakeTimer = setTimeout(() => setState(next), 1800);
       } else if (next === "sleep" || next === "focus") setState(next);
@@ -127,12 +136,17 @@ export function Pet({
           "look",
           "walk",
           "yawn",
+          "stretch",
+          "groom",
+          "curious",
+          "peek",
+          "sit",
+          "wave",
         ];
         setState(
-          activity ??
-            (message
-              ? "speak"
-              : choices[Math.floor(Math.random() * choices.length)]),
+          message
+            ? "speak"
+            : choices[Math.floor(Math.random() * choices.length)],
         );
       }
       previous.current = next;
@@ -145,16 +159,34 @@ export function Pet({
     };
   }, [p, focus, visible, message, activity]);
   function affection() {
-    setState("affection");
-    setTimeout(() => setState("idle"), 2200);
+    setPetted(true);
+    clearTimeout(affectionTimer.current);
+    affectionTimer.current = setTimeout(() => setPetted(false), 2200);
     onClick?.();
   }
   return (
     <div
+      ref={scene}
       className={`pet-scene ${reduced ? "reduced" : ""} ${!visible ? "paused" : ""}`}
       style={
         { "--pet-color": p.color, "--pet-accent": p.accent } as CSSProperties
       }
+      onPointerMove={(event) => {
+        if (reduced || !scene.current) return;
+        const rect = scene.current.getBoundingClientRect();
+        scene.current.style.setProperty(
+          "--gaze-x",
+          `${Math.max(-3, Math.min(3, (event.clientX - rect.left - rect.width / 2) / 35))}px`,
+        );
+        scene.current.style.setProperty(
+          "--gaze-y",
+          `${Math.max(-2, Math.min(2, (event.clientY - rect.top - rect.height / 2) / 35))}px`,
+        );
+      }}
+      onPointerLeave={() => {
+        scene.current?.style.setProperty("--gaze-x", "0px");
+        scene.current?.style.setProperty("--gaze-y", "0px");
+      }}
     >
       {message && (
         <div className="pet-balloon" role="status">
@@ -163,12 +195,14 @@ export function Pet({
       )}
       <button
         className={`pet pet-${state}`}
+        data-pet-interactive
         aria-label={`${p.name}: ${state === "sleep" ? "dormindo" : "clique para dar carinho"}`}
         onClick={interactive ? affection : undefined}
         tabIndex={interactive ? 0 : -1}
       >
         <svg viewBox="0 0 220 210" aria-hidden="true">
           <ellipse
+            className="pet-ground-shadow"
             cx="110"
             cy="191"
             rx="68"
@@ -217,14 +251,23 @@ export function Pet({
               fill="var(--pet-color)"
             />
             <g className="pet-head">
+              <g className="pet-ear-left">
+                <path
+                  d="M51 84 Q31 17 53 29 L86 51 Z"
+                  fill="var(--pet-color)"
+                />
+                <path d="M53 65 L50 39 L74 53 Z" fill="var(--pet-accent)" />
+              </g>
+              <g className="pet-ear-right">
+                <path
+                  d="M134 51 L167 29 Q189 17 169 84 Z"
+                  fill="var(--pet-color)"
+                />
+                <path d="M146 53 L170 39 L167 65 Z" fill="var(--pet-accent)" />
+              </g>
               <path
-                d="M51 85 Q35 12 74 40 Q110 27 146 40 Q185 12 169 85 Q181 137 111 142 Q38 137 51 85"
+                d="M49 78 Q47 42 110 42 Q173 42 171 78 Q182 137 111 142 Q38 137 49 78"
                 fill="var(--pet-color)"
-              />
-              <path
-                d="M53 62 L53 39 L73 51 M147 51 L168 39 L167 63"
-                fill="var(--pet-accent)"
-                opacity=".9"
               />
               <ellipse
                 cx="69"
@@ -240,7 +283,9 @@ export function Pet({
                 ry="7"
                 fill="var(--pet-accent)"
               />
-              {state === "sleep" || state === "yawn" ? (
+              {["sleep", "yawn", "affection", "groom", "dance"].includes(
+                state,
+              ) ? (
                 <g
                   fill="none"
                   stroke="#264e40"
@@ -251,19 +296,24 @@ export function Pet({
                   <path d="M130 88 Q138 96 146 88" />
                 </g>
               ) : (
-                <g className="eyes" fill="#264e40">
-                  <ellipse cx="84" cy="89" rx="5" ry="7" />
-                  <ellipse cx="137" cy="89" rx="5" ry="7" />
-                  <circle cx="86" cy="87" r="1.5" fill="white" />
-                  <circle cx="139" cy="87" r="1.5" fill="white" />
+                <g className="pet-gaze">
+                  <g className="eyes" fill="#264e40">
+                    <ellipse cx="84" cy="89" rx="5" ry="7" />
+                    <ellipse cx="137" cy="89" rx="5" ry="7" />
+                    <circle cx="86" cy="87" r="1.5" fill="white" />
+                    <circle cx="139" cy="87" r="1.5" fill="white" />
+                  </g>
                 </g>
               )}
               <path
                 d="M106 102 Q110 107 114 102 Q110 99 106 102"
                 fill="#264e40"
               />
-              {state === "speak" || state === "yawn" ? (
+              {state === "speak" ||
+              state === "yawn" ||
+              state === "surprised" ? (
                 <ellipse
+                  className="pet-mouth"
                   cx="110"
                   cy="115"
                   rx="5"
@@ -279,9 +329,32 @@ export function Pet({
                   strokeLinecap="round"
                 />
               )}
+              {state === "groom" && (
+                <path
+                  className="pet-tongue"
+                  d="M109 115 Q110 130 118 118"
+                  fill="var(--pet-accent)"
+                />
+              )}
+              {state === "focus" && (
+                <g fill="none" stroke="#365d4d" strokeWidth="2">
+                  <circle cx="84" cy="89" r="14" />
+                  <circle cx="137" cy="89" r="14" />
+                  <path d="M98 88 Q110 82 123 88" />
+                </g>
+              )}
             </g>
             <path
-              d="M64 143 Q47 164 66 163 M156 143 Q173 164 154 163"
+              className="pet-arm-left"
+              d="M64 143 Q47 164 66 163"
+              fill="none"
+              stroke="var(--pet-color)"
+              strokeWidth="17"
+              strokeLinecap="round"
+            />
+            <path
+              className="pet-arm-right"
+              d="M156 143 Q173 164 154 163"
               fill="none"
               stroke="var(--pet-color)"
               strokeWidth="17"
@@ -300,14 +373,59 @@ export function Pet({
             </g>
           )}
           {state === "think" && (
-            <text x="172" y="50" fontSize="25">
+            <text
+              className="pet-thought"
+              x="172"
+              y="50"
+              fontSize="25"
+              fill="#527e68"
+            >
               …
             </text>
           )}
           {state === "celebrate" && (
-            <text x="15" y="50" fontSize="26">
-              ✦
+            <g className="pet-confetti">
+              {[
+                "#e1b84c",
+                "#df99b5",
+                "#73b8a2",
+                "#ad94d0",
+                "#e1b84c",
+                "#df99b5",
+              ].map((color, i) => (
+                <circle
+                  key={i}
+                  cx={25 + i * 34}
+                  cy={25 + (i % 2) * 20}
+                  r="3"
+                  fill={color}
+                  style={{ animationDelay: `${i * -0.16}s` }}
+                />
+              ))}
+            </g>
+          )}
+          {state === "surprised" && (
+            <text
+              className="pet-thought"
+              x="172"
+              y="45"
+              fontSize="23"
+              fill="#bf9a47"
+            >
+              !
             </text>
+          )}
+          {state === "listen" && (
+            <g
+              className="pet-listening"
+              fill="none"
+              stroke="#79ab96"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <path d="M185 63 Q198 75 185 88" />
+              <path d="M194 56 Q214 75 194 95" />
+            </g>
           )}
         </svg>
       </button>

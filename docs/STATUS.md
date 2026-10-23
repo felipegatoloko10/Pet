@@ -1,5 +1,11 @@
 # Estado da entrega
 
+## Avatar 2.2
+
+Avatar recortado com transparência de documento e WebView, barra de conversa, 24 estados vetoriais animados, redimensionamento persistente, passagem do cursor no espaço vazio e revisão de propostas na sessão correspondente do painel. A conversa usa a API existente, com identificadores persistentes para retentar respostas incertas sem duplicar operações, sem compartilhar a fila offline do painel.
+
+59 testes unitários/simulados e 13 testes de navegador cobrem a base e o novo avatar. A homologação com chave real de IA continua pendente; os testes não usam créditos de provedores. Os testes nativos Windows verificam instância única, tamanho persistente e fechamento das duas janelas; transparência do compositor e passagem do cursor são conferidas quando o runner fornece desktop interativo.
+
 ## Revisão 2.1
 
 A revisão visual `2.1.0-beta.2` traz fundo verde suave, navegação compacta, colunas pastel, cartões brancos e ações em amarelo. Agenda, conversas, ajustes e painel desktop compartilham a aparência. A revisão preserva os fluxos, contratos de API e dados da versão anterior.

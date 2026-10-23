@@ -1,0 +1,397 @@
+/* All character motions are local. Separate joints keep every pose scalable. */
+.pet .pet-ear-left {
+  transform-origin: 64px 65px;
+}
+.pet .pet-ear-right {
+  transform-origin: 156px 65px;
+}
+.pet .pet-arm-left {
+  transform-origin: 64px 143px;
+}
+.pet .pet-arm-right {
+  transform-origin: 156px 143px;
+}
+.pet .pet-gaze {
+  transform: translate(var(--gaze-x, 0px), var(--gaze-y, 0px));
+  transition: transform 0.16s;
+}
+.pet.pet-blink .eyes {
+  animation: pingo-blink 0.9s ease-in-out 2;
+}
+.pet.pet-wave .pet-arm-right {
+  animation: pingo-wave 0.65s ease-in-out infinite;
+}
+.pet.pet-wave .pet-head {
+  transform: rotate(-5deg);
+}
+.pet.pet-stretch .pet-body {
+  animation: pingo-stretch 3s ease-in-out infinite;
+}
+.pet.pet-stretch .pet-arm-left {
+  transform: rotate(150deg);
+}
+.pet.pet-stretch .pet-arm-right {
+  transform: rotate(-150deg);
+}
+.pet.pet-stretch .eyes {
+  transform: scaleY(0.5);
+  animation: none;
+}
+.pet.pet-dance .pet-body {
+  animation: pingo-dance 1.1s ease-in-out infinite;
+}
+.pet.pet-dance .pet-arm-left {
+  animation: pingo-dance-arm 0.55s infinite alternate;
+}
+.pet.pet-dance .pet-arm-right {
+  animation: pingo-dance-arm 0.55s infinite alternate-reverse;
+}
+.pet.pet-dance .tail {
+  animation: pingo-tail 0.6s ease-in-out infinite alternate;
+}
+.pet.pet-groom .pet-arm-right {
+  animation: pingo-groom 1.2s ease-in-out infinite;
+}
+.pet.pet-groom .pet-head {
+  transform: rotate(12deg) translate(4px, 3px);
+}
+.pet.pet-groom .pet-tongue {
+  animation: pingo-lick 1.2s infinite;
+}
+.pet.pet-curious .pet-head {
+  animation: pingo-curious 3.2s ease-in-out infinite;
+}
+.pet.pet-curious .pet-ear-left {
+  animation: pingo-ear 1.8s ease-in-out infinite;
+}
+.pet.pet-curious .pet-ear-right {
+  animation: pingo-ear 1.8s 0.5s ease-in-out infinite reverse;
+}
+.pet.pet-hop .pet-body {
+  animation: pingo-hop 1.1s ease-in-out infinite;
+}
+.pet.pet-hop .pet-ground-shadow {
+  animation: pingo-shadow 1.1s ease-in-out infinite;
+  transform-origin: 110px 191px;
+}
+.pet.pet-peek .pet-body {
+  animation: pingo-peek 3s ease-in-out infinite;
+}
+.pet.pet-peek .pet-arm-left {
+  transform: rotate(100deg);
+}
+.pet.pet-peek .pet-arm-right {
+  transform: rotate(-100deg);
+}
+.pet.pet-listen .pet-head {
+  transform: rotate(-9deg);
+}
+.pet.pet-listen .pet-ear-right {
+  transform: rotate(13deg);
+}
+.pet.pet-listen .pet-listening {
+  animation: pingo-listen 1.5s infinite;
+}
+.pet.pet-roll .pet-body {
+  animation: pingo-roll 3s ease-in-out infinite;
+  transform-origin: 110px 150px;
+}
+.pet.pet-roll .pet-ground-shadow {
+  opacity: 0.04;
+}
+.pet.pet-sit .pet-body {
+  transform: translateY(6px) scaleY(0.94);
+  animation: pingo-sit 4s ease-in-out infinite;
+}
+.pet.pet-sit .tail {
+  animation: pingo-tail 2s infinite alternate;
+}
+.pet.pet-surprised .pet-body {
+  animation: pingo-surprise 1.8s ease-in-out infinite;
+}
+.pet.pet-surprised .eyes {
+  transform: scaleY(1.25);
+  animation: none;
+}
+.pet.pet-surprised .pet-ear-left {
+  transform: rotate(-12deg);
+}
+.pet.pet-surprised .pet-ear-right {
+  transform: rotate(12deg);
+}
+.pet.pet-spin .pet-body {
+  animation: pingo-spin 2.5s ease-in-out infinite;
+}
+.pet.pet-speak .pet-mouth {
+  animation: pingo-talk 0.45s ease-in-out infinite alternate;
+  transform-origin: 110px 115px;
+}
+.pet.pet-affection .pet-ear-left {
+  transform: rotate(-8deg);
+}
+.pet.pet-affection .pet-ear-right {
+  transform: rotate(8deg);
+}
+.pet.pet-wake .pet-arm-left {
+  animation: pingo-wake-left 1.8s ease-in-out;
+}
+.pet.pet-wake .pet-arm-right {
+  animation: pingo-wake-right 1.8s ease-in-out;
+}
+.pet .pet-confetti circle {
+  animation: pingo-confetti 1.6s ease-out infinite;
+}
+.pet .pet-thought {
+  animation: pingo-float 1.8s ease-in-out infinite alternate;
+}
+@keyframes pingo-blink {
+  0%,
+  35%,
+  100% {
+    transform: scaleY(1);
+  }
+  50%,
+  65% {
+    transform: scaleY(0.08);
+  }
+}
+@keyframes pingo-wave {
+  0%,
+  100% {
+    transform: rotate(-135deg);
+  }
+  50% {
+    transform: rotate(-175deg);
+  }
+}
+@keyframes pingo-stretch {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  45%,
+  65% {
+    transform: translateY(-8px) scale(0.96, 1.08);
+  }
+}
+@keyframes pingo-dance {
+  0%,
+  100% {
+    transform: rotate(-7deg) translateY(0);
+  }
+  25% {
+    transform: rotate(0) translateY(-6px);
+  }
+  50% {
+    transform: rotate(7deg) translateY(0);
+  }
+  75% {
+    transform: rotate(0) translateY(-6px);
+  }
+}
+@keyframes pingo-dance-arm {
+  from {
+    transform: rotate(-55deg);
+  }
+  to {
+    transform: rotate(90deg);
+  }
+}
+@keyframes pingo-tail {
+  from {
+    transform: rotate(-15deg);
+  }
+  to {
+    transform: rotate(15deg);
+  }
+}
+@keyframes pingo-groom {
+  0%,
+  100% {
+    transform: rotate(-65deg);
+  }
+  50% {
+    transform: rotate(-110deg) translateY(-3px);
+  }
+}
+@keyframes pingo-lick {
+  0%,
+  70%,
+  100% {
+    opacity: 0;
+  }
+  30%,
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes pingo-curious {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  30%,
+  60% {
+    transform: rotate(-12deg);
+  }
+  80% {
+    transform: rotate(7deg);
+  }
+}
+@keyframes pingo-ear {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0);
+  }
+  70%,
+  90% {
+    transform: rotate(-10deg);
+  }
+}
+@keyframes pingo-hop {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  15% {
+    transform: translateY(4px) scale(1.05, 0.93);
+  }
+  35% {
+    transform: translateY(-19px) scale(0.97, 1.04);
+  }
+  70% {
+    transform: scale(1.04, 0.96);
+  }
+}
+@keyframes pingo-shadow {
+  0%,
+  60%,
+  100% {
+    transform: scaleX(1);
+    opacity: 0.08;
+  }
+  35% {
+    transform: scaleX(0.7);
+    opacity: 0.04;
+  }
+}
+@keyframes pingo-peek {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40%,
+  65% {
+    transform: translateY(10px) scale(0.98, 0.97);
+  }
+}
+@keyframes pingo-listen {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+@keyframes pingo-roll {
+  0%,
+  15%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  35%,
+  65% {
+    transform: translateY(14px) rotate(-80deg) scale(0.9);
+  }
+}
+@keyframes pingo-sit {
+  0%,
+  100% {
+    transform: translateY(6px) scaleY(0.94);
+  }
+  50% {
+    transform: translateY(5px) scaleY(0.95);
+  }
+}
+@keyframes pingo-surprise {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  20% {
+    transform: translateY(-9px) scaleY(1.03);
+  }
+  40% {
+    transform: translateY(0);
+  }
+}
+@keyframes pingo-spin {
+  0%,
+  20%,
+  100% {
+    transform: scaleX(1);
+  }
+  45% {
+    transform: scaleX(0.08) translateY(-4px);
+  }
+  70% {
+    transform: scaleX(-1);
+  }
+}
+@keyframes pingo-talk {
+  from {
+    transform: scaleY(0.55);
+  }
+  to {
+    transform: scaleY(1.1);
+  }
+}
+@keyframes pingo-wake-left {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  50% {
+    transform: rotate(145deg);
+  }
+}
+@keyframes pingo-wake-right {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  50% {
+    transform: rotate(-145deg);
+  }
+}
+@keyframes pingo-confetti {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+}
+@keyframes pingo-float {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pet-scene .pet *,
+  .pet-scene .pet {
+    animation: none !important;
+    transition: none !important;
+  }
+}

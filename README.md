@@ -1,8 +1,10 @@
-# Pingo 2.1
+# Pingo 2.2
 
 Um pequeno companheiro para organizar tarefas, agenda e rotina. Beta não comercial por convite, com espaços individuais e até 10 convidados.
 
 [Abrir o Pingo](https://pingo-gilt.vercel.app)
+
+O [avatar 2.2](docs/AVATAR.md) é recortado, tem 24 estados animados, conversa pela barra abaixo do personagem e permite ajustar e guardar seu tamanho. As animações são locais e não consomem IA.
 
 Veja as [mudanças da revisão 2.1](docs/REVISION-2.1.md): Kanban inicial, etiquetas/checklists, conversas separadas, calendário mensal/anual e login desktop sem códigos manuais. Fechar o painel ou o avatar encerra o programa; minimizar mantém a companhia.
 

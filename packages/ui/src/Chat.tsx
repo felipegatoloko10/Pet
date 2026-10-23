@@ -11,15 +11,19 @@ export function Chat({
   client,
   onUpdate,
   preview,
+  requestedConversation,
 }: {
   client: PingoClient;
   onUpdate: () => void;
   preview: (command: Command) => ReactNode;
+  requestedConversation?: { id: string; requestId: number };
 }) {
   normalizeWorkspace(client.workspace);
   const conversations = client.workspace.conversations!;
   const [selected, setSelected] = useState(
-      conversations.find((c) => !c.archived)?.id ?? "",
+      requestedConversation?.id ??
+        conversations.find((c) => !c.archived)?.id ??
+        "",
     ),
     [draft, setDraft] = useState(""),
     [busy, setBusy] = useState(false),
@@ -36,6 +40,14 @@ export function Chat({
         (m) => !c?.messages.some((saved) => saved.id === m.id),
       ),
     ];
+  useEffect(() => {
+    if (requestedConversation) {
+      setSelected(requestedConversation.id);
+      setOptimistic([]);
+      setRetry(null);
+      setHistory(false);
+    }
+  }, [requestedConversation]);
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "nearest" });
   }, [messages.length, busy]);

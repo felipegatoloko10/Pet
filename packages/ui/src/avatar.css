@@ -1,0 +1,3 @@
+/* The floating avatar has no panel theme or remote font stylesheet. */
+@import "./avatar-base.css";
+@import "./pet-motion.css";

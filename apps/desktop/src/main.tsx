@@ -1,26 +1,35 @@
 import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { createRoot } from "react-dom/client";
-import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, emit } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { useDesktopPet } from "./pet-service";
 import Database from "@tauri-apps/plugin-sql";
-import { PingoApp, Pet, Api, type Storage } from "@pingo/ui";
-import {
-  emptyWorkspace,
-  isQuiet,
-  petState,
-  type Workspace,
-  type Notice,
-} from "@pingo/core";
-import "@pingo/ui/styles.css";
+import { Api, type Storage } from "@pingo/ui/client";
+import type { Workspace } from "@pingo/core";
 import "./pet.css";
 const base = import.meta.env.VITE_API_URL ?? "https://pingo-gilt.vercel.app";
 const api = new Api(base);
+const isPet = new URLSearchParams(location.search).has("pet");
+if (isPet) {
+  document.documentElement.classList.add("pet-surface");
+  document.body.classList.add("pet-body-transparent");
+}
 const platform = {
   api,
+  onOpenConversation: (handler: (id: string) => void) => {
+    const stop = listen<{ id: string }>("open-conversation", (event) =>
+      handler(event.payload.id),
+    );
+    return () => {
+      void stop.then((fn) => fn());
+    };
+  },
+  onRemoteUpdate: (handler: () => void) => {
+    const stop = listen("pet-workspace-changed", handler);
+    return () => {
+      void stop.then((fn) => fn());
+    };
+  },
   onWorkspace: (workspace: Workspace, userId: string) => {
     void emit("workspace-updated", { workspace, userId });
   },
@@ -175,57 +184,26 @@ async function browserLogin() {
     clearTimeout(timer);
   }
 }
-function PetWindow() {
-  const {
-    workspace: w,
-    bubble,
-    setBubble,
-    activity,
-  } = useDesktopPet(api, sqliteStorage);
-  return (
-    <div
-      className="desktop-pet"
-      onContextMenu={(e) => {
-        e.preventDefault();
-        void invoke("open_panel");
-      }}
-    >
-      <button
-        className="pet-close"
-        aria-label="Sair do Pingo"
-        onClick={() => void invoke("quit_pingo")}
-      >
-        ×
-      </button>
-      <div
-        className="pet-drag-handle"
-        data-tauri-drag-region
-        title="Arraste para mover"
-      >
-        ⠿
-      </div>
-      <Pet
-        soundEnabled
-        activity={activity}
-        preferences={w.preferences}
-        message={bubble}
-        onClick={() => {
-          setBubble("Um carinho muda o dia. ♡");
-          setTimeout(() => setBubble(""), 6000);
-        }}
-      />
-      <button className="open-panel" onClick={() => void invoke("open_panel")}>
-        Meu dia <span>↗</span>
-      </button>
-    </div>
-  );
-}
 async function main() {
+  if (isPet) {
+    await import("@pingo/ui/avatar.css");
+    const { NativeCompanion, PreviewCompanion } =
+      await import("./NativeCompanion");
+    if (!isTauri()) {
+      createRoot(document.getElementById("root")!).render(<PreviewCompanion />);
+      return;
+    }
+    api.token = await invoke<string>("read_session").catch(() => undefined);
+    createRoot(document.getElementById("root")!).render(
+      <NativeCompanion api={api} storageFor={sqliteStorage} />,
+    );
+    return;
+  }
+  await import("@pingo/ui/styles.css");
+  const { PingoApp } = await import("@pingo/ui");
   api.token = await invoke<string>("read_session").catch(() => undefined);
-  const isPet = new URLSearchParams(location.search).has("pet");
-  if (isPet) document.body.classList.add("pet-body-transparent");
   createRoot(document.getElementById("root")!).render(
-    isPet ? <PetWindow /> : <PingoApp platform={platform} />,
+    <PingoApp platform={platform} />,
   );
 }
 void main();

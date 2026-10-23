@@ -55,7 +55,7 @@ async function handler(r: Request) {
     const path = url.pathname.replace("/api/v1/", "");
     if (path === "health")
       return Response.json({
-        version: "2.1.0-beta.2",
+        version: "2.2.0-beta.1",
         configured: !!(
           process.env.DATABASE_URL && process.env.GOOGLE_CLIENT_ID
         ),

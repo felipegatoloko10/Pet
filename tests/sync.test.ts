@@ -81,6 +81,8 @@ it("o alias primary e o ID real da agenda não duplicam o evento vinculado", asy
           },
         ],
       });
+    if (!input.includes("/calendars/real-primary/"))
+      return Response.json({ items: [] });
     return Response.json({
       items: [
         {

@@ -134,6 +134,38 @@ export async function approve(
         403,
       );
   }
+  const [candidate] = await db()
+    .select()
+    .from(approvals)
+    .where(and(eq(approvals.id, id), eq(approvals.userId, userId)));
+  if (candidate && !candidate.consumed && candidate.expiresAt > new Date()) {
+    const command = commandSchema.parse(candidate.command);
+    if (command.type === "event.upsert" && command.requireAvailable) {
+      const w = await readWorkspace(userId),
+        e = command.event;
+      const events = await calendarRange(
+        userId,
+        e.allDay ? dayBounds(e.start, w.preferences.timezone).start : e.start,
+        e.allDay ? dayBounds(e.end, w.preferences.timezone).start : e.end,
+      );
+      if (
+        events.some(
+          (other) =>
+            other.id !== e.id &&
+            overlaps(
+              other,
+              e as Workspace["events"][number],
+              w.preferences.timezone,
+            ),
+        )
+      )
+        throw new DomainError(
+          "busy_slot",
+          "Esse horário ficou ocupado. Escolha outro horário.",
+          409,
+        );
+    }
+  }
   return db().transaction(async (tx) => {
     const [a] = await tx
       .select()

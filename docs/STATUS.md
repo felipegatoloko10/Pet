@@ -21,8 +21,8 @@ Kanban inicial com ordenação, etiquetas, checklists e arquivamento; conversas 
 
 ## Evidências
 
-- 50 testes unitários/simulados: domínio, Google, offline, criptografia, rotina configurável e ferramentas de IA.
-- 9 testes de navegador: painel, celular, acesso sem sessão, recarga offline com sincronização única e aprovação de sugestões da IA.
+- 55 testes unitários/simulados: domínio, Google, offline, criptografia, rotina configurável, ferramentas de IA e expiração/repetição do retorno desktop.
+- 10 testes de navegador: painel, celular, acesso sem sessão, recarga offline com sincronização única, aprovação da IA, arraste por mouse/teclado, arquivamento e conversas separadas.
 - Verificação real da API com duas contas artificiais na branch de desenvolvimento Neon: sessões, isolamento, idempotência, conflitos, aprovação e propriedade das assinaturas push. As contas são removidas ao terminar.
 - 50 verificações WPF legadas preservadas e passando.
 - Compilação web, frontend desktop e instalador Windows pelo GitHub Actions. O fluxo de publicação é bloqueado se a verificação do código/navegador falhar.

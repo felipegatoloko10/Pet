@@ -1,5 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use tauri::{Manager, menu::{MenuBuilder, MenuItemBuilder},tray::TrayIconBuilder};
+fn trace_shutdown(message: &str) {
+ if let Ok(path) = std::env::var("PINGO_SHUTDOWN_TRACE") {
+  use std::io::Write;
+  if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+   let _ = writeln!(file,"{}",message);
+  }
+ }
+}
 
 #[tauri::command]
 fn read_session() -> Result<String, String> {
@@ -18,6 +26,10 @@ fn open_panel(app:tauri::AppHandle){if let Some(window)=app.get_webview_window("
 fn show_device_code(app:tauri::AppHandle,code:String){if let Some(window)=app.get_webview_window("main"){let _=window.set_title(&format!("Pingo — confirme o código {} no navegador",code));}}
 fn main(){tauri::Builder::default()
  .plugin(tauri_plugin_single_instance::init(|app,_,_|open_panel(app.clone())))
+ .plugin(tauri::plugin::Builder::new("shutdown-observer").on_event(|_,event|match event{
+ tauri::RunEvent::ExitRequested{..}=>trace_shutdown("exit requested: before plugin cleanup"),
+ tauri::RunEvent::Exit=>trace_shutdown("exit: before plugin cleanup"),_=>()
+ }).build())
  .plugin(tauri_plugin_deep_link::init())
  .plugin(tauri_plugin_opener::init()).plugin(tauri_plugin_sql::Builder::default().build()).plugin(tauri_plugin_notification::init())
  .invoke_handler(tauri::generate_handler![read_session,save_session,open_panel,show_device_code,quit_pingo])
@@ -26,11 +38,17 @@ fn main(){tauri::Builder::default()
  if let Some(w)=app.get_webview_window("pet"){if let Ok(Some(monitor))=w.current_monitor(){if let Ok(window_size)=w.outer_size(){let size=monitor.size();let origin=monitor.position();let _=w.set_position(tauri::PhysicalPosition::new(origin.x+size.width as i32-window_size.width as i32-16,origin.y+size.height as i32-window_size.height as i32-60));}}}
  Ok(())})
  .on_window_event(|window,event|{if let tauri::WindowEvent::CloseRequested{api,..}=event{
+ trace_shutdown(&format!("close requested: {}",window.label()));
  // Let the application exit own both webviews instead of destroying one while exit is queued.
  api.prevent_close();
  window.app_handle().exit(0);
+ trace_shutdown("exit request queued");
  }})
- .run(tauri::generate_context!()).expect("Não foi possível iniciar o Pingo");}
+ .build(tauri::generate_context!()).expect("Não foi possível iniciar o Pingo")
+ .run(|_,event|match event{
+ tauri::RunEvent::ExitRequested{..}=>trace_shutdown("exit requested: after plugins"),
+ tauri::RunEvent::Exit=>trace_shutdown("exit: after plugins"),_=>()
+ });trace_shutdown("event loop returned");}
 
 #[tauri::command]
 fn quit_pingo(app:tauri::AppHandle){app.exit(0);}

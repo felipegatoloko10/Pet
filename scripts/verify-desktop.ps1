@@ -1,6 +1,8 @@
 $ErrorActionPreference = 'Stop'
 $binary = (Resolve-Path 'apps/desktop/src-tauri/target/release/pingo.exe').Path
 $started = $null
+New-Item -ItemType Directory -Path '.verification' -Force | Out-Null
+$env:PINGO_SHUTDOWN_TRACE = Join-Path (Get-Location) '.verification/native-shutdown.log'
 function Get-PingoInstances {
     @(Get-Process -Name pingo -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $binary })
 }
@@ -25,5 +27,6 @@ try {
     if ((Get-PingoInstances).Count -ne 1) { throw 'A reabertura criou instâncias incorretas.' }
     Write-Output 'Instância única, fechamento do painel e reabertura verificados no Windows.'
 } finally {
+    if (Test-Path -LiteralPath $env:PINGO_SHUTDOWN_TRACE) { Get-Content -LiteralPath $env:PINGO_SHUTDOWN_TRACE }
     Get-PingoInstances | Stop-Process -ErrorAction SilentlyContinue
 }

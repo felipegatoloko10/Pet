@@ -66,8 +66,15 @@ try {
         $window = $instances | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
     } until ($window -or (Get-Date) -gt $deadline)
     if (-not $window) { throw 'O painel nativo não abriu.' }
-    1..3 | ForEach-Object { Start-Process -FilePath $binary -WindowStyle Hidden | Out-Null; Start-Sleep -Seconds 1 }
-    if ((Get-PingoInstances).Count -ne 1) { throw 'Mais de uma instância do Pingo ficou ativa.' }
+    1..3 | ForEach-Object {
+        $duplicate = Start-Process -FilePath $binary -WindowStyle Hidden -PassThru
+        if (-not $duplicate.WaitForExit(10000)) { throw "A segunda abertura não encerrou seu processo auxiliar: $($duplicate.Id)." }
+    }
+    $instances = @(Get-PingoInstances)
+    if ($instances.Count -ne 1 -or $instances[0].Id -ne $window.Id) {
+        $details = ($instances | ForEach-Object { "$($_.Id):$($_.MainWindowTitle)" }) -join ', '
+        throw "A instância original não permaneceu sozinha após as reaberturas. Processos: [$details]."
+    }
     $petHandle = [PingoWindows]::Find($window.Id, 'Pingo')
     if ($petHandle -eq [IntPtr]::Zero) { throw 'O avatar não abriu.' }
     $bounds = [PingoWindows]::Rectangle($petHandle)

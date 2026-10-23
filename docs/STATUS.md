@@ -8,6 +8,8 @@ Ativado em 23/10/2026: Worker `pingo-scheduler` em `https://pingo-scheduler.ping
 
 Homologação de infraestrutura em produção: em **2026-10-23 15:06:20 UTC**, o cron processou um lembrete de conta temporária, chamou o backend e criou o aviso, com uma conclusão e zero repetições. A conta de teste e seus trabalhos foram removidos. O teste não usou Google ou IA; não criou compromissos nas contas reais. A confirmação de exibição do Web Push em cada dispositivo ainda depende de sua permissão e ambiente.
 
+A rotina da conta Google conectada foi observada em **2026-10-23 15:14:22 UTC**, com conexão sem erro e sem alterações pendentes. Após uma nova sincronização do app, a próxima rotina continuou ancorada 15 minutos após essa execução. A autorização de notificações de cada dispositivo é feita pelo usuário em Ajustes.
+
 ## Avatar 2.2
 
 Avatar recortado com transparência de documento e WebView, barra de conversa, 24 estados vetoriais animados, redimensionamento persistente, passagem do cursor no espaço vazio e revisão de propostas na sessão correspondente do painel. A conversa usa a API existente, com identificadores persistentes para retentar respostas incertas sem duplicar operações, sem compartilhar a fila offline do painel.

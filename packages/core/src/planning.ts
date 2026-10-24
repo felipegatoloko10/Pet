@@ -57,7 +57,17 @@ export function nextDay(day: string) {
   return d.toISOString().slice(0, 10);
 }
 export function taskScheduleKey(t: Task) {
-  return `${t.scheduledStart ?? ""}|${t.scheduledEnd ?? ""}`;
+  return normalizeScheduleKey(
+    `${t.scheduledStart ?? ""}|${t.scheduledEnd ?? ""}`,
+  );
+}
+export function normalizeScheduleKey(key: string) {
+  return key
+    .split("|")
+    .map((s) =>
+      Number.isFinite(Date.parse(s)) ? new Date(s).toISOString() : s,
+    )
+    .join("|");
 }
 export function taskIsLate(t: Task, today: string, now = Date.now()) {
   return (
@@ -175,8 +185,10 @@ export function reconcileTaskCalendars(
       enqueue("event", e.id, "upsert");
     } else if (
       e.title !== title ||
-      e.start !== start ||
-      e.end !== end ||
+      (allDay
+        ? e.start !== start
+        : Date.parse(e.start) !== Date.parse(start)) ||
+      (allDay ? e.end !== end : Date.parse(e.end) !== Date.parse(end)) ||
       e.allDay !== allDay
     ) {
       Object.assign(e, {
@@ -226,7 +238,10 @@ export function taskAlarms(
     const start = Date.parse(t.scheduledStart),
       end = Date.parse(t.scheduledEnd),
       key = taskScheduleKey(t),
-      check = t.checkIn?.key === key ? t.checkIn : undefined;
+      check =
+        t.checkIn && normalizeScheduleKey(t.checkIn.key) === key
+          ? t.checkIn
+          : undefined;
     if (start > now + 7 * 86400000 || end + 30 * 60000 < now) continue;
     const push = (
       phase: CheckInPhase,

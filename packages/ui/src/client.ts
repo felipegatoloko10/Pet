@@ -8,6 +8,21 @@ import {
   type Command,
 } from "@pingo/core";
 export type User = { id: string; name: string; email: string };
+export function errorMessage(error: unknown): string {
+  if (
+    error &&
+    typeof error === "object" &&
+    "issues" in error &&
+    Array.isArray(error.issues)
+  )
+    return error.issues
+      .map((i: { message?: string }) => i.message)
+      .filter(Boolean)
+      .join(" ");
+  return error instanceof Error
+    ? error.message
+    : "Não consegui salvar. Confira os dados e tente novamente.";
+}
 export type Storage = {
   nativeFlush?: () => Promise<{ workspace?: Workspace; pending: Pending[] }>;
   discardPending?: () => Promise<void>;
@@ -75,6 +90,9 @@ export class PingoClient {
   online = typeof navigator === "undefined" ? true : navigator.onLine;
   listeners = new Set<() => void>();
   private running = false;
+  private generation = 0;
+  private flushAgain = false;
+  private flushWaiters: (() => void)[] = [];
   constructor(
     public api: Api,
     public storage: Storage,
@@ -133,8 +151,10 @@ export class PingoClient {
     if (this.running) return;
     try {
       await this.flush();
-      if (this.pending.some((p) => p.error)) return;
+      if (this.pending.length || this.running) return;
+      const generation = this.generation;
       const r = await this.api.request<{ workspace: Workspace }>("workspace");
+      if (generation !== this.generation) return;
       this.workspace = normalizeWorkspace({
         ...emptyWorkspace(),
         ...r.workspace,
@@ -154,6 +174,7 @@ export class PingoClient {
       operation.operationId,
     );
     this.pending.push({ operation });
+    this.generation++;
     await this.persist();
     this.emit();
     if (this.demo) {
@@ -161,16 +182,26 @@ export class PingoClient {
       this.workspace.outbox = [];
       await this.persist();
       this.emit();
-    } else await this.flush();
+    } else void this.flush();
   }
   async flush() {
-    if (this.running || this.demo || !navigator.onLine) return;
+    if (this.running) {
+      this.flushAgain = true;
+      await new Promise<void>((resolve) => this.flushWaiters.push(resolve));
+      return;
+    }
+    if (this.demo || !navigator.onLine) return;
     this.running = true;
     this.syncing = true;
     this.emit();
     try {
       if (this.storage.nativeFlush) {
+        const generation = this.generation;
         const result = await this.storage.nativeFlush();
+        if (generation !== this.generation) {
+          this.flushAgain = true;
+          return;
+        }
         this.pending = result.pending;
         if (result.workspace)
           this.workspace = normalizeWorkspace(result.workspace);
@@ -220,16 +251,24 @@ export class PingoClient {
     } finally {
       this.running = false;
       this.syncing = false;
+      if (this.flushAgain) {
+        this.flushAgain = false;
+        await this.flush();
+      }
+      this.flushWaiters.splice(0).forEach((resolve) => resolve());
       this.emit();
     }
   }
   async sync() {
     await this.flush();
-    if (this.demo || this.pending.length || !navigator.onLine) return;
+    if (this.demo || this.pending.length || this.running || !navigator.onLine)
+      return;
     this.syncing = true;
     this.emit();
     try {
+      const generation = this.generation;
       const r = await this.api.post<{ workspace: Workspace }>("sync");
+      if (generation !== this.generation) return;
       this.workspace = normalizeWorkspace({
         ...emptyWorkspace(),
         ...r.workspace,

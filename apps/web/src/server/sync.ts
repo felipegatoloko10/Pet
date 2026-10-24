@@ -121,8 +121,12 @@ function syncLinkedTask(w: Workspace, e: CalendarEvent, prior?: CalendarEvent) {
     if (due === beforeDate && t.dueDate !== beforeDate) due = t.dueDate;
   }
   if (
-    t.scheduledStart !== (e.allDay ? null : start) ||
-    t.scheduledEnd !== (e.allDay ? null : end) ||
+    (e.allDay
+      ? t.scheduledStart !== null
+      : Date.parse(t.scheduledStart ?? "") !== Date.parse(start!)) ||
+    (e.allDay
+      ? t.scheduledEnd !== null
+      : Date.parse(t.scheduledEnd ?? "") !== Date.parse(end!)) ||
     t.title !== title ||
     t.dueDate !== due
   ) {

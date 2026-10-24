@@ -65,6 +65,21 @@ public class MobileCloudInstrumentedTest {
                     if(synced)break;SystemClock.sleep(1000);
                 }
                 assertTrue("Comecei deve chegar à API real e confirmar a fila nativa.",synced);
+                if(fixture.optBoolean("complete")) {
+                    JSONObject task=fixture.getJSONObject("workspace").getJSONArray("tasks").getJSONObject(0);
+                    JSONObject end=new JSONObject().put("userId",userId).put("taskId","fixture-task").put("noticeId",fixture.getString("noticeId")+":complete").put("phase","end").put("scheduleKey",task.getString("scheduledStart")+"|"+task.getString("scheduledEnd")).put("title",task.getString("title")).put("expiresAt",System.currentTimeMillis()+600000);
+                    NotificationCoordinator.deliver(c,end);
+                    shown=c.getSystemService(NotificationManager.class).getActiveNotifications()[0].getNotification();
+                    android.view.View compact=shown.contentView.apply(c,new android.widget.FrameLayout(c));
+                    InstrumentationRegistry.getInstrumentation().runOnMainSync(()->compact.findViewById(R.id.status_complete).performClick());
+                    synced=false;
+                    for(int i=0;i<90;i++){
+                        JSONObject s=new JSONObject(PingoDatabase.get(c).read(userId,"snapshot"));JSONObject current=TaskActions.task(s.getJSONObject("workspace"),"fixture-task");
+                        synced=current!=null&&current.optBoolean("completed")&&s.getJSONArray("pending").length()==0;
+                        if(synced)break;SystemClock.sleep(1000);
+                    }
+                    assertTrue("Concluir pelo botão recolhido precisa confirmar na API real.",synced);
+                }
             }
         } finally {
             try { TokenRegistrationWorker.send("DELETE", fixture.getString("token"), installation, null); } catch (Exception ignored) {}

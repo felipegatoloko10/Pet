@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { after } from "next/server";
 import {
   startDesktop,
   authorizeDesktop,
@@ -61,7 +62,7 @@ async function handler(r: Request) {
     const path = url.pathname.replace("/api/v1/", "");
     if (path === "health")
       return Response.json({
-        version: "2.4.0-beta.1",
+        version: "2.4.1-beta.1",
         configured: !!(
           process.env.DATABASE_URL && process.env.GOOGLE_CLIENT_ID
         ),
@@ -214,9 +215,12 @@ async function handler(r: Request) {
     }
     if (path === "operations" && r.method === "POST") {
       const op = operationSchema.parse(await body(r));
-      let w = await runOperation(user.id, op);
-      if (op.command.type !== "pet.care") w = await syncGoogle(user.id);
-      await indexJobs(user.id, w).catch(() => {});
+      const w = await runOperation(user.id, op);
+      after(async () => {
+        const current =
+          op.command.type !== "pet.care" ? await syncGoogle(user.id) : w;
+        await indexJobs(user.id, current).catch(() => {});
+      });
       return Response.json({ workspace: sanitizeWorkspace(w) });
     }
     if (path === "sync" && r.method === "POST") {

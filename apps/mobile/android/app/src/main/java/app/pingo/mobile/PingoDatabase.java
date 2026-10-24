@@ -12,7 +12,7 @@ final class PingoDatabase extends SQLiteOpenHelper {
         if (instance == null) synchronized (PingoDatabase.class) { if (instance == null) instance = new PingoDatabase(c.getApplicationContext()); }
         return instance;
     }
-    private PingoDatabase(Context c) { super(c, "pingo-mobile.db", null, 2); setWriteAheadLoggingEnabled(true); }
+    private PingoDatabase(Context c) { super(c, "pingo-mobile.db", null, 3); setWriteAheadLoggingEnabled(true); }
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE cache(user_id TEXT NOT NULL,k TEXT NOT NULL,v TEXT NOT NULL,PRIMARY KEY(user_id,k))");
         db.execSQL("CREATE TABLE reminders(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,data TEXT NOT NULL)");
@@ -30,6 +30,10 @@ final class PingoDatabase extends SQLiteOpenHelper {
                 while(rows.moveToNext()) try { importPending(db,rows.getString(0),new org.json.JSONObject(rows.getString(1))); } catch(org.json.JSONException e) { throw new IllegalStateException("Não consegui migrar a fila. A cópia original foi preservada.",e); }
             }
         }
+        if(oldVersion < 3) retryCheckIns(db);
+    }
+    private void retryCheckIns(SQLiteDatabase db) {
+        try(Cursor rows=db.rawQuery("SELECT user_id,operation_id,data FROM pending_operations WHERE error IS NOT NULL",null)){while(rows.moveToNext())try{if("task.checkIn".equals(new org.json.JSONObject(rows.getString(2)).getJSONObject("command").optString("type"))){ContentValues v=new ContentValues();v.putNull("error");db.update("pending_operations",v,"user_id=? AND operation_id=?",new String[]{rows.getString(0),rows.getString(1)});}}catch(org.json.JSONException ignored){}}
     }
     private void importPending(SQLiteDatabase db,String user,org.json.JSONObject snapshot) throws org.json.JSONException {
         org.json.JSONArray pending=snapshot.optJSONArray("pending"); if(pending==null)return;

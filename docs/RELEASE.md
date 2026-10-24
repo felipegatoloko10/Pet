@@ -1,15 +1,14 @@
-Pingo 2.4.0-beta.1 — quadro diário, agenda integrada e notificações com ações.
+Pingo 2.4.1-beta.1 — correções de tarefas e notificações Android.
 
-Meu dia reúne tarefas de hoje, atrasadas, compromissos e lembretes de feriados. A lista Google fica fixa. Colunas ganham 24 cores, edição, ordenação e exclusão com transferência segura dos cartões.
+- Notificações com título e botões A fazer, Fazendo, Aguardar e Concluir no conteúdo recolhido. Tocar no corpo abre Meu dia. Aguardar aparece quando essa coluna existe.
+- Conclusão pelo aviso tolera revisões de metadados e formatos de fuso equivalentes, sem aceitar avisos de horários antigos. Falhas de outra tarefa não bloqueiam uma ação independente.
+- Corrigido “Cannot read properties of undefined (reading 'some')” após sincronização Android. Respostas do backend também protegem clientes 2.4 já instalados.
+- Dia inteiro usa Último dia e converte corretamente o fim exclusivo exigido pelo Google.
+- Salvamento local imediato, com envio em segundo plano, proteção contra respostas atrasadas e mensagens de erro legíveis.
+- Removido Organizar datas; tarefas antigas sem data continuam acessíveis. Formulários bloqueiam a rolagem do fundo.
 
-Tarefas datadas têm um evento vinculado no Google Agenda: dia inteiro, horário único ou início/fim. Concluir conserva o evento com ✓. Confirmações de Tasks e Agenda são acompanhadas separadamente. Uma exclusão externa do bloco pede decisão sobre a tarefa, sem recriá-lo automaticamente.
+Instale sobre a versão anterior, sem desinstalar. O APK conserva a assinatura e migra o SQLite para v3 preservando cache e fila. Confira os arquivos SHA256SUMS. Versões 2.3 e 2.4 continuam recuperáveis.
 
-O botão + dos e-mails abre uma tarefa preenchida para revisão, usando somente metadados. Mensagens não são abertas nem enviadas à IA. A cabeça do Pingo identifica o site.
+Validação: 114 testes de domínio/cliente, 21 de navegador, 12 Android unitários e instrumentação Android 16. A homologação desta correção no telefone físico ainda deve ser confirmada; a confirmação anterior se referia à versão 2.4.0.
 
-No Android, os lembretes oferecem Comecei, Concluir, adiar e alterar status. Há acompanhamento no início e fim, com uma única repetição sem resposta. Ações offline ficam na mesma fila SQLite da interface e são enviadas pelo trabalho nativo. Nenhuma tarefa é concluída automaticamente. Ajustes permite desligar o acompanhamento.
-
-Instale sobre a versão anterior para preservar os dados. O APK mantém a assinatura do beta. Confira SHA256SUMS-Android.txt. A versão 2.3 continua disponível e recuperável.
-
-APK 2.4 testado no telefone físico e confirmado como funcionando pelo titular em 23/10/2026. Também passaram 106 testes de domínio/backend, 18 de navegador, 15 Workers/D1, 38 verificações reais API/Neon e testes nativos Android/Windows. Google real confirmou criação do evento, edição de horário no caminho inverso e conclusão no Tasks com ✓ preservado na Agenda. FCM e Comecei foram verificados com a interface fechada e envio real da fila à API.
-
-Notificações são de melhor esforço, conforme permissões, bateria e conectividade. Beta gratuito, não comercial e por convite. Nenhum serviço pago é ativado. O instalador Windows não possui assinatura comercial. Detalhes em docs/REVISION-2.4.md e docs/ANDROID.md.
+O Android controla agrupamento e apresentação final da notificação, conforme versão, fabricante e privacidade da tela bloqueada. Notificações continuam de melhor esforço. Beta gratuito por convite; nenhum serviço pago ativado.

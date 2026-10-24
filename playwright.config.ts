@@ -1,4 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
+const mobilePort = process.env.PINGO_MOBILE_TEST_PORT ?? "1430";
+const desktopPort = process.env.PINGO_DESKTOP_TEST_PORT ?? "1420";
 export default defineConfig({
   testDir: "tests",
   testMatch: [
@@ -14,8 +16,8 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "npm run dev -w @pingo/mobile",
-      url: "http://127.0.0.1:1430",
+      command: `npm run dev -w @pingo/mobile -- --port ${mobilePort}`,
+      url: `http://127.0.0.1:${mobilePort}`,
       reuseExistingServer: !process.env.CI,
       timeout: 30000,
     },
@@ -30,8 +32,8 @@ export default defineConfig({
           },
         ]),
     {
-      command: "npm run dev -w @pingo/desktop",
-      url: "http://127.0.0.1:1420",
+      command: `npm run dev -w @pingo/desktop -- --port ${desktopPort}`,
+      url: `http://127.0.0.1:${desktopPort}`,
       reuseExistingServer: !process.env.CI,
       timeout: 30000,
     },

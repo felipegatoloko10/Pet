@@ -1,12 +1,24 @@
 import { z } from "zod";
 import { TZDate } from "@date-fns/tz";
-import { reconcileTaskCalendars, taskScheduleKey } from "./planning";
+import {
+  reconcileTaskCalendars,
+  taskScheduleKey,
+  normalizeScheduleKey,
+} from "./planning";
 export * from "./planning";
 
 export function taskOrder(a: Task, b: Task) {
   return (a.position ?? 1e9) - (b.position ?? 1e9) || a.id.localeCompare(b.id);
 }
 export function normalizeWorkspace(w: Workspace): Workspace {
+  w.boards ??= [];
+  w.tasks ??= [];
+  w.events ??= [];
+  w.mail ??= [];
+  w.notices ??= [];
+  w.outbox ??= [];
+  w.cursor ??= {};
+  w.connection ??= { connected: false, scopes: [] };
   w.preferences = { ...defaultPreferences, ...w.preferences };
   w.petCare ??= initialPetCare();
   if (!w.conversations || (!w.conversations.length && w.conversation?.length))
@@ -460,7 +472,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("task.checkIn"),
     id,
-    action: z.enum(["start", "complete", "snooze"]),
+    action: z.enum(["start", "complete", "snooze", "pending", "waiting"]),
     actedAt: z.iso.datetime().optional(),
     phase: z.enum(["before", "start", "end", "repeat", "snooze"]),
     scheduleKey: z.string().max(200),
@@ -639,16 +651,19 @@ export function applyCommand(
       const t = w.tasks.find((t) => t.id === c.id && !t.deleted);
       if (!t) throw new DomainError("missing", "Tarefa não encontrada.");
       if (t.completed) break;
-      checkRevision(t, c.expectedRevision);
-      if (taskScheduleKey(t) !== c.scheduleKey)
+      if (c.expectedRevision > t.revision) checkRevision(t, c.expectedRevision);
+      if (taskScheduleKey(t) !== normalizeScheduleKey(c.scheduleKey))
         throw new DomainError(
           "conflict",
           "O horário desta tarefa mudou. Abra a tarefa para revisar.",
           409,
         );
       t.checkIn = {
-        ...(t.checkIn?.key === c.scheduleKey ? t.checkIn : {}),
-        key: c.scheduleKey,
+        ...(t.checkIn &&
+        normalizeScheduleKey(t.checkIn.key) === taskScheduleKey(t)
+          ? t.checkIn
+          : {}),
+        key: taskScheduleKey(t),
       };
       const endPhase =
         ["end", "repeat"].includes(c.phase) ||
@@ -666,12 +681,25 @@ export function applyCommand(
       } else {
         delete t.checkIn.snoozeAt;
         const b = w.boards.find((b) => b.id === t.boardId)!;
-        t.columnId = b.columns.find(
-          (col) => col.kind === (c.action === "complete" ? "done" : "active"),
-        )!.id;
+        const kind =
+          c.action === "complete"
+            ? "done"
+            : c.action === "pending"
+              ? "todo"
+              : c.action === "waiting"
+                ? "waiting"
+                : "active";
+        const destination = b.columns.find((col) => col.kind === kind);
+        if (!destination)
+          throw new DomainError(
+            "missing",
+            "Essa etapa foi removida. Abra o Pingo para escolher outra etapa.",
+          );
+        t.columnId = destination!.id;
         t.completed = c.action === "complete";
         t.completedAt = t.completed ? actedAt : null;
-        if (!t.completed) t.actualStartedAt = actedAt;
+        if (c.action === "start") t.actualStartedAt = actedAt;
+        else if (!t.completed) t.actualStartedAt = null;
         if (t.completed) {
           t.syncState = "pending";
           enqueue("task", t.id, "upsert");
@@ -1397,9 +1425,7 @@ export function advancePetCare(
   care.updatedAt = new Date(Math.max(cursor, +now)).toISOString();
   return care;
 }
-export function sanitizeWorkspace(
-  w: Workspace,
-): Omit<Workspace, "outbox" | "cursor"> {
+export function sanitizeWorkspace(w: Workspace): Workspace {
   const { outbox: _, cursor: __, ...safe } = w;
-  return safe;
+  return { ...safe, outbox: [], cursor: {} };
 }

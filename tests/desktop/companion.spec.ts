@@ -1,8 +1,9 @@
 import { test, expect } from "@playwright/test";
 import { inflateSync } from "node:zlib";
 
+const desktopOrigin = `http://127.0.0.1:${process.env.PINGO_DESKTOP_TEST_PORT ?? "1420"}`;
 async function preview(page: import("@playwright/test").Page) {
-  await page.goto("http://127.0.0.1:1420/?pet=1");
+  await page.goto(desktopOrigin+"/?pet=1");
   await expect(page.locator(".pet")).toBeVisible();
 }
 test("avatar has real alpha transparency, and balloons appear only for a message", async ({
@@ -10,7 +11,7 @@ test("avatar has real alpha transparency, and balloons appear only for a message
 }) => {
   const external: string[] = [];
   page.on("request", (request) => {
-    if (new URL(request.url()).origin !== "http://127.0.0.1:1420")
+    if (new URL(request.url()).origin !== desktopOrigin)
       external.push(request.url());
   });
   await page.setViewportSize({ width: 360, height: 500 });

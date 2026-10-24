@@ -72,3 +72,5 @@
     min-width: 0;
   }
 }
+
+dialog[open] { overscroll-behavior: contain; touch-action: pan-y; }

@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
         : JSON.stringify({ error: "Entre no Pingo." }),
     }),
   );
-  await page.goto("http://127.0.0.1:1430");
+  await page.goto(`http://127.0.0.1:${process.env.PINGO_MOBILE_TEST_PORT ?? "1430"}`);
   await page
     .getByRole("button", { name: "Explorar demonstração local" })
     .click();

@@ -50,11 +50,14 @@ import {
   emptyWorkspace,
   eventOnDate,
   zonedDateTime,
+  nextDay,
 } from "@pingo/core";
 import { PingoMark } from "./PingoMark";
+import { useModalScrollLock } from "./modal-scroll";
 import {
   Api,
   ApiError,
+  errorMessage,
   PingoClient,
   webStorage,
   type User,
@@ -150,6 +153,7 @@ function download(name: string, value: string) {
   URL.revokeObjectURL(url);
 }
 export function PingoApp({ platform = {} }: { platform?: Platform }) {
+  useModalScrollLock();
   const apiRef = useRef(platform.api ?? new Api());
   const api = apiRef.current;
   const soundEnabled = platform.kind === "android" || !platform.api;
@@ -215,7 +219,11 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     const unsubscribe = platform.onNotice?.(
       async ({ eventId, noticeId, taskId }) => {
         if (!active) return;
-        if (taskId) {
+        if (platform.kind === "android") {
+          setTaskEditor(null);
+          setEventEditor(null);
+          setScreen("day");
+        } else if (taskId) {
           let t = client.workspace.tasks.find(
             (t) => t.id === taskId && !t.deleted,
           );
@@ -363,17 +371,20 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   const prefs = w?.preferences ?? defaultPreferences;
   async function act(command: Command) {
     if (!client) return;
+    setError("");
     try {
       await client.command(command);
       setToast(
         client.demo
           ? "Modificação salva na demonstração local."
           : client.pending.length
-            ? "Guardei aqui. Vou sincronizar quando houver conexão."
+            ? navigator.onLine
+              ? "Alteração salva no aparelho. Sincronizando…"
+              : "Guardei aqui. Vou sincronizar quando houver conexão."
             : "Alteração salva.",
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Não foi possível salvar.");
+      if (!document.querySelector("dialog[open]")) setError(errorMessage(e));
       throw e;
     }
   }
@@ -1150,7 +1161,7 @@ function ConflictDialog({
       await client.refresh();
       onClose();
     } catch (e) {
-      setError((e as Error).message);
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -1371,7 +1382,7 @@ function TaskEditor({
       });
       onClose();
     } catch (e) {
-      setError((e as Error).message);
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -1635,6 +1646,10 @@ function EventEditor({
       return;
     setBusy(true);
     try {
+      if (e.allDay && e.end <= e.start)
+        throw new Error(
+          "Para um evento de dia inteiro, o fim precisa ser no dia seguinte ou depois.",
+        );
       await act({
         type: "event.upsert",
         event: {
@@ -1648,7 +1663,7 @@ function EventEditor({
       });
       onClose();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -1710,7 +1725,11 @@ function EventEditor({
                 start: v.target.checked
                   ? e.start.slice(0, 10)
                   : e.start + "T09:00",
-                end: v.target.checked ? e.end.slice(0, 10) : e.end + "T10:00",
+                end: v.target.checked
+                  ? e.end.slice(0, 10) <= e.start.slice(0, 10)
+                    ? nextDay(e.start.slice(0, 10))
+                    : e.end.slice(0, 10)
+                  : e.start.slice(0, 10) + "T10:00",
               })
             }
           />{" "}
@@ -1723,16 +1742,40 @@ function EventEditor({
               required
               type={e.allDay ? "date" : "datetime-local"}
               value={e.start}
-              onChange={(v) => setE({ ...e, start: v.target.value })}
+              onChange={(v) =>
+                setE({
+                  ...e,
+                  start: v.target.value,
+                  end:
+                    e.allDay && e.end <= v.target.value
+                      ? nextDay(v.target.value)
+                      : e.end,
+                })
+              }
             />
           </label>
           <label>
-            Fim {e.allDay ? "(data exclusiva)" : ""}
+            {e.allDay ? "Último dia" : "Fim"}
             <input
               required
               type={e.allDay ? "date" : "datetime-local"}
-              value={e.end}
-              onChange={(v) => setE({ ...e, end: v.target.value })}
+              min={e.start}
+              value={
+                e.allDay && e.end
+                  ? new Date(Date.parse(e.end + "T12:00:00Z") - 86400000)
+                      .toISOString()
+                      .slice(0, 10)
+                  : e.end
+              }
+              onChange={(v) =>
+                setE({
+                  ...e,
+                  end:
+                    e.allDay && v.target.value
+                      ? nextDay(v.target.value)
+                      : v.target.value,
+                })
+              }
             />
           </label>
         </div>

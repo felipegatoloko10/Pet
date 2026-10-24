@@ -88,4 +88,26 @@ public class NotificationCoordinatorTest {
         assertEquals(0,c.getSystemService(NotificationManager.class).getActiveNotifications().length);
         assertEquals(1,PingoDatabase.get(c).pending("alice").length());
     }
+
+    @Test public void compactNotificationNamesTaskAndKeepsStatusButtonsVisible()throws Exception{
+        JSONObject n=timedTask();NotificationCoordinator.deliver(c,n);
+        android.app.Notification notification=c.getSystemService(NotificationManager.class).getActiveNotifications()[0].getNotification();
+        assertNotNull(notification.contentView);
+        android.view.View view=notification.contentView.apply(c,new android.widget.FrameLayout(c));
+        assertNotNull(view.findViewById(R.id.status_start));assertNotNull(view.findViewById(R.id.status_complete));assertNotNull(view.findViewById(R.id.status_pending));
+        assertEquals(n.getString("title"),((android.widget.TextView)view.findViewById(R.id.task_title)).getText().toString());
+        assertEquals(android.view.View.VISIBLE,view.findViewById(R.id.status_complete).getVisibility());
+        android.content.Intent opened=org.robolectric.Shadows.shadowOf(notification.contentIntent).getSavedIntent();assertFalse(opened.hasExtra("taskId"));assertFalse(opened.hasExtra("eventId"));
+    }
+    @Test public void equivalentGoogleTimeZoneDoesNotInvalidateNotification()throws Exception{
+        JSONObject n=timedTask();String key=n.getString("scheduleKey");
+        assertEquals(TaskActions.canonicalKey(key),key);
+        assertEquals("2026-10-23T21:00:00.000Z|2026-10-23T21:30:00.000Z",TaskActions.canonicalKey("2026-10-23T18:00:00-03:00|2026-10-23T18:30:00-03:00"));
+    }
+    @Test public void failedOtherTaskDoesNotBlockIndependentNotificationAction()throws Exception{
+        JSONObject bad=new JSONObject().put("error","Revisar").put("operation",new JSONObject().put("command",new JSONObject().put("type","task.upsert").put("task",new JSONObject().put("id","a"))));
+        JSONObject good=new JSONObject().put("operation",new JSONObject().put("operationId","next").put("command",new JSONObject().put("type","task.checkIn").put("id","b")));
+        assertEquals("next",OperationWorker.nextEntry(new JSONArray().put(bad).put(good)).getJSONObject("operation").getString("operationId"));
+        good.getJSONObject("operation").getJSONObject("command").put("id","a");assertNull(OperationWorker.nextEntry(new JSONArray().put(bad).put(good)));
+    }
 }

@@ -47,7 +47,6 @@ export function Board({ w, today, act, onEdit, onEventEdit }: Props) {
     [detail, setDetail] = useState<string | null>(null),
     [error, setError] = useState("");
   const [columnEditor, setColumnEditor] = useState<Column | "new" | null>(null);
-  const [organize, setOrganize] = useState(false);
   const b =
     w.boards.find((b) => b.id === w.preferences.defaultBoardId) ?? w.boards[0];
   const perform = (c: Command) => {
@@ -141,9 +140,8 @@ export function Board({ w, today, act, onEdit, onEventEdit }: Props) {
         !!t.archivedAt === archive &&
         (archive ||
           t.id.startsWith("event:") ||
-          (organize
-            ? !t.dueDate
-            : taskOnDay(t, today, w.preferences.timezone))) &&
+          (!t.dueDate && !t.completed) ||
+          taskOnDay(t, today, w.preferences.timezone)) &&
         (!query ||
           `${t.title} ${t.notes}`
             .toLowerCase()
@@ -255,27 +253,11 @@ export function Board({ w, today, act, onEdit, onEventEdit }: Props) {
           aria-pressed={archive}
           onClick={() => {
             setArchive(!archive);
-            setOrganize(false);
           }}
         >
           {archive ? "↩" : "▣"}
         </button>
       </div>
-      {!!tasks.filter((t) => !t.completed && !t.archivedAt && !t.dueDate)
-        .length && (
-        <p className="organize-undated">
-          Você tem tarefas sem data.{" "}
-          <button
-            className="text-link"
-            onClick={() => {
-              setOrganize(!organize);
-              setArchive(false);
-            }}
-          >
-            {organize ? "Voltar ao dia" : "Organizar datas"}
-          </button>
-        </p>
-      )}
       {error && (
         <p role="alert" className="error">
           {error}
@@ -305,7 +287,7 @@ export function Board({ w, today, act, onEdit, onEventEdit }: Props) {
             strategy={horizontalListSortingStrategy}
           >
             <div className="kanban">
-              {!archive && !organize && !!holidays.length && (
+              {!archive && !!holidays.length && (
                 <section className="kanban-column day-holidays">
                   <header>
                     <strong>Lembretes do dia</strong>

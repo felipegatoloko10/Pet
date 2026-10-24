@@ -19,10 +19,20 @@ public class TaskActionInstrumentedTest {
         SystemClock.sleep(1200);
         try(android.os.ParcelFileDescriptor command=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand("cmd statusbar expand-notifications");java.io.FileInputStream output=new java.io.FileInputStream(command.getFileDescriptor())){output.readAllBytes();}
         SystemClock.sleep(1800);
+        android.view.accessibility.AccessibilityNodeInfo root=InstrumentationRegistry.getInstrumentation().getUiAutomation().getRootInActiveWindow();
+        collapse(root);SystemClock.sleep(600);
         android.graphics.Bitmap b=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
         try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(c.getExternalFilesDir(null),file))){b.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}
+        try(android.os.ParcelFileDescriptor command=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand("cp "+new java.io.File(c.getExternalFilesDir(null),file).getAbsolutePath()+" /data/local/tmp/"+file);java.io.FileInputStream output=new java.io.FileInputStream(command.getFileDescriptor())){output.readAllBytes();}
         try(android.os.ParcelFileDescriptor command=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand("cmd statusbar collapse");java.io.FileInputStream output=new java.io.FileInputStream(command.getFileDescriptor())){output.readAllBytes();}
         SystemClock.sleep(700);
+    }
+    private boolean collapse(android.view.accessibility.AccessibilityNodeInfo node){
+        if(node==null)return false;
+        CharSequence desc=node.getContentDescription();
+        if(desc!=null&&desc.toString().toLowerCase(java.util.Locale.ROOT).contains("collapse")){node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);return true;}
+        for(int i=0;i<node.getChildCount();i++)if(collapse(node.getChild(i)))return true;
+        return false;
     }
     @Test public void buttonsWorkWithNoWebViewOfflineAndSurviveReopen()throws Exception{
         Context c=InstrumentationRegistry.getInstrumentation().getTargetContext();String user="instrumentation-checkin";
@@ -41,7 +51,10 @@ public class TaskActionInstrumentedTest {
             waitFor(c,user,false);assertEquals(start,snapshot(c,user).getJSONObject("workspace").getJSONArray("tasks").getJSONObject(0).getString("scheduledStart"));
             PingoDatabase.get(c).close();assertEquals(1,snapshot(c,user).getJSONArray("pending").length());
             n.put("phase","end").put("noticeId","native:end").put("body","Deu tempo de concluir? Está tudo no seu ritmo.");NotificationCoordinator.deliver(c,n);capture(c,"v24-end-notification.png");
-            notice=c.getSystemService(NotificationManager.class).getActiveNotifications()[0].getNotification();assertEquals("Concluir",notice.actions[0].title.toString());notice.actions[0].actionIntent.send();waitFor(c,user,true);
+            notice=c.getSystemService(NotificationManager.class).getActiveNotifications()[0].getNotification();assertEquals("Concluir",notice.actions[0].title.toString());
+            android.view.View compact=notice.contentView.apply(c,new android.widget.FrameLayout(c));
+            assertEquals(android.view.View.VISIBLE,compact.findViewById(R.id.status_complete).getVisibility());
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->compact.findViewById(R.id.status_complete).performClick());waitFor(c,user,true);
             assertEquals(2,snapshot(c,user).getJSONArray("pending").length());
             NotificationCoordinator.deliver(c,n.put("noticeId","late:end"));assertEquals(0,c.getSystemService(NotificationManager.class).getActiveNotifications().length);
         }finally{NotificationCoordinator.clear(c);PingoDatabase.get(c).clear(user);androidx.work.WorkManager.getInstance(c).cancelUniqueWork("pingo-operations");}

@@ -9,6 +9,6 @@ Pingo 2.4.1-beta.1 — correções de tarefas e notificações Android.
 
 Instale sobre a versão anterior, sem desinstalar. O APK conserva a assinatura e migra o SQLite para v3 preservando cache e fila. Confira os arquivos SHA256SUMS. Versões 2.3 e 2.4 continuam recuperáveis.
 
-Validação: 114 testes de domínio/cliente, 21 de navegador, 12 Android unitários e instrumentação Android 16. Também passaram 38 verificações reais API/Neon e o CI completo de Android e Windows. FCM real, Comecei e Concluir pelo conteúdo recolhido confirmaram a fila nativa na API de produção. Tarefa às 18h e compromisso de dia inteiro sincronizaram com Google. A homologação desta correção no telefone físico ainda deve ser confirmada; a confirmação anterior se referia à versão 2.4.0.
+Validação: 114 testes de domínio/cliente, 21 de navegador, 12 Android unitários e instrumentação Android 16. Também passaram 38 verificações reais API/Neon e o CI completo de Android e Windows. FCM real, Comecei e Concluir pelo conteúdo recolhido confirmaram a fila nativa na API de produção. Tarefa às 18h e compromisso de dia inteiro sincronizaram com Google. Em 24/10/2026, o titular confirmou que testou esta versão no celular e que funcionou, autorizando a publicação da pré-release.
 
 O Android controla agrupamento e apresentação final da notificação, conforme versão, fabricante e privacidade da tela bloqueada. Notificações continuam de melhor esforço. Beta gratuito por convite; nenhum serviço pago ativado.

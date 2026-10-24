@@ -2,7 +2,7 @@
 
 ## Correção 2.4.1
 
-Corrige cache Android sem outbox, comparação de horários equivalentes, ações de status por notificação, intervalos de dia inteiro e rolagem de fundo. Salvamento termina após a persistência local. Organizar datas foi removido. Detalhes em [REVISION-2.4.1.md](REVISION-2.4.1.md). Validação: 114 testes de domínio/cliente, 21 de navegador, 12 unitários Android e instrumentação Android 16. Homologação física desta correção pendente; registros abaixo referem-se às versões anteriores.
+Corrige cache Android sem outbox, comparação de horários equivalentes, ações de status por notificação, intervalos de dia inteiro e rolagem de fundo. Salvamento termina após a persistência local. Organizar datas foi removido. Detalhes em [REVISION-2.4.1.md](REVISION-2.4.1.md). Validação: 114 testes de domínio/cliente, 21 de navegador, 12 unitários Android e instrumentação Android 16. Em 24/10/2026, o titular confirmou a homologação física desta correção e autorizou a publicação da pré-release 2.4.1. Registros abaixo referem-se às versões anteriores.
 
 ## Revisão 2.4
 

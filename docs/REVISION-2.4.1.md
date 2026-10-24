@@ -25,3 +25,6 @@ Diálogos bloqueiam a página enquanto abertos e preservam a posição de rolage
 ## Validação
 
 114 testes de domínio/cliente, 21 de navegador e 12 testes unitários Android. Instrumentação Android 16 verifica ações sem WebView, persistência após reabertura e acionamento direto do botão Concluir do conteúdo recolhido. Instaladores são produzidos pelo CI. Testes de produção usam conta artificial temporária, removida ao terminar. A aprovação física desta correção é distinta da homologação da 2.4.0.
+
+
+Evidência da entrega: CI [40056425433](https://github.com/felipegatoloko10/Pet/actions/runs/40056425433) passou em validação, Android e Windows, no commit fab1c56. Produção confirmou 2.4.1-beta.1; tarefa de teste às 18h e compromisso de dia inteiro sincronizaram. FCM real seguido de Comecei e Concluir pelo conteúdo recolhido confirmou o estado no servidor sem WebView; a conta artificial foi removida. As 38 verificações API/Neon também passaram. APK assinado com a chave anterior, SHA256 d310da0f6799dcf6cc050ba63321954e4d638678788fec788e8ea69fb88eb558. Instaladores e checksums estão no rascunho 2.4.1, aguardando homologação física. Dois itens Google identificados como Teste Pingo 2.4.1 permanecem após interrupção do controle do navegador durante a limpeza.

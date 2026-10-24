@@ -4,6 +4,7 @@ import {
   newBoard,
   applyCommand,
   zonedParts,
+  zonedDateTime,
   nextDay,
   dayBounds,
   type Workspace,
@@ -199,6 +200,9 @@ test("e-mail abre tarefa para revisão e horário único reserva 30 minutos", as
     .click();
   await expect(dialog).not.toBeVisible();
   const task = state().tasks.find((t) => t.title === "Documento para revisar")!;
+  expect(task.scheduledStart).toBe(
+    zonedDateTime(task.dueDate!, "15:00", state().preferences.timezone),
+  );
   expect(task.sourceMail?.id).toBe("mail");
   expect(
     Date.parse(task.scheduledEnd!) - Date.parse(task.scheduledStart!),

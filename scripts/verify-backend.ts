@@ -109,8 +109,8 @@ try {
     [bob],
   );
   check(remaining.rowCount === 1);
-  check(!("outbox" in b.workspace));
-  check(!("cursor" in b.workspace));
+  check(Array.isArray(b.workspace.outbox) && b.workspace.outbox.length === 0);
+  check(Object.keys(b.workspace.cursor).length === 0);
   check(
     (
       await call(tokenB, "operations", {

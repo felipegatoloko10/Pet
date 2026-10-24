@@ -6,7 +6,7 @@ Um pequeno companheiro para organizar tarefas, agenda e rotina. Beta não comerc
 
 O [Android beta](docs/ANDROID.md) reúne tarefas, agenda, conversas e um espaço para cuidar do Pingo. APK assinado, login Google com retorno automático, SQLite offline e notificações FCM com lembretes locais.
 
-A [revisão 2.4](docs/REVISION-2.4.md) reúne o quadro diário e a Agenda: tarefas de hoje e atrasadas, compromissos e feriados, eventos vinculados às tarefas, 24 cores de coluna e conversão de e-mail por metadados. No Android, as notificações oferecem Comecei, Concluir, adiamento e alteração de status, com fila offline nativa. A distribuição pública da 2.4 depende da homologação dessas ações em aparelho físico; a 2.3 permanece recuperável.
+A [revisão 2.4](docs/REVISION-2.4.md) reúne o quadro diário e a Agenda: tarefas de hoje e atrasadas, compromissos e feriados, eventos vinculados às tarefas, 24 cores de coluna e conversão de e-mail por metadados. No Android, as notificações oferecem Comecei, Concluir, adiamento e alteração de status, com fila offline nativa. O titular confirmou o APK 2.4 funcionando em aparelho físico; a versão 2.3 permanece recuperável.
 
 O [avatar 2.2](docs/AVATAR.md) é recortado, tem 24 estados animados, conversa pela barra abaixo do personagem e permite ajustar e guardar seu tamanho. As animações são locais e não consomem IA.
 

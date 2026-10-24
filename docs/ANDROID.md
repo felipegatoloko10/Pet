@@ -28,7 +28,7 @@ Título e antecedência aparecem no lembrete, sem descrições, e-mails ou conve
 
 Na 2.4, tarefas com horário oferecem **Comecei**, **Concluir**, **Lembrar em 10/15 min** e **Alterar status**. São ações locais sem IA e sem conclusão automática. Ações offline ficam na mesma fila SQLite da interface, enviadas pelo trabalho nativo. Ajustes permite desligar o acompanhamento. A migração preserva cache e operações anteriores. Consulte [o comportamento detalhado](REVISION-2.4.md).
 
-Antes de publicar a pré-release 2.4, é necessário instalar seu APK assinado sobre a 2.3 e homologar esses botões em aparelho físico, incluindo ação sem internet e confirmação em Tasks e Agenda. Emulador não substitui esse teste.
+O titular recebeu o APK 2.4 para homologação sobre a 2.3 e confirmou em 23/10/2026 que testou e está funcionando. Ações nativas offline, FCM e sincronização da fila foram também verificadas em emulador; Tasks e evento foram conferidos com Google real.
 
 ## Compilar
 
@@ -51,6 +51,6 @@ Testes simulados cobrem cuidados, passagem de tempo, sono, preservação de camp
 
 A conta gratuita Pingo, para até 20 aparelhos, foi criada em 23/10/2026. O pacote `app.pingo.mobile` está Registrado no Android Developer Console e seu certificado está Verificado pelo Google. Impressão SHA-256 do certificado do beta: `E1:14:38:B5:51:09:A1:18:48:E5:79:7A:36:83:1D:F2:C5:7E:37:0E:DB:21:EC:D4:86:BD:40:E0:1A:9D:23:62`.
 
-O titular confirmou em 23/10/2026 a instalação no celular e a sincronização de uma tarefa criada no app para o Google Tasks. O APK está disponível na pré-release 2.3.0-beta.1. Notificações no telefone físico, sincronização inversa, reinício offline e restrições de bateria ainda precisam de confirmação.
+O titular confirmou em 23/10/2026 a instalação no celular e a sincronização de uma tarefa criada no app para o Google Tasks. O APK atualizado está disponível na pré-release 2.4.0-beta.1, preservando a 2.3. Notificações no telefone físico, sincronização inversa, reinício offline e restrições de bateria ainda precisam de confirmação.
 
 A autorização de cada dispositivo depende dos titulares. No Android Developer Console, abra Dispositivos, adicione o aparelho e siga o vínculo/código no próprio celular. A assinatura do APK não substitui essa autorização. O primeiro aparelho já foi autorizado; aparelhos adicionais precisam do próprio vínculo. Não há publicação na Play Store nesta entrega. iPhone, avatar flutuante e widgets ficam para outra etapa.

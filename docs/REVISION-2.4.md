@@ -43,4 +43,4 @@ Protocolo Android 2 habilita botões apenas em clientes compatíveis. Clientes a
 
 Versão 2.4.0-beta.1; certificado Android preservado. O agendador compatível é publicado antes do backend que indexa as novas fases. Instaladores Windows e Android são produzidos pelo CI. A versão 2.3 permanece na release anterior.
 
-A pré-release 2.4 só sai do rascunho após confirmação em telefone físico de Comecei/Concluir, adiamento, ação offline e sincronização da tarefa com Google Tasks e seu evento no Google Agenda. Testes automatizados e emulador não substituem essa confirmação.
+O titular recebeu o APK para essa homologação e confirmou em 23/10/2026 que o instalou, testou e está funcionando. Os resultados automatizados, nativos, FCM real e Google real estão em VALIDATION.md. O CI aprovou os instaladores Android e Windows.

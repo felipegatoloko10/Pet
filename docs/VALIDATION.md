@@ -7,8 +7,10 @@
 - Android: migração SQLite 1 → 2 preservando fila/cache, recibos contra reintrodução de operações e ações nativas de notificação.
 - Instrumentação Android 16: cinco testes passaram; um teste FCM de produção opt-in foi omitido nessa execução local. Comecei e Concluir funcionaram sem WebView, sem sessão de rede, preservando a agenda e a fila após reabrir SQLite.
 - Em execução opt-in separada, o backend 2.4 enviou um check-in FCM real ao emulador sem Activity aberta. O botão Comecei alcançou a API de produção, a fila foi confirmada e o início planejado permaneceu intacto. Conta artificial, sessão, assinatura e trabalhos foram removidos ao terminar; nenhum Google Workspace ou IA foi usado nessa prova.
-- Google real na conta autorizada: tarefa de homologação criou um único evento; editar o horário no Google Agenda para 18h05 atualizou a reserva do Pingo. O alias primary foi reconciliado com o identificador real da agenda para evitar registros locais duplicados.
-- Resta homologar os novos botões em telefone físico e a ligação Tasks/Agenda com Google real. A homologação física da 2.3 não conta como homologação da 2.4.
+- Google real na conta autorizada: tarefa de homologação criou um único evento; editar o horário no Google Agenda para 18h05 atualizou a reserva do Pingo. Concluir no Pingo concluiu a tarefa no Tasks e preservou seu evento com ✓. O alias primary foi reconciliado com o identificador real da agenda para evitar registros locais duplicados.
+- CI 40015358430 passou nas etapas verify, Android e Windows. O teste nativo confirmou transparência, passagem do cursor, RGB do avatar ao minimizar/restaurar, instância única e saída das duas janelas.
+- 38 verificações reais API/Neon passaram com duas contas artificiais de desenvolvimento: sessões, isolamento, idempotência, conflitos e aprovação; os dados de teste foram removidos.
+- O titular confirmou o APK 2.4 testado e funcionando em aparelho físico em 23/10/2026. A confirmação foi recebida após as instruções de homologação dos botões e sincronização.
 
 Teste físico: crie uma tarefa com início e fim próximos; confirme um único cartão/evento; use Comecei com o app fechado; adie o aviso final; desligue a rede e conclua pelo aviso. Reabra, reconecte e confira o cartão concluído, Tasks concluída e evento com ✓. Teste também reagendamento e cancelamento dos avisos antigos.
 

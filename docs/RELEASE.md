@@ -10,6 +10,6 @@ No Android, os lembretes oferecem Comecei, Concluir, adiar e alterar status. Há
 
 Instale sobre a versão anterior para preservar os dados. O APK mantém a assinatura do beta. Confira SHA256SUMS-Android.txt. A versão 2.3 continua disponível e recuperável.
 
-Rascunho para homologação: os botões das notificações e a sincronização Tasks ↔ evento precisam ser confirmados no telefone físico antes de publicar esta pré-release. A confirmação física da 2.3 cobriu instalação e tarefa no Tasks, não as novas ações da 2.4.
+APK 2.4 testado no telefone físico e confirmado como funcionando pelo titular em 23/10/2026. Também passaram 106 testes de domínio/backend, 18 de navegador, 15 Workers/D1, 38 verificações reais API/Neon e testes nativos Android/Windows. Google real confirmou criação do evento, edição de horário no caminho inverso e conclusão no Tasks com ✓ preservado na Agenda. FCM e Comecei foram verificados com a interface fechada e envio real da fila à API.
 
 Notificações são de melhor esforço, conforme permissões, bateria e conectividade. Beta gratuito, não comercial e por convite. Nenhum serviço pago é ativado. O instalador Windows não possui assinatura comercial. Detalhes em docs/REVISION-2.4.md e docs/ANDROID.md.

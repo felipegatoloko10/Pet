@@ -186,7 +186,6 @@ export class PingoClient {
   }
   async flush() {
     if (this.running) {
-      this.flushAgain = true;
       await new Promise<void>((resolve) => this.flushWaiters.push(resolve));
       return;
     }

@@ -3,15 +3,17 @@
 ## Uso
 
 1. Escolha **Usar neste aparelho** para criar tarefas, editar a agenda e cuidar do pet sem conta.
-2. Para sincronizar, abra o convite privado, escolha sua senha e entre no app com o mesmo e-mail. No Windows/Android, o navegador retorna ao app por PKCE, state e código temporário de uso único. Não há login Google ou token para copiar.
-3. Ao trocar do espaço local/antigo para a conta, o Pingo oferece uma prévia de cópia dos itens. Essa oferta só aparece quando o e-mail anterior corresponde à conta ou quando a origem era local. Confirme para copiar. A origem fica preservada.
+2. Para sincronizar, use **Não tem conta? Criar conta** e informe nome, e-mail e senha. O cadastro é direto e começa vazio. No Windows/Android, o navegador retorna ao app por PKCE, state e código temporário de uso único. Não há login Google, convite ou token para copiar.
+3. Nenhum dado antigo é importado automaticamente. Para recuperar uma cópia depois, use a importação em Ajustes e confira a prévia antes de confirmar. A origem fica preservada.
 4. Ajustes permite exportar a cópia JSON e importar uma cópia com prévia. Identificadores são preservados; uma segunda importação não duplica nem sobrescreve itens existentes.
 
-O convite de primeiro acesso é uma credencial privada e vence em sete dias. Não publique o arquivo de convites nem o link. Ele vincula o cadastro ao e-mail aprovado; a senha não é enviada por e-mail. Para recuperar acesso, o administrador gera outro convite com `--recover`. As demais sessões são encerradas depois da recuperação. O Pingo não afirma que um e-mail foi verificado por envio de mensagem: o acesso é aprovado pelo administrador do beta.
+Para começar do zero, basta criar sua conta. O quadro e a agenda estarão vazios. Nenhuma tarefa, conversa ou compromisso da conta Google será trazido automaticamente, e a cópia antiga continuará disponível para recuperação.
+
+O e-mail identifica a conta; não há envio nem verificação de propriedade do endereço nesta versão. Para recuperar acesso, o administrador deve confirmar a identidade do solicitante e gerar um link privado com `--recover`, válido por sete dias e de uso único. As demais sessões são encerradas depois da recuperação. A recuperação não é liberada apenas por conhecer o e-mail. Links privados antigos de primeiro acesso continuam compatíveis, mas não são necessários para o cadastro comum.
 
 ## Configuração do servidor
 
-Use um projeto Supabase exclusivo e gratuito. A autenticação continua no Better Auth, agora com senha e cadastro fechado. Supabase Auth/SMTP não é utilizado. Isso evita a restrição do remetente de testes e a necessidade de outro provedor de e-mail.
+Use um projeto Supabase exclusivo e gratuito. A autenticação continua no Better Auth, agora com senha e cadastro direto. Supabase Auth/SMTP não é utilizado. Isso evita a restrição do remetente de testes e a necessidade de outro provedor de e-mail.
 
 - `DATABASE_URL`: pooler de transação para o backend.
 - `DATABASE_URL_UNPOOLED`: conexão direta ou pooler de sessão para migrações.
@@ -19,7 +21,7 @@ Use um projeto Supabase exclusivo e gratuito. A autenticação continua no Bette
 - `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `CREDENTIAL_ENCRYPTION_KEY`: valores privados do backend.
 - Agendador e Web Push: configuração privada existente, sem Firebase.
 
-Execute `db:migrate`, autorize os e-mails com `invite` e gere convites com `scripts/create-invite-link.ts`. As tabelas públicas têm RLS e nenhum privilégio para `anon` ou `authenticated`. Somente o backend autorizado acessa essas tabelas. O segredo do banco nunca entra no bundle dos aplicativos.
+Execute `db:migrate`. O cadastro público usa o endpoint padrão do Better Auth, com senha protegida, validação e limite de tentativas. As tabelas públicas têm RLS e nenhum privilégio para `anon` ou `authenticated`. Somente o backend autorizado acessa essas tabelas. O segredo do banco nunca entra no bundle dos aplicativos.
 
 Os snapshots PostgreSQL usam um envelope gzip versionado para reduzir tráfego do banco. O leitor aceita o formato anterior. Leituras comuns consultam a revisão antes de trazer o snapshot completo; uma cópia local nova não é confundida com uma revisão já recebida do servidor. Escritas e reconhecimento de operações são transacionais.
 

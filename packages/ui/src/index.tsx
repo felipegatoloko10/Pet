@@ -171,8 +171,6 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   const [loginBusy, setLoginBusy] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [activation, setActivation] = useState<Activation>();
-  const [importOffer, setImportOffer] =
-    useState<ReturnType<ReturnType<typeof pingoImportInput>["parse"]>>();
   const chosenProfile = useRef(false);
   const [, render] = useState(0);
   const [screen, setScreen] = useState<Screen>("day");
@@ -422,27 +420,11 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     }
   }
   async function completeSignIn() {
-    const previous = client ? structuredClone(client.workspace) : undefined;
-    const previousId = user?.id;
-    const previousEmail = user?.email;
     api.accountId = undefined;
     const result = await api.request<{ user: User }>("workspace");
     await attach(result.user);
     setAccountOpen(false);
     setActivation(undefined);
-    if (
-      previous &&
-      previousId !== result.user.id &&
-      (!previousEmail ||
-        previousEmail.toLowerCase() === result.user.email.toLowerCase())
-    ) {
-      const data = pingoImportInput().safeParse(previous);
-      if (data.success) setImportOffer(data.data);
-      else
-        setToast(
-          "Sua cópia anterior foi preservada. Exporte-a em Ajustes para revisar a importação.",
-        );
-    }
   }
   async function login() {
     setLoginBusy(true);
@@ -557,7 +539,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
             </button>
             <small>
               {configured
-                ? "Beta gratuito por convite · seu espaço é só seu"
+                ? "Beta gratuito · seu espaço é só seu"
                 : "Você já pode usar sem internet e sem conta."}
             </small>
             {accountOpen && (
@@ -1013,39 +995,6 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
       {accountOpen && (
         <Dialog title="Sua conta Pingo" onClose={() => setAccountOpen(false)}>
           <AccountForm activation={activation} onSignedIn={completeSignIn} />
-        </Dialog>
-      )}
-      {importOffer && (
-        <Dialog
-          title="Trazer seus dados deste aparelho"
-          onClose={() => setImportOffer(undefined)}
-        >
-          <p>
-            Encontramos {importOffer.tasks.filter((t) => !t.deleted).length}{" "}
-            tarefa(s) e{" "}
-            {importOffer.events.filter((e) => !e.deleted && !e.taskId).length}{" "}
-            compromisso(s) no espaço anterior. Você pode copiá-los para esta
-            conta. A cópia original será preservada. Conversas serão copiadas
-            como histórico; nome, cores, rotina e cuidados serão trazidos na
-            primeira importação.
-          </p>
-          <button
-            className="button primary"
-            onClick={() =>
-              void act({
-                type: "workspace.import",
-                data: importOffer,
-                confirmed: true,
-              })
-                .then(() => setImportOffer(undefined))
-                .catch(() => {})
-            }
-          >
-            Copiar para minha conta
-          </button>
-          <button className="button" onClick={() => setImportOffer(undefined)}>
-            Agora não
-          </button>
         </Dialog>
       )}
       {taskEditor && (

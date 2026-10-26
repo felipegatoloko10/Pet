@@ -78,8 +78,8 @@ try {
     (
       await request("/api/auth/sign-up/email", {
         email: emails[0],
-        name: "Não permitido",
-        password,
+        name: "Verificação temporária",
+        password: "curta",
       })
     ).status === 400,
   );
@@ -95,7 +95,7 @@ try {
       )
     ).status === 403,
   );
-  const a = await request("/api/auth/password/sign-up", registration(0));
+  const a = await request("/api/auth/sign-up/email", registration(0));
   check(a.ok);
   const cookieA = cookies(a);
   check(cookieA.includes("session_token="));
@@ -103,10 +103,10 @@ try {
   const userA = (await a.json()).user;
   ip = `10.60.${subnet}.2`;
   check(
-    (await request("/api/auth/password/sign-up", registration(0))).status ===
-      403,
+    (await request("/api/auth/sign-up/email", registration(0))).status === 422,
   );
-  const b = await request("/api/auth/password/sign-up", registration(1));
+  await pool.query("DELETE FROM invitations WHERE email=$1", [emails[1]]);
+  const b = await request("/api/auth/sign-up/email", registration(1));
   check(b.ok);
   const cookieB = cookies(b);
   const userB = (await b.json()).user;
@@ -123,6 +123,11 @@ try {
   ).workspace;
   check(workspaceA.boards.length === 1);
   check(workspaceA.storageMode === "pingo");
+  check(
+    workspaceA.tasks.length === 0 &&
+      workspaceA.events.length === 0 &&
+      workspaceA.conversations.length === 0,
+  );
   const board = workspaceA.boards[0];
   const operation = {
     operationId: randomUUID(),
@@ -297,7 +302,7 @@ try {
     }
   }
   console.log(
-    `${checks} verificações reais passaram: convite, senha, recuperação, isolamento, repetição segura, sincronização compactada, PKCE e bloqueio dos papéis públicos.`,
+    `${checks} verificações reais passaram: cadastro sem convite, senha, recuperação protegida, isolamento, repetição segura, sincronização compactada, PKCE e bloqueio dos papéis públicos.`,
   );
 } finally {
   if (tickets.length)

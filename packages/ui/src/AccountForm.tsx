@@ -26,28 +26,36 @@ export function AccountForm({
 }) {
   const [signup, setSignup] = useState(!!activation);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     setBusy(true);
-    setMessage("");
     setError("");
     try {
       const r = await fetch(
-        signup ? "/api/auth/password/sign-up" : "/api/auth/sign-in/email",
+        signup
+          ? activation
+            ? "/api/auth/password/sign-up"
+            : "/api/auth/sign-up/email"
+          : "/api/auth/sign-in/email",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            email: form.get("email"),
+            email: String(form.get("email") ?? "")
+              .trim()
+              .toLowerCase(),
             password: form.get("password"),
             ...(signup
               ? {
                   name: form.get("name"),
-                  inviteCode: activation?.code ?? form.get("inviteCode"),
-                  purpose: activation?.purpose ?? "register",
+                  ...(activation
+                    ? {
+                        inviteCode: activation.code,
+                        purpose: activation.purpose,
+                      }
+                    : {}),
                 }
               : {}),
           }),
@@ -55,7 +63,13 @@ export function AccountForm({
       );
       const data = await r.json();
       if (!r.ok)
-        throw new Error(data.message ?? "Não foi possível entrar agora.");
+        throw new Error(
+          data.code === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL"
+            ? "Já existe uma conta com este e-mail. Use Entrar."
+            : data.code === "INVALID_EMAIL_OR_PASSWORD"
+              ? "E-mail ou senha incorretos."
+              : (data.message ?? "Não foi possível entrar agora."),
+        );
       await onSignedIn();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha de conexão.");
@@ -83,22 +97,6 @@ export function AccountForm({
           readOnly={!!activation}
         />
       </label>
-      {signup && !activation && (
-        <label>
-          Convite de primeiro acesso
-          <input
-            name="inviteCode"
-            required
-            minLength={43}
-            maxLength={43}
-            autoComplete="off"
-          />
-          <small>
-            Use o convite privado fornecido pelo administrador. Para recuperar
-            uma senha, peça um convite de recuperação.
-          </small>
-        </label>
-      )}
       <label>
         Senha
         <input
@@ -108,14 +106,17 @@ export function AccountForm({
           minLength={10}
           maxLength={128}
           autoComplete={signup ? "new-password" : "current-password"}
+          aria-describedby={signup ? "account-password-help" : undefined}
         />
       </label>
+      {signup && (
+        <small id="account-password-help">Use pelo menos 10 caracteres.</small>
+      )}
       {error && (
         <p className="error" role="alert">
           {error}
         </p>
       )}
-      {message && <p role="status">{message}</p>}
       <button className="button primary" disabled={busy}>
         {busy
           ? "Aguarde…"
@@ -132,14 +133,13 @@ export function AccountForm({
         onClick={() => {
           setSignup(!signup);
           setError("");
-          setMessage("");
         }}
       >
-        {signup ? "Já tenho uma conta" : "Primeiro acesso? Criar conta"}
+        {signup ? "Já tenho uma conta" : "Não tem conta? Criar conta"}
       </button>
       <small>
-        Conta por convite. A internet é necessária para entrar e sincronizar;
-        suas tarefas continuam disponíveis offline.
+        A internet é necessária para criar a conta, entrar e sincronizar; suas
+        tarefas continuam disponíveis offline.
       </small>
     </form>
   );

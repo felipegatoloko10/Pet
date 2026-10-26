@@ -1,7 +1,6 @@
 import { betterAuth, APIError } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, deviceAuthorization } from "better-auth/plugins";
-import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "./schema";
 import { passwordAuth } from "./password-auth";
@@ -12,11 +11,15 @@ function createAuth() {
     logger: { disabled: true },
     baseURL: process.env.BETTER_AUTH_URL,
     secret: process.env.BETTER_AUTH_SECRET,
-    database: drizzleAdapter(db(), { provider: "pg", schema }),
+    database: drizzleAdapter(db(), {
+      provider: "pg",
+      schema,
+      transaction: true,
+    }),
     account: { encryptOAuthTokens: true },
     emailAndPassword: {
       enabled: true,
-      disableSignUp: true,
+      disableSignUp: false,
       minPasswordLength: 10,
       maxPasswordLength: 128,
       requireEmailVerification: false,
@@ -40,15 +43,12 @@ function createAuth() {
       user: {
         create: {
           before: async (data) => {
-            const invite = await db()
-              .select()
-              .from(schema.invitations)
-              .where(eq(schema.invitations.email, data.email.toLowerCase()));
-            if (!invite.length)
-              throw new APIError("FORBIDDEN", {
-                message: "O beta do Pingo precisa de convite.",
+            const name = data.name.trim();
+            if (!name || name.length > 100 || data.email.length > 254)
+              throw new APIError("BAD_REQUEST", {
+                message: "Informe seu nome e um e-mail válido.",
               });
-            return { data };
+            return { data: { ...data, name } };
           },
         },
       },

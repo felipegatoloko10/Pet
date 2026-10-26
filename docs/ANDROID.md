@@ -4,7 +4,7 @@ Aplicativo `app.pingo.mobile`, Android 7 ou superior. Instale o APK sobre a vers
 
 ## Entrar e usar
 
-**Usar neste aparelho** oferece tarefas, agenda e cuidados sem conta. Para compartilhar seus dados entre Android, web e Windows, abra seu convite privado de primeiro acesso, escolha uma senha e use **Entrar para sincronizar** no aplicativo. O navegador retorna automaticamente ao Pingo, sem copiar tokens. O e-mail é o identificador da conta; não há autorização Google.
+**Usar neste aparelho** oferece tarefas, agenda e cuidados sem conta. Para compartilhar seus dados entre Android, web e Windows, use **Entrar para sincronizar** e **Não tem conta? Criar conta**. Preencha nome, e-mail e senha, sem convite. O navegador retorna automaticamente ao Pingo, sem copiar tokens. O e-mail é o identificador da conta; não há autorização Google. A conta começa vazia, sem importar dados antigos automaticamente.
 
 O Android Keystore protege a sessão e a tentativa de login. A fila SQLite é separada por conta e persiste as alterações junto da cópia otimista. Uma resposta atrasada de outra conta ou de uma sincronização anterior não pode substituir mudanças locais mais recentes.
 

@@ -1,10 +1,10 @@
 # Pingo 2.5 — seu dia, mesmo sem internet
 
-Companheiro pessoal para tarefas, agenda, rotina e pequenos cuidados. Beta gratuito por convite, com espaços individuais.
+Companheiro pessoal para tarefas, agenda, rotina e pequenos cuidados. Beta gratuito, com espaços individuais.
 
 [Abrir o Pingo](https://pingo-gilt.vercel.app) · [Android](docs/ANDROID.md) · [Migração para Supabase](docs/OFFLINE-SUPABASE.md)
 
-**Usar neste aparelho** abre um quadro e uma agenda reais, sem conta e sem internet. Dados são guardados no SQLite do Android/Windows e no IndexedDB da web. Uma conta do Pingo, por e-mail e senha, permite sincronizar os dispositivos quando houver conexão. O primeiro acesso usa um convite privado; os logins seguintes usam a senha.
+**Usar neste aparelho** abre um quadro e uma agenda reais, sem conta e sem internet. Dados são guardados no SQLite do Android/Windows e no IndexedDB da web. Uma conta do Pingo, por e-mail e senha, permite sincronizar os dispositivos quando houver conexão. Selecione **Não tem conta? Criar conta**, preencha nome, e-mail e senha e comece com um espaço vazio, sem convite ou autorização Google.
 
 A versão 2.5 não consulta Google Tasks, Agenda ou Gmail e não usa Firebase para notificações. Tarefas e horários pertencem ao Pingo. O avatar permanece transparente, com animações e cuidados locais. Conversa com IA é opcional e necessita de internet e uma chave OpenAI ou Claude.
 
@@ -25,12 +25,10 @@ Node 24 e npm. Copie `.env.example` para `apps/web/.env.local`; valores privados
 ```sh
 npm ci
 npm run db:migrate
-npm run invite -- pessoa@example.com
-npx tsx scripts/create-invite-link.ts pessoa@example.com
 npm run dev
 ```
 
-O gerador salva o convite em `.verification/supabase-private/invitations.json`, sem imprimir nem enviar o link. Entregue-o em particular ao titular. Uma recuperação de senha usa um novo convite com `--recover` e invalida sessões antigas. Consulte a [ativação e a migração](docs/OFFLINE-SUPABASE.md).
+O cadastro comum não exige aprovação do administrador. A recuperação de senha continua administrativa, por link privado de uso único gerado com `scripts/create-invite-link.ts --recover`, após confirmar quem está pedindo. Não há envio de e-mails nesta versão. Consulte a [ativação e a migração](docs/OFFLINE-SUPABASE.md).
 
 ```sh
 npm run check

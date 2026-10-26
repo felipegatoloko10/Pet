@@ -245,3 +245,37 @@ it("importa aparência, cuidados e histórico sem reativar propostas antigas ou 
   expect(target.preferences.name).toBe("Novo nome");
   expect(target.conversations).toHaveLength(1);
 });
+
+it("preserva datas especiais como lembretes somente leitura, sem bloquear a disponibilidade", () => {
+  const source = localWorkspace();
+  source.calendars.push({
+    id: "old-holiday",
+    title: "Datas especiais",
+    holiday: true,
+    readOnly: true,
+  });
+  source.events.push({
+    id: "holiday",
+    title: "Natal",
+    allDay: true,
+    start: "2026-12-25",
+    end: "2026-12-26",
+    calendarId: "old-holiday",
+    revision: 1,
+    syncState: "synced",
+  });
+  const target = applyCommand(
+    localWorkspace(),
+    {
+      type: "workspace.import",
+      data: pingoImportInput().parse(source),
+      confirmed: true,
+    },
+    crypto.randomUUID(),
+  );
+  const event = target.events.find((e) => e.id === "holiday")!;
+  expect(event.transparent).toBe(true);
+  expect(target.calendars.find((c) => c.id === event.calendarId)).toMatchObject(
+    { holiday: true, readOnly: true },
+  );
+});

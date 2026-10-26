@@ -20,6 +20,17 @@ const column = z.object({
 });
 export function pingoImportInput() {
   return z.object({
+    calendars: z
+      .array(
+        z.object({
+          id: z.string().max(200),
+          title: z.string().max(200),
+          holiday: z.boolean().optional(),
+          readOnly: z.boolean().optional(),
+        }),
+      )
+      .max(100)
+      .optional(),
     preferences: preferenceInput.optional(),
     petCare: z
       .object({
@@ -72,6 +83,7 @@ export function pingoImportInput() {
     events: z
       .array(
         eventInput.extend({
+          transparent: z.boolean().optional(),
           deleted: z.boolean().optional(),
           columnId: z.string().max(200).optional(),
           completedAt: z.iso.datetime({ offset: true }).nullable().optional(),
@@ -87,6 +99,19 @@ export function importPingoData(w: Workspace, input: PingoImport) {
   const destination =
     w.boards.find((b) => b.id === w.preferences.defaultBoardId) ?? w.boards[0];
   if (!destination) throw new Error("Crie o quadro antes de importar.");
+  const holidayCalendars = new Map<string, string>();
+  for (const calendar of input.calendars ?? [])
+    if (calendar.holiday) {
+      const id = `pingo-holiday:${mirrorId(calendar.id)}`;
+      if (!w.calendars.some((c) => c.id === id))
+        w.calendars.push({
+          id,
+          title: calendar.title,
+          holiday: true,
+          readOnly: true,
+        });
+      holidayCalendars.set(calendar.id, id);
+    }
   const restoreSettings = !w.migrationSettingsRestored;
   const columns = new Map<string, string>();
   for (const board of input.boards)
@@ -128,7 +153,9 @@ export function importPingoData(w: Workspace, input: PingoImport) {
     const copy: CalendarEvent = {
       ...e,
       id: e.id,
-      calendarId: w.preferences.defaultCalendarId,
+      calendarId:
+        holidayCalendars.get(e.calendarId) ?? w.preferences.defaultCalendarId,
+      transparent: holidayCalendars.has(e.calendarId) ? true : e.transparent,
       columnId: e.columnId ? columns.get(e.columnId) : undefined,
       revision: 1,
       syncState: "pending",

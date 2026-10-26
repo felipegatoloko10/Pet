@@ -14,7 +14,7 @@ test("demonstração permite editar, mover e persistir tarefas sem Google", asyn
     .getByRole("button", { name: "Explorar demonstração local" })
     .click();
   await expect(
-    page.getByText("Demonstração · sem conexão Google"),
+    page.getByText("Demonstração local"),
   ).toBeVisible();
   await page.getByRole("button", { name: "Nova tarefa", exact: true }).click();
   await page

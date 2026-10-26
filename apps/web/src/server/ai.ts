@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { generateText, isStepCount, tool } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
@@ -27,7 +26,7 @@ import {
   mutateWorkspace,
   runOperationIn,
 } from "./workspace";
-import { syncGoogle, calendarRange } from "./sync";
+import { syncAccount, calendarRange } from "./account-sync";
 import { db } from "./db";
 import { approvals } from "./schema";
 export const explicitMutation = (message: string) =>
@@ -103,7 +102,7 @@ export function makeModel(
     case "openai":
       return createOpenAI({ apiKey: key })(model);
     case "google":
-      return createGoogleGenerativeAI({ apiKey: key })(model);
+      throw new DomainError("provider", "Escolha OpenAI ou Claude nos Ajustes.", 400);
     case "anthropic":
       return createAnthropic({ apiKey: key })(model);
   }
@@ -424,7 +423,7 @@ export async function chat(
       const next = await runOperation(userId, { operationId, command });
       return {
         status: "salvo_no_pingo",
-        googleConfirmed: false,
+        synced: true,
         revision: next.revision,
       };
     };
@@ -466,11 +465,11 @@ export async function chat(
             );
         }
         await approve(userId, proposal.approvalId);
-        await syncGoogle(userId);
+        await syncAccount(userId);
         return await remember(
           cmd.type === "routine.update"
             ? "Rotina salva. Vou considerá-la nas próximas sugestões."
-            : "Compromisso salvo no Pingo. Confira o estado de sincronização na agenda para a confirmação do Google.",
+            : "Compromisso salvo no Pingo. O horário já está na sua agenda.",
         );
       }
     }
@@ -492,7 +491,7 @@ export async function chat(
         w.preferences.aiModel,
         key.key,
       ),
-      system: `Você é ${w.preferences.name}, assistente de rotina em português. Agora: ${new Date().toISOString()}; fuso: ${w.preferences.timezone}. Converse naturalmente, pergunte duração/data/horários que faltarem. Consulte rotina e agenda antes de sugerir e consulte o período real antes de escrever. Se a rotina for desconhecida, pergunte; não invente trabalho ou disponibilidade. Proponha uma rotina para aprovação antes de salvar. Ao concordar com uma proposta única de horário, o usuário autoriza agendar. Pedidos completos e claros podem ser executados. Reorganizações espontâneas são sugestões. Não confunda registro na agenda com reserva em clínicas. Nunca afirme confirmação do Google sem resultado confirmado. Não possui ferramentas de e-mail, computador ou SQL. Exclusões e convites sempre exigem confirmação. Quadro padrão: ${w.preferences.defaultBoardId}.`,
+      system: `Você é ${w.preferences.name}, assistente de rotina em português. Agora: ${new Date().toISOString()}; fuso: ${w.preferences.timezone}. Converse naturalmente, pergunte duração/data/horários que faltarem. Consulte rotina e agenda antes de sugerir e consulte o período real antes de escrever. Se a rotina for desconhecida, pergunte; não invente trabalho ou disponibilidade. Proponha uma rotina para aprovação antes de salvar. Ao concordar com uma proposta única de horário, o usuário autoriza agendar. Pedidos completos e claros podem ser executados. Reorganizações espontâneas são sugestões. Não confunda registro na agenda com reserva em clínicas. Informe que as alterações são salvas no Pingo e sincronizadas entre dispositivos. Não há integração com Google. Não possui ferramentas de e-mail, computador ou SQL. Exclusões sempre exigem confirmação. Você não envia convites a terceiros ou e-mails. Quadro padrão: ${w.preferences.defaultBoardId}.`,
       messages: [
         ...c.messages
           .slice(-16)
@@ -505,7 +504,7 @@ export async function chat(
       abortSignal: AbortSignal.timeout(45000),
       maxRetries: 1,
     });
-    await syncGoogle(userId);
+    await syncAccount(userId);
     return await remember(result.text, suggestions);
   } catch (e) {
     await mutateWorkspace(userId, (w) => {

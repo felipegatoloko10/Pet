@@ -10,28 +10,21 @@ import {
 import { and, eq } from "drizzle-orm";
 import { cors } from "../../../../server/cors";
 import {
-  registerMobile,
-  unregisterMobile,
-  startWorkspace,
-  authorizeWorkspace,
-} from "../../../../server/mobile";
-import { inspectConflict, resolveConflict } from "../../../../server/conflicts";
-import { operationSchema, sanitizeWorkspace, DomainError } from "@pingo/core";
+  operationSchema,
+  sanitizeWorkspace,
+  DomainError,
+  deviceReminderPlan,
+  zonedParts,
+} from "@pingo/core";
 import { requireUser } from "../../../../server/auth";
 import {
   readWorkspace,
+  workspaceRevision,
   runOperation,
   saveCredential,
   mutateWorkspace,
 } from "../../../../server/workspace";
-import {
-  beginGoogle,
-  finishGoogle,
-  disconnectGoogle,
-  GoogleClient,
-  googleToken,
-} from "../../../../server/google";
-import { syncGoogle, calendarRange } from "../../../../server/sync";
+import { syncAccount, calendarRange } from "../../../../server/account-sync";
 import { chat, approve } from "../../../../server/ai";
 import {
   indexJobs,
@@ -43,16 +36,19 @@ import { db } from "../../../../server/db";
 import {
   subscriptions,
   credentials,
-  channels,
+  user as authUser,
 } from "../../../../server/schema";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 async function body(r: Request) {
-  if (Number(r.headers.get("content-length") ?? 0) > 1000000)
+  const max = new URL(r.url).pathname.endsWith("/operations")
+    ? 12000000
+    : 1000000;
+  if (Number(r.headers.get("content-length") ?? 0) > max)
     throw new DomainError("size", "Requisição muito grande.", 413);
   const raw = await r.text();
-  if (raw.length > 1000000)
+  if (raw.length > max)
     throw new DomainError("size", "Requisição muito grande.", 413);
   return JSON.parse(raw);
 }
@@ -62,12 +58,12 @@ async function handler(r: Request) {
     const path = url.pathname.replace("/api/v1/", "");
     if (path === "health")
       return Response.json({
-        version: "2.4.1-beta.1",
+        version: "2.5.0-beta.1",
         configured: !!(
-          process.env.DATABASE_URL && process.env.GOOGLE_CLIENT_ID
+          process.env.DATABASE_URL && process.env.BETTER_AUTH_SECRET
         ),
         scheduler: !!process.env.SCHEDULER_URL,
-        androidPush: !!process.env.FIREBASE_FEDERATION_CONFIG,
+        androidPush: false,
       });
     if (path === "scheduler/run" && r.method === "POST") {
       if (
@@ -87,29 +83,26 @@ async function handler(r: Request) {
           entityId: z.string().optional(),
         })
         .parse(await body(r));
+      const [owner] = await db()
+        .select({ id: authUser.id })
+        .from(authUser)
+        .where(eq(authUser.id, job.userId));
+      if (!owner) return Response.json({ indexed: true, retired: true });
       await processJob(job);
       return Response.json({ indexed: true });
     }
-    if (path === "google/calendar-hook" && r.method === "POST") {
-      const id = r.headers.get("x-goog-channel-id") ?? "";
-      const [channel] = await db()
-        .select()
-        .from(channels)
-        .where(eq(channels.id, id));
-      if (
-        !channel ||
-        channel.expiresAt < new Date() ||
-        channel.resourceId !== r.headers.get("x-goog-resource-id") ||
-        !secretEqual(
-          channel.tokenHash,
-          digest(r.headers.get("x-goog-channel-token") ?? ""),
-        )
-      )
-        return new Response(null, { status: 403 });
-      if (r.headers.get("x-goog-resource-state") !== "sync")
-        await indexJobs(channel.userId, await syncGoogle(channel.userId));
-      return new Response(null, { status: 204 });
-    }
+    if (
+      path.startsWith("google/") ||
+      path.startsWith("mobile/workspace") ||
+      path === "mobile/devices"
+    )
+      return Response.json(
+        {
+          error:
+            "Esta versão usa somente os dados do Pingo. Atualize o aplicativo para sincronizar.",
+        },
+        { status: 410 },
+      );
     if (
       [
         "desktop-auth/start",
@@ -167,79 +160,53 @@ async function handler(r: Request) {
         { headers: { "Cache-Control": "no-store" } },
       );
     }
-    if (path === "mobile/devices" && r.method === "POST")
-      return Response.json(await registerMobile(user.id, await body(r)));
-    if (path === "mobile/devices" && r.method === "DELETE")
-      return Response.json(await unregisterMobile(user.id, await body(r)));
-    if (path === "mobile/workspace" && r.method === "POST")
-      return Response.json(await startWorkspace(user.id), {
-        headers: { "Cache-Control": "no-store" },
+    if (path === "mobile/snapshot" && r.method === "GET") {
+      const day = zonedParts(new Date(), "UTC").date;
+      if (
+        url.searchParams.get("revision") !== null &&
+        Number(url.searchParams.get("revision")) ===
+          (await workspaceRevision(user.id)) &&
+        url.searchParams.get("day") === day
+      )
+        return Response.json({ unchanged: true });
+      const w = await readWorkspace(user.id);
+      return Response.json({
+        workspace: sanitizeWorkspace(w),
+        plan: deviceReminderPlan(w, user.id),
+        day,
       });
-    if (path === "mobile/workspace/authorize" && r.method === "POST")
-      return Response.json(await authorizeWorkspace(user.id, await body(r)), {
-        headers: { "Cache-Control": "no-store" },
-      });
-    if (path === "workspace" && r.method === "GET")
+    }
+    if (path === "workspace" && r.method === "GET") {
+      const revision = url.searchParams.get("revision");
+      if (
+        revision !== null &&
+        Number(revision) === (await workspaceRevision(user.id))
+      )
+        return Response.json(
+          {
+            unchanged: true,
+            user: { id: user.id, name: user.name, email: user.email },
+          },
+          { headers: { "Cache-Control": "no-store" } },
+        );
       return Response.json({
         workspace: sanitizeWorkspace(await readWorkspace(user.id)),
         user: { id: user.id, name: user.name, email: user.email },
-      });
-    if (path === "conflicts" && r.method === "GET") {
-      const input = z
-        .object({ kind: z.enum(["task", "event"]), id: z.string() })
-        .parse(Object.fromEntries(url.searchParams));
-      return Response.json(
-        await inspectConflict(user.id, input.kind, input.id),
-      );
-    }
-    if (path === "conflicts" && r.method === "POST") {
-      const input = z
-        .object({
-          kind: z.enum(["task", "event"]),
-          id: z.string(),
-          choice: z.enum(["google", "pingo"]),
-          expectedRevision: z.number().int(),
-          confirmed: z.literal(true),
-        })
-        .parse(await body(r));
-      await resolveConflict(
-        user.id,
-        input.kind,
-        input.id,
-        input.choice,
-        input.expectedRevision,
-      );
-      return Response.json({
-        workspace: sanitizeWorkspace(await syncGoogle(user.id)),
       });
     }
     if (path === "operations" && r.method === "POST") {
       const op = operationSchema.parse(await body(r));
       const w = await runOperation(user.id, op);
       after(async () => {
-        const current =
-          op.command.type !== "pet.care" ? await syncGoogle(user.id) : w;
+        const current = w;
         await indexJobs(user.id, current).catch(() => {});
       });
       return Response.json({ workspace: sanitizeWorkspace(w) });
     }
     if (path === "sync" && r.method === "POST") {
-      const w = await syncGoogle(user.id);
+      const w = await syncAccount(user.id);
       await indexJobs(user.id, w).catch(() => {});
       return Response.json({ workspace: sanitizeWorkspace(w) });
-    }
-    if (path === "google/connect" && r.method === "POST")
-      return Response.json({ url: await beginGoogle(user.id) });
-    if (path === "google/callback" && r.method === "GET") {
-      const client = await finishGoogle(user.id, url);
-      await indexJobs(user.id, await syncGoogle(user.id));
-      return Response.redirect(
-        `${process.env.BETTER_AUTH_URL}/${client === "mobile" ? "mobile/connected" : "?connected=1"}`,
-      );
-    }
-    if (path === "google/disconnect" && r.method === "POST") {
-      await disconnectGoogle(user.id);
-      return Response.json({ ok: true });
     }
     if (path === "calendar/range" && r.method === "GET")
       return Response.json({
@@ -252,7 +219,7 @@ async function handler(r: Request) {
     if (path === "ai/key" && r.method === "POST") {
       const input = z
         .object({
-          provider: z.enum(["openai", "google", "anthropic"]),
+          provider: z.enum(["openai", "anthropic"]),
           key: z.string().min(8).max(1000),
         })
         .parse(await body(r));
@@ -261,7 +228,7 @@ async function handler(r: Request) {
     }
     if (path === "ai/key" && r.method === "DELETE") {
       const input = z
-        .object({ provider: z.enum(["openai", "google", "anthropic"]) })
+        .object({ provider: z.enum(["openai", "anthropic"]) })
         .parse(await body(r));
       await db()
         .delete(credentials)
@@ -296,7 +263,7 @@ async function handler(r: Request) {
         .parse(await body(r));
       await approve(user.id, id, conversationId);
       return Response.json({
-        workspace: sanitizeWorkspace(await syncGoogle(user.id)),
+        workspace: sanitizeWorkspace(await syncAccount(user.id)),
       });
     }
     if (path === "notifications/claim" && r.method === "POST") {
@@ -395,7 +362,9 @@ async function handler(r: Request) {
   }
 }
 async function wrapped(r: Request) {
-  return cors(r, await handler(r));
+  const response = await handler(r);
+  response.headers.set("Cache-Control", "no-store");
+  return cors(r, response);
 }
 export const GET = wrapped;
 export const POST = wrapped;

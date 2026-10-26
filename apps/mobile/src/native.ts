@@ -4,6 +4,7 @@ import {
   type PluginListenerHandle,
 } from "@capacitor/core";
 export type Reminder = {
+  summary?: boolean;
   taskId?: string;
   phase?: string;
   snoozePhase?: string;

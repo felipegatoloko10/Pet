@@ -1,29 +1,28 @@
 {
   "name": "@pingo/web",
-  "version": "2.4.1-beta.1",
+  "version": "2.5.0-beta.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node ../../scripts/build-offline-manifest.mjs",
     "start": "next start"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "latest",
+    "@ai-sdk/openai": "latest",
+    "@date-fns/tz": "^1.4.0",
     "@pingo/core": "*",
     "@pingo/ui": "*",
-    "next": "16.4.2",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "better-auth": "1.7.12",
-    "drizzle-orm": "^0.45.0",
-    "pg": "^8.16.0",
     "@vercel/functions": "latest",
     "ai": "7.0.149",
-    "@ai-sdk/openai": "latest",
-    "@ai-sdk/google": "latest",
-    "@ai-sdk/anthropic": "latest",
-    "zod": "^4.0.0",
-    "web-push": "^3.6.7",
+    "better-auth": "1.7.12",
     "date-fns": "^4.1.0",
-    "@date-fns/tz": "^1.4.0"
+    "drizzle-orm": "^0.45.0",
+    "next": "16.4.2",
+    "pg": "^8.16.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "web-push": "^3.6.7",
+    "zod": "^4.0.0"
   }
 }

@@ -1,0 +1,159 @@
+import { z } from "zod";
+import {
+  taskInput,
+  eventInput,
+  preferenceInput,
+  type Workspace,
+  type Task,
+  type CalendarEvent,
+} from "./index";
+import { mirrorId, reconcileTaskCalendars } from "./planning";
+
+const column = z.object({
+  id: z.string().max(200),
+  title: z.string().min(1).max(100),
+  kind: z.enum(["todo", "active", "waiting", "done", "custom"]),
+  color: z
+    .string()
+    .regex(/^#[0-9a-f]{6}$/i)
+    .optional(),
+});
+export function pingoImportInput() {
+  return z.object({
+    preferences: preferenceInput.optional(),
+    petCare: z
+      .object({
+        satiety: z.number().min(0).max(100),
+        mood: z.number().min(0).max(100),
+        energy: z.number().min(0).max(100),
+        updatedAt: z.iso.datetime({ offset: true }),
+        napUntil: z.iso.datetime({ offset: true }).optional(),
+        awakeUntil: z.iso.datetime({ offset: true }).optional(),
+      })
+      .optional(),
+    conversations: z
+      .array(
+        z.object({
+          id: z.string().max(200),
+          title: z.string().min(1).max(100),
+          archived: z.boolean(),
+          updatedAt: z.iso.datetime({ offset: true }),
+          messages: z
+            .array(
+              z.object({
+                id: z.string().max(200).optional(),
+                role: z.enum(["user", "assistant"]),
+                text: z.string().max(100000),
+              }),
+            )
+            .max(1000),
+        }),
+      )
+      .max(100)
+      .optional(),
+    boards: z
+      .array(
+        z.object({
+          id: z.string().max(200),
+          title: z.string().max(200),
+          columns: z.array(column).max(50),
+        }),
+      )
+      .max(30),
+    tasks: z
+      .array(
+        taskInput.extend({
+          completed: z.boolean().default(false),
+          completedAt: z.iso.datetime({ offset: true }).nullable().optional(),
+          deleted: z.boolean().optional(),
+        }),
+      )
+      .max(1000),
+    events: z
+      .array(
+        eventInput.extend({
+          deleted: z.boolean().optional(),
+          columnId: z.string().max(200).optional(),
+          completedAt: z.iso.datetime({ offset: true }).nullable().optional(),
+        }),
+      )
+      .max(1000),
+  });
+}
+export type PingoImport = z.infer<ReturnType<typeof pingoImportInput>>;
+
+/** Additive, stable IDs: importing a backup twice never overwrites newer edits. */
+export function importPingoData(w: Workspace, input: PingoImport) {
+  const destination =
+    w.boards.find((b) => b.id === w.preferences.defaultBoardId) ?? w.boards[0];
+  if (!destination) throw new Error("Crie o quadro antes de importar.");
+  const restoreSettings = !w.migrationSettingsRestored;
+  const columns = new Map<string, string>();
+  for (const board of input.boards)
+    for (const c of board.columns) {
+      let target = destination.columns.find(
+        (x) => c.kind !== "custom" && x.kind === c.kind,
+      );
+      const id = `import:${mirrorId(c.id)}`;
+      target ??= destination.columns.find((x) => x.id === id);
+      if (!target) {
+        target = { ...c, id };
+        destination.columns.push(target);
+      }
+      if (restoreSettings && c.kind !== "custom") {
+        target.title = c.title;
+        target.color = c.color;
+      }
+      columns.set(c.id, target.id);
+    }
+  for (const t of input.tasks.filter((t) => !t.deleted)) {
+    // Existing Pingo IDs are preserved, so moving the same backup between devices is safe.
+    if (w.tasks.some((x) => x.id === t.id)) continue;
+    const copy: Task = {
+      ...t,
+      id: t.id,
+      boardId: destination.id,
+      columnId:
+        columns.get(t.columnId) ??
+        destination.columns.find(
+          (c) => c.kind === (t.completed ? "done" : "todo"),
+        )!.id,
+      revision: 1,
+      syncState: "pending",
+    };
+    w.tasks.push(copy);
+  }
+  for (const e of input.events.filter((e) => !e.deleted && !e.taskId)) {
+    if (w.events.some((x) => x.id === e.id)) continue;
+    const copy: CalendarEvent = {
+      ...e,
+      id: e.id,
+      calendarId: w.preferences.defaultCalendarId,
+      columnId: e.columnId ? columns.get(e.columnId) : undefined,
+      revision: 1,
+      syncState: "pending",
+    };
+    // Invitations and external authorization are never imported or executed.
+    delete copy.attendees;
+    w.events.push(copy);
+  }
+  for (const conversation of input.conversations ?? [])
+    if (!w.conversations?.some((c) => c.id === conversation.id))
+      (w.conversations ??= []).push(conversation);
+  if (restoreSettings && input.preferences) {
+    w.preferences = {
+      ...input.preferences,
+      defaultBoardId: destination.id,
+      defaultCalendarId: w.preferences.defaultCalendarId,
+      proactiveAI: false,
+    };
+    if (w.preferences.aiProvider === "google") {
+      w.preferences.aiProvider = "openai";
+      w.preferences.aiModel = "";
+    }
+    if (input.petCare) w.petCare = input.petCare;
+    w.migrationSettingsRestored = true;
+  }
+  destination.revision++;
+  reconcileTaskCalendars(w, () => {});
+}

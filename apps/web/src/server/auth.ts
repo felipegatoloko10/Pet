@@ -4,6 +4,7 @@ import { bearer, deviceAuthorization } from "better-auth/plugins";
 import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "./schema";
+import { passwordAuth } from "./password-auth";
 let instance: ReturnType<typeof createAuth> | undefined;
 function createAuth() {
   return betterAuth({
@@ -12,15 +13,14 @@ function createAuth() {
     baseURL: process.env.BETTER_AUTH_URL,
     secret: process.env.BETTER_AUTH_SECRET,
     database: drizzleAdapter(db(), { provider: "pg", schema }),
-    socialProviders: {
-      google: {
-        clientId: process.env.GOOGLE_CLIENT_ID ?? "",
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-        scope: ["openid", "email", "profile"],
-        accessType: "online",
-      },
-    },
     account: { encryptOAuthTokens: true },
+    emailAndPassword: {
+      enabled: true,
+      disableSignUp: true,
+      minPasswordLength: 10,
+      maxPasswordLength: 128,
+      requireEmailVerification: false,
+    },
     trustedOrigins: [
       process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
       "tauri://localhost",
@@ -29,6 +29,7 @@ function createAuth() {
     ],
     plugins: [
       bearer(),
+      passwordAuth(),
       deviceAuthorization({
         verificationUri: "/device",
         expiresIn: "10m",
@@ -39,10 +40,6 @@ function createAuth() {
       user: {
         create: {
           before: async (data) => {
-            if (!data.emailVerified)
-              throw new APIError("FORBIDDEN", {
-                message: "Entre com um e-mail Google verificado.",
-              });
             const invite = await db()
               .select()
               .from(schema.invitations)
@@ -73,6 +70,12 @@ export async function requireUser(request: Request) {
   if (!session)
     throw new APIError("UNAUTHORIZED", {
       message: "Entre no Pingo para continuar.",
+    });
+  const expected = request.headers.get("x-pingo-account");
+  if (expected && expected !== session.user.id)
+    throw new APIError("FORBIDDEN", {
+      message:
+        "Esta sessão pertence a outra conta. Entre novamente para sincronizar.",
     });
   return session.user;
 }

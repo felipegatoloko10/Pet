@@ -6,11 +6,9 @@ import { dailySummary, isQuiet, zonedParts, type Workspace } from "@pingo/core";
 import { db } from "./db";
 import { subscriptions } from "./schema";
 import { mutateWorkspace, readWorkspace } from "./workspace";
-import { syncGoogle, calendarRange } from "./sync";
+
 import { maybeProactive } from "./ai";
 import { digest } from "./crypto";
-import { androidSubscription } from "./mobile";
-import { sendAndroidPush } from "./fcm";
 import { taskAlarms, taskAlarmNotice, taskScheduleKey } from "@pingo/core";
 export type Job = {
   id: string;
@@ -43,15 +41,23 @@ export function jobsFor(userId: string, w: Workspace): Job[] {
   const summaryPending =
     time >= w.preferences.summaryTime &&
     !w.notices.some((n) => n.id === `summary:${date}`);
-  const nextRoutine = (w.cursor.routineLastAt ?? now - 15 * 60000) + 15 * 60000;
+  const interval =
+    w.storageMode === "pingo"
+      ? w.preferences.proactiveAI
+        ? 6 * 3600000
+        : 24 * 3600000
+      : 15 * 60000;
+  const nextRoutine = (w.cursor.routineLastAt ?? now - interval) + interval;
   return [
-    ...taskAlarms(w, userId, now).map((a) => ({
-      id: a.id,
-      userId,
-      kind: "checkin" as const,
-      entityId: a.taskId,
-      dueAt: Math.max(now, a.dueAt),
-    })),
+    ...(w.storageMode === "pingo" ? [] : taskAlarms(w, userId, now)).map(
+      (a) => ({
+        id: a.id,
+        userId,
+        kind: "checkin" as const,
+        entityId: a.taskId,
+        dueAt: Math.max(now, a.dueAt),
+      }),
+    ),
     {
       id: `routine:${userId}`,
       userId,
@@ -114,26 +120,6 @@ export async function indexJobs(userId: string, w: Workspace) {
   if (!response.ok) throw new Error("O agendador não confirmou os trabalhos.");
 }
 export async function processJob(job: Job) {
-  if (job.kind === "routine") {
-    const prior = await readWorkspace(job.userId);
-    if (!isQuiet(new Date(), prior.preferences)) {
-      await syncGoogle(job.userId);
-      // Recurring instances must be available even when nobody opens the calendar UI.
-      try {
-        await calendarRange(
-          job.userId,
-          new Date().toISOString(),
-          new Date(Date.now() + 48 * 3600000).toISOString(),
-        );
-      } catch {
-        await mutateWorkspace(job.userId, (w) => {
-          w.connection.error =
-            "Não consegui atualizar as ocorrências da agenda. Vou tentar novamente.";
-          w.revision++;
-        });
-      }
-    }
-  }
   await mutateWorkspace(job.userId, (w) => {
     const now = new Date();
     const { date, time } = zonedParts(now, w.preferences.timezone);
@@ -219,42 +205,11 @@ async function sendPush(userId: string, w: Workspace) {
   let retry = false;
   for (const notice of candidates) {
     for (const sub of subs) {
-      const android = androidSubscription(sub.data);
-      if (notice.taskId) {
-        const t = w.tasks.find((t) => t.id === notice.taskId);
-        if (
-          !android ||
-          ((sub.data as import("./mobile").AndroidSubscription).protocol ?? 1) <
-            2 ||
-          !t ||
-          t.completed ||
-          t.deleted ||
-          t.archivedAt ||
-          t.calendarSuppressed ||
-          taskScheduleKey(t) !== notice.scheduleKey ||
-          w.preferences.taskCheckIns === false
-        )
-          continue;
-        if (
-          ["end", "repeat"].includes(notice.phase ?? "") &&
-          t.checkIn?.endAnswered
-        )
-          continue;
-      }
       if (
-        android &&
-        ((sub.data as import("./mobile").AndroidSubscription).protocol ?? 1) >=
-          2 &&
-        !notice.taskId &&
-        notice.id.startsWith("reminder:") &&
-        w.preferences.taskCheckIns !== false &&
-        w.events.some(
-          (e) =>
-            e.taskId && notice.id === `reminder:${userId}:${e.id}:${e.start}`,
-        )
+        (sub.data as { transport?: string }).transport === "fcm" ||
+        notice.taskId ||
+        !webConfigured
       )
-        continue;
-      if (android ? !process.env.FIREBASE_FEDERATION_CONFIG : !webConfigured)
         continue;
       if (w.cursor.push?.[notice.id]?.[sub.id]?.sent) continue;
       const lease = crypto.randomUUID();
@@ -281,21 +236,15 @@ async function sendPush(userId: string, w: Workspace) {
       });
       if (!claimed) continue;
       try {
-        if (androidSubscription(sub.data)) {
-          const event = w.events.find(
-            (e) => notice.id === `reminder:${userId}:${e.id}:${e.start}`,
-          );
-          await sendAndroidPush(sub.data, userId, claimed, event?.id);
-        } else
-          await webpush.sendNotification(
-            sub.data as webpush.PushSubscription,
-            JSON.stringify(claimed),
-            {
-              TTL: 1800,
-              timeout: 10000,
-              topic: digest(notice.id).slice(0, 32),
-            },
-          );
+        await webpush.sendNotification(
+          sub.data as webpush.PushSubscription,
+          JSON.stringify(claimed),
+          {
+            TTL: 1800,
+            timeout: 10000,
+            topic: digest(notice.id).slice(0, 32),
+          },
+        );
         await mutateWorkspace(userId, (current) => {
           const delivery = current.cursor.push?.[notice.id]?.[sub.id];
           if (delivery?.lease === lease) delivery.sent = true;

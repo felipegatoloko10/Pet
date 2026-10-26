@@ -25,9 +25,9 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
 
-/** Shared durable coordinator: local alarms and FCM use the very same tag and delivery ledger. */
+/** Shared durable coordinator: local alarms share one delivery ledger across restarts. */
 final class NotificationCoordinator {
-    private static final Object LOCK = new Object();
+    static final Object LOCK = new Object();
     private static final String NORMAL = "pingo-reminders", SILENT = "pingo-quiet";
     static android.content.SharedPreferences prefs(Context c) { return c.getSharedPreferences("pingo-notifications", Context.MODE_PRIVATE); }
     static void channels(Context c) {
@@ -92,11 +92,28 @@ final class NotificationCoordinator {
                 long now = System.currentTimeMillis(), starts = r.getLong("startAt");
                 if (now < r.getLong("dueAt") - 1000) { schedule(c, r); return; }
                 if (starts <= now) return;
+                if(r.optBoolean("summary")){ r.put("body", localSummary(c,r.getString("userId"),now,r.optString("body"))); deliver(c,r); return; }
                 if(!r.optString("taskId").isEmpty()){deliver(c,r);return;}
                 r.put("body", "Começa em " + Math.max(0, Math.round((starts - now) / 60000.0)) + " minutos.");
                 r.put("expiresAt", starts); deliver(c, r);
             } catch (Exception ignored) {}
         }
+    }
+    static String localSummary(Context c,String user,long now,String fallback) {
+        try {
+            String raw=PingoDatabase.get(c).read(user,"snapshot");if(raw==null)return fallback;
+            JSONObject w=new JSONObject(raw).getJSONObject("workspace");
+            SimpleDateFormat dateFormat=new SimpleDateFormat("yyyy-MM-dd",Locale.ROOT);
+            dateFormat.setTimeZone(TimeZone.getTimeZone(w.optJSONObject("preferences").optString("timezone","America/Sao_Paulo")));
+            String today=dateFormat.format(new Date(now));int due=0,late=0;
+            JSONArray tasks=w.optJSONArray("tasks");
+            if(tasks!=null)for(int i=0;i<tasks.length();i++){
+                JSONObject t=tasks.getJSONObject(i);
+                if(t.optBoolean("completed")||t.optBoolean("deleted")||!TaskActions.text(t,"archivedAt").isEmpty())continue;
+                String day=TaskActions.text(t,"dueDate");if(day.equals(today))due++;else if(!day.isEmpty()&&day.compareTo(today)<0)late++;
+            }
+            return "Você tem "+due+" tarefa(s) para hoje e "+late+" atrasada(s). Abra o Pingo para ver sua agenda e cuidar de uma coisa por vez.";
+        }catch(Exception ignored){return fallback;}
     }
     static boolean quiet(Context c, long now) {
         try {
@@ -179,7 +196,7 @@ final class NotificationCoordinator {
             try (Cursor rows = PingoDatabase.get(c).getReadableDatabase().rawQuery("SELECT id FROM reminders", null)) { while (rows.moveToNext()) c.getSystemService(AlarmManager.class).cancel(alarmIntent(c, rows.getString(0))); }
             PingoDatabase.get(c).getWritableDatabase().delete("reminders", null, null);
             PingoDatabase.get(c).getWritableDatabase().delete("deliveries", null, null);
-            prefs(c).edit().remove("userId").remove("config").commit();
+            prefs(c).edit().remove("userId").remove("config").remove("cloudPlanDay").commit();
             NotificationManagerCompat.from(c).cancelAll();
         }
     }

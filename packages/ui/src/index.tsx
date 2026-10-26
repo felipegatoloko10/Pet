@@ -47,6 +47,7 @@ import {
   type Preferences,
   type Command,
   newBoard,
+  pingoImportInput,
   emptyWorkspace,
   eventOnDate,
   zonedDateTime,
@@ -72,6 +73,11 @@ const Calendar = lazy(() =>
 const Chat = lazy(() => import("./Chat").then((m) => ({ default: m.Chat })));
 import { Routine } from "./Routine";
 import { demoWorkspace } from "./demo";
+import {
+  AccountForm,
+  activationFromLocation,
+  type Activation,
+} from "./AccountForm";
 export { Pet, PingoClient, Api };
 export type { Storage };
 export type Platform = {
@@ -163,6 +169,11 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   const [configured, setConfigured] = useState(false);
   const [error, setError] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [activation, setActivation] = useState<Activation>();
+  const [importOffer, setImportOffer] =
+    useState<ReturnType<ReturnType<typeof pingoImportInput>["parse"]>>();
+  const chosenProfile = useRef(false);
   const [, render] = useState(0);
   const [screen, setScreen] = useState<Screen>("day");
   const [requestedConversation, setRequestedConversation] = useState<{
@@ -174,10 +185,6 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     null,
   );
   const [noticesOpen, setNoticesOpen] = useState(false);
-  const [conflict, setConflict] = useState<{
-    kind: "task" | "event";
-    id: string;
-  } | null>(null);
   const [focus, setFocus] = useState(false);
   const [toast, setToast] = useState("");
   useEffect(
@@ -195,10 +202,6 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
           setNoticesOpen(false);
           return true;
         }
-        if (conflict) {
-          setConflict(null);
-          return true;
-        }
         const dialog =
           document.querySelector<HTMLDialogElement>("dialog[open]");
         if (dialog) {
@@ -211,7 +214,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
         }
         return false;
       }),
-    [platform.onBack, taskEditor, eventEditor, noticesOpen, conflict, screen],
+    [platform.onBack, taskEditor, eventEditor, noticesOpen, screen],
   );
   useEffect(() => {
     if (!client) return;
@@ -257,10 +260,18 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     };
   }, [platform.onNotice, client]);
   async function attach(u: User, demo = false) {
+    chosenProfile.current = true;
+    api.accountId = u.id;
     const storage = await (platform.storage ?? webStorage)(
       demo ? "demo" : u.id,
     );
-    const next = new PingoClient(api, storage, demo);
+    client?.dispose();
+    const next = new PingoClient(
+      new Api(api.base, api.token, u.id),
+      storage,
+      demo,
+      u.id.startsWith("local:"),
+    );
     if (demo && !(await storage.get("workspace")))
       await storage.set("workspace", JSON.stringify(demoWorkspace()));
     localStorage.setItem("pingo:user", JSON.stringify(u));
@@ -278,6 +289,12 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   }
   useEffect(() => {
     let active = true;
+    const invite = activationFromLocation();
+    if (invite) {
+      setActivation(invite);
+      setAccountOpen(true);
+      history.replaceState(null, "", location.pathname + location.search);
+    }
     const page = new URLSearchParams(location.search).get("page");
     if (page === "boards") setScreen("day");
     if (nav.some((n) => n.id === page)) setScreen(page as Screen);
@@ -289,10 +306,24 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
         if (active) setConfigured(r.configured);
       })
       .catch(() => {});
+    const savedProfile = localStorage.getItem("pingo:user");
+    if (savedProfile) {
+      const cachedUser = JSON.parse(savedProfile) as User;
+      if (cachedUser.id !== "demo") {
+        void attach(cachedUser).finally(() => {
+          if (active) setBoot(false);
+        });
+        return () => {
+          active = false;
+        };
+      }
+    }
+    setBoot(false);
+    api.accountId = undefined;
     api
       .request<{ user: User }>("workspace")
       .then((r) => {
-        if (active) return attach(r.user);
+        if (active && !chosenProfile.current) return attach(r.user);
       })
       .catch(async (e) => {
         if (!(e instanceof ApiError && e.status === 401)) {
@@ -375,17 +406,42 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     try {
       await client.command(command);
       setToast(
-        client.demo
-          ? "Modificação salva na demonstração local."
-          : client.pending.length
-            ? navigator.onLine
-              ? "Alteração salva no aparelho. Sincronizando…"
-              : "Guardei aqui. Vou sincronizar quando houver conexão."
-            : "Alteração salva.",
+        client.localOnly
+          ? "Salvei neste aparelho."
+          : client.demo
+            ? "Modificação salva na demonstração local."
+            : client.pending.length
+              ? navigator.onLine
+                ? "Alteração salva no aparelho. Sincronizando…"
+                : "Guardei aqui. Vou sincronizar quando houver conexão."
+              : "Alteração salva.",
       );
     } catch (e) {
       if (!document.querySelector("dialog[open]")) setError(errorMessage(e));
       throw e;
+    }
+  }
+  async function completeSignIn() {
+    const previous = client ? structuredClone(client.workspace) : undefined;
+    const previousId = user?.id;
+    const previousEmail = user?.email;
+    api.accountId = undefined;
+    const result = await api.request<{ user: User }>("workspace");
+    await attach(result.user);
+    setAccountOpen(false);
+    setActivation(undefined);
+    if (
+      previous &&
+      previousId !== result.user.id &&
+      (!previousEmail ||
+        previousEmail.toLowerCase() === result.user.email.toLowerCase())
+    ) {
+      const data = pingoImportInput().safeParse(previous);
+      if (data.success) setImportOffer(data.data);
+      else
+        setToast(
+          "Sua cópia anterior foi preservada. Exporte-a em Ajustes para revisar a importação.",
+        );
     }
   }
   async function login() {
@@ -394,21 +450,9 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     try {
       if (platform.login) {
         await platform.login();
-        const result = await api.request<{ user: User }>("workspace");
-        await attach(result.user);
+        await completeSignIn();
       } else {
-        const r = await fetch("/api/auth/sign-in/social", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            provider: "google",
-            callbackURL: window.location.origin,
-          }),
-        });
-        const data = await r.json();
-        if (!r.ok || !data.url)
-          throw new Error(data.message ?? "Login ainda não configurado.");
-        window.location.assign(data.url);
+        setAccountOpen(true);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao entrar.");
@@ -420,10 +464,11 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     if (
       client?.pending.length &&
       !confirm(
-        "Há alterações ainda não sincronizadas. Sair agora apagará a cópia local. Deseja sair mesmo assim?",
+        "Há alterações ainda não sincronizadas. Suas alterações ficarão guardadas neste aparelho. Deseja sair mesmo assim?",
       )
     )
       return;
+    client?.dispose();
     setRequestedConversation(undefined);
     if (!platform.api && "serviceWorker" in navigator) {
       const registration = await navigator.serviceWorker.getRegistration();
@@ -441,7 +486,8 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
       const notices = await registration?.getNotifications();
       notices?.forEach((n) => n.close());
     }
-    await client?.storage.clear();
+    // Keep the account cache and pending work recoverable when signing out.
+    // Authentication removal is separate from explicitly deleting local data.
     localStorage.removeItem("pingo:user");
     if (platform.logout) await platform.logout();
     else if (!client?.demo)
@@ -488,8 +534,18 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
               onClick={() => void login()}
               disabled={loginBusy || !configured}
             >
-              {loginBusy ? "Aguardando autorização…" : "Entrar com Google"}
+              {loginBusy
+                ? "Aguardando autorização…"
+                : "Entrar para sincronizar"}
               <ArrowUpRight size={18} />
+            </button>
+            <button
+              className="button text-button"
+              onClick={() =>
+                void attach({ id: "local:personal", name: "Você", email: "" })
+              }
+            >
+              Usar neste aparelho <MoveRight size={17} />
             </button>
             <button
               className="button text-button"
@@ -497,13 +553,24 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
                 void attach({ id: "demo", name: "Você", email: "" }, true)
               }
             >
-              Explorar demonstração local <MoveRight size={17} />
+              Explorar demonstração local
             </button>
             <small>
               {configured
                 ? "Beta gratuito por convite · seu espaço é só seu"
-                : "O login aguarda a configuração OAuth pelo administrador."}
+                : "Você já pode usar sem internet e sem conta."}
             </small>
+            {accountOpen && (
+              <Dialog
+                title="Sua conta Pingo"
+                onClose={() => setAccountOpen(false)}
+              >
+                <AccountForm
+                  activation={activation}
+                  onSignedIn={completeSignIn}
+                />
+              </Dialog>
+            )}
             {error && (
               <p role="alert" className="error">
                 {error}
@@ -530,14 +597,6 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   const pending = tasks.filter((t) => !t.completed);
   const completed = tasks.filter((t) => t.completed);
   const visibleError = error || client.error;
-  const googleConflicts = [
-    ...w.tasks
-      .filter((t) => t.syncState === "conflict")
-      .map((t) => ({ kind: "task" as const, id: t.id })),
-    ...w.events
-      .filter((e) => e.syncState === "conflict")
-      .map((e) => ({ kind: "event" as const, id: e.id })),
-  ];
   const openExternal = async (url: string) => {
     if (platform.openExternal) await platform.openExternal(url);
     else window.open(url, "_blank", "noopener,noreferrer");
@@ -608,7 +667,11 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
             <span>
               {user.name.split(" ")[0]}
               <small>
-                {client.demo ? "Demonstração local" : "Espaço individual"}
+                {client.localOnly
+                  ? "Neste aparelho"
+                  : client.demo
+                    ? "Demonstração local"
+                    : "Espaço individual"}
               </small>
             </span>
             <LogOut size={16} />
@@ -620,7 +683,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
           <span>
             <span className="online-dot" />
             {client.demo
-              ? "Demonstração · sem conexão Google"
+              ? "Demonstração local"
               : client.online
                 ? "Seu espaço pessoal"
                 : "Modo offline"}
@@ -701,23 +764,10 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
               </button>
             </div>
           )}
-          {googleConflicts.length > 0 && (
-            <div className="conflict-banner">
-              <strong>
-                {googleConflicts.length} item(ns) precisam de revisão com o
-                Google.
-              </strong>
-              <button
-                className="button"
-                onClick={() => setConflict(googleConflicts[0])}
-              >
-                Comparar versões
-              </button>
-            </div>
-          )}
           {screen === "day" && (
             <>
               <Board
+                localOnly={client.localOnly}
                 w={w}
                 today={today}
                 act={act}
@@ -728,13 +778,8 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
                 .filter((t) => t.calendarRemoved)
                 .map((t) => (
                   <section className="panel" key={t.id}>
-                    <h3>
-                      O bloco de “{t.title}” foi excluído no Google Agenda.
-                    </h3>
-                    <p>
-                      A tarefa foi preservada. Deseja excluir também do Google
-                      Tasks?
-                    </p>
+                    <h3>O horário de “{t.title}” foi removido da agenda.</h3>
+                    <p>A tarefa foi preservada. Deseja excluí-la também?</p>
                     <button
                       className="button"
                       onClick={() =>
@@ -752,11 +797,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
                     <button
                       className="button danger"
                       onClick={() => {
-                        if (
-                          confirm(
-                            "Excluir também esta tarefa do Pingo e do Google Tasks?",
-                          )
-                        )
+                        if (confirm("Excluir também esta tarefa do Pingo?"))
                           void act({
                             type: "task.calendarDecision",
                             id: t.id,
@@ -901,74 +942,6 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
                 </section>
               </div>
               <div className="day-grid">
-                <section className="panel mail-panel">
-                  <div className="section-heading">
-                    <h2>E-mails de hoje</h2>
-                    <span>
-                      {
-                        w.mail.filter(
-                          (m) =>
-                            zonedParts(new Date(m.date), prefs.timezone)
-                              .date === today,
-                        ).length
-                      }{" "}
-                      recebidos
-                    </span>
-                  </div>
-                  <div className="daily-mail-list">
-                    <p className="mail-help">
-                      Veja os e-mails recebidos hoje na sua caixa de entrada. As
-                      mensagens não podem ser abertas pelo Pingo, mas você pode
-                      transformá-las em tarefas pelo botão +.
-                    </p>
-                    {w.mail
-                      .filter(
-                        (m) =>
-                          zonedParts(new Date(m.date), prefs.timezone).date ===
-                          today,
-                      )
-                      .map((m) => (
-                        <div
-                          className={`mail-item ${m.isRead ? "read" : "unread"}`}
-                          key={m.id}
-                        >
-                          <span className="mail-avatar">{m.from[0]}</span>
-                          <div>
-                            <strong>{m.from}</strong>
-                            <p>{m.subject}</p>
-                            <small>
-                              {formatTime(m.date, prefs)} ·{" "}
-                              {m.isRead ? "Lido" : "Não lido"}
-                            </small>
-                          </div>
-                          <button
-                            className="icon-button"
-                            aria-label={`Criar tarefa do e-mail ${m.subject}`}
-                            title="Transformar em tarefa"
-                            onClick={() =>
-                              setTaskEditor({
-                                title: m.subject,
-                                notes: `E-mail de ${m.from}\nRecebido em ${new Date(m.date).toLocaleString("pt-BR", { timeZone: prefs.timezone })}`,
-                                sourceMail: {
-                                  id: m.id,
-                                  from: m.from,
-                                  receivedAt: m.date,
-                                },
-                                dueDate: today,
-                              })
-                            }
-                          >
-                            ＋
-                          </button>
-                        </div>
-                      ))}
-                  </div>
-                  {!w.mail.some(
-                    (m) =>
-                      zonedParts(new Date(m.date), prefs.timezone).date ===
-                      today,
-                  ) && <p>Nenhum e-mail recebido hoje na caixa de entrada.</p>}
-                </section>
                 <section className="pause-card">
                   <span>UM CUIDADO PEQUENO</span>
                   <h3>
@@ -1021,6 +994,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
               client={client}
               act={act}
               openExternal={openExternal}
+              onConnect={() => void login()}
               onToast={setToast}
             />
           )}
@@ -1030,18 +1004,49 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
               {client.pending.length
                 ? `${client.pending.length} alteração(ões) pendente(s)`
                 : w.connection.lastSync
-                  ? `Google atualizado às ${formatTime(w.connection.lastSync, prefs)}`
+                  ? `Sincronizado às ${formatTime(w.connection.lastSync, prefs)}`
                   : "Seu ritmo, seu espaço."}
             </span>
           </footer>
         </main>
       </div>
-      {conflict && (
-        <ConflictDialog
-          client={client}
-          item={conflict}
-          onClose={() => setConflict(null)}
-        />
+      {accountOpen && (
+        <Dialog title="Sua conta Pingo" onClose={() => setAccountOpen(false)}>
+          <AccountForm activation={activation} onSignedIn={completeSignIn} />
+        </Dialog>
+      )}
+      {importOffer && (
+        <Dialog
+          title="Trazer seus dados deste aparelho"
+          onClose={() => setImportOffer(undefined)}
+        >
+          <p>
+            Encontramos {importOffer.tasks.filter((t) => !t.deleted).length}{" "}
+            tarefa(s) e{" "}
+            {importOffer.events.filter((e) => !e.deleted && !e.taskId).length}{" "}
+            compromisso(s) no espaço anterior. Você pode copiá-los para esta
+            conta. A cópia original será preservada. Conversas serão copiadas
+            como histórico; nome, cores, rotina e cuidados serão trazidos na
+            primeira importação.
+          </p>
+          <button
+            className="button primary"
+            onClick={() =>
+              void act({
+                type: "workspace.import",
+                data: importOffer,
+                confirmed: true,
+              })
+                .then(() => setImportOffer(undefined))
+                .catch(() => {})
+            }
+          >
+            Copiar para minha conta
+          </button>
+          <button className="button" onClick={() => setImportOffer(undefined)}>
+            Agora não
+          </button>
+        </Dialog>
       )}
       {taskEditor && (
         <TaskEditor
@@ -1114,108 +1119,6 @@ function Empty({ title, text }: { title: string; text: string }) {
       <strong>{title}</strong>
       <p>{text}</p>
     </div>
-  );
-}
-function ConflictDialog({
-  client,
-  item,
-  onClose,
-}: {
-  client: PingoClient;
-  item: { kind: "task" | "event"; id: string };
-  onClose: () => void;
-}) {
-  const [data, setData] = useState<{
-    local: Task | CalendarEvent;
-    remote: Record<string, unknown> | null;
-  }>();
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    void client.api
-      .request<{
-        local: Task | CalendarEvent;
-        remote: Record<string, unknown> | null;
-      }>(`conflicts?kind=${item.kind}&id=${encodeURIComponent(item.id)}`)
-      .then(setData)
-      .catch((e) => setError(e.message));
-  }, [item.id, item.kind, client]);
-  async function choose(choice: "google" | "pingo") {
-    if (!data) return;
-    if (
-      !confirm(
-        choice === "google"
-          ? "Usar a versão Google e descartar a alteração pendente do Pingo? Se não houver item no Google, a cópia local será removida."
-          : "Você revisou o Google e quer enviar a versão do Pingo? Se a criação anterior não foi confirmada, confira no Google antes de reenviar.",
-      )
-    )
-      return;
-    setBusy(true);
-    try {
-      await client.api.post("conflicts", {
-        ...item,
-        choice,
-        expectedRevision: data.local.revision,
-        confirmed: true,
-      });
-      await client.refresh();
-      onClose();
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <Dialog title="Vamos revisar com cuidado" onClose={onClose}>
-      {data ? (
-        <div className="editor-form">
-          <div className="form-grid">
-            <section>
-              <h3>No Pingo</h3>
-              <p>{data.local.title}</p>
-              <small>
-                {"notes" in data.local ? data.local.notes : data.local.start}
-              </small>
-            </section>
-            <section>
-              <h3>No Google</h3>
-              <p>
-                {String(
-                  data.remote?.title ??
-                    data.remote?.summary ??
-                    "Nenhuma correspondência encontrada",
-                )}
-              </p>
-              <small>
-                {String(data.remote?.notes ?? data.remote?.status ?? "")}
-              </small>
-            </section>
-          </div>
-          <p className="muted">
-            Sua escolha será aplicada somente a este item. Nenhuma versão será
-            substituída sem esta confirmação.
-          </p>
-          <button
-            disabled={busy}
-            className="button"
-            onClick={() => void choose("google")}
-          >
-            Usar versão Google
-          </button>
-          <button
-            disabled={busy}
-            className="button primary"
-            onClick={() => void choose("pingo")}
-          >
-            Revisei no Google. Enviar versão Pingo
-          </button>
-        </div>
-      ) : (
-        <p>Consultando o Google…</p>
-      )}
-      {error && <p className="error">{error}</p>}
-    </Dialog>
   );
 }
 const formatTime = (date: string, p: Preferences) =>
@@ -1518,7 +1421,7 @@ function TaskEditor({
           <p>
             {timeMode === "none"
               ? "Aparece no resumo e na agenda, sem alerta por horário."
-              : "Você receberá lembretes conforme suas preferências. O horário será reservado no Google Agenda."}
+              : "Você receberá lembretes conforme suas preferências. O horário será reservado na sua agenda do Pingo."}
           </p>
         </fieldset>
         {initial.error && <p className="error">{initial.error}</p>}
@@ -1537,7 +1440,7 @@ function TaskEditor({
                 onClick={() => {
                   if (
                     confirm(
-                      "Excluir esta tarefa do Pingo, do Google Tasks e seu bloco vinculado no Google Agenda?",
+                      "Excluir esta tarefa e seu horário na agenda do Pingo?",
                     )
                   )
                     void act({
@@ -1569,12 +1472,7 @@ function TaskEditor({
             {busy ? "Salvando…" : "Salvar tarefa"}
           </button>
         </footer>
-        {!board && (
-          <p>
-            Conecte o Google ou crie um quadro em Quadros antes de adicionar
-            tarefas.
-          </p>
-        )}
+        {!board && <p>Crie seu quadro antes de adicionar tarefas.</p>}
       </form>
     </Dialog>
   );
@@ -1628,22 +1526,11 @@ function EventEditor({
     recurrence: initial.recurrence,
     attendees: initial.attendees,
   });
-  const [invites, setInvites] = useState(initial.attendees?.join(", ") ?? "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   async function submit(ev: FormEvent) {
     ev.preventDefault();
-    const attendees = invites
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (
-      attendees.length &&
-      !confirm(
-        "Salvar este compromisso e enviar convites aos participantes pelo Google Agenda?",
-      )
-    )
-      return;
+    const attendees: string[] = [];
     setBusy(true);
     try {
       if (e.allDay && e.end <= e.start)
@@ -1779,14 +1666,6 @@ function EventEditor({
             />
           </label>
         </div>
-        <label>
-          Participantes (e-mails separados por vírgula)
-          <input
-            value={invites}
-            onChange={(v) => setInvites(v.target.value)}
-            placeholder="Opcional; o envio exige confirmação"
-          />
-        </label>
         {initial.recurringEventId && (
           <p className="muted">A edição vale para esta ocorrência.</p>
         )}
@@ -1802,9 +1681,7 @@ function EventEditor({
               className="icon-button danger"
               aria-label="Excluir compromisso"
               onClick={() => {
-                if (
-                  confirm("Excluir este compromisso também no Google Agenda?")
-                )
+                if (confirm("Excluir este compromisso da sua agenda?"))
                   void act({
                     type: "event.delete",
                     id: e.id,
@@ -1912,7 +1789,7 @@ function SuggestionPreview({
           Excluir {c.type === "task.delete" ? "tarefa" : "compromisso"}:{" "}
           {item?.title ?? "item selecionado"}
         </h3>
-        <p>A exclusão também será enviada ao Google.</p>
+        <p>A exclusão será sincronizada entre seus dispositivos.</p>
       </div>
     );
   }
@@ -1925,6 +1802,7 @@ function SettingsPage({
   act,
   openExternal,
   onToast,
+  onConnect,
 }: {
   platform: Platform;
   w: Workspace;
@@ -1932,6 +1810,7 @@ function SettingsPage({
   act: (c: Command) => Promise<void>;
   openExternal: (url: string) => Promise<void>;
   onToast: (s: string) => void;
+  onConnect: () => void;
 }) {
   const [p, setP] = useState(w.preferences);
   const [key, setKey] = useState("");
@@ -1961,8 +1840,10 @@ function SettingsPage({
     }
   }
   async function push() {
-    if (client.demo)
-      throw new Error("Entre na sua conta para ativar notificações.");
+    if (client.demo || client.localOnly)
+      throw new Error(
+        "Entre na sua conta para ativar avisos web em segundo plano. Seus avisos no Android funcionam localmente.",
+      );
     const registration = await navigator.serviceWorker.register("/sw.js");
     const permission = await Notification.requestPermission();
     if (permission !== "granted")
@@ -2185,61 +2066,70 @@ function SettingsPage({
         </form>
         <div className="settings-secondary">
           <section className="panel connection-panel">
-            <span className="connection-icon">G</span>
-            <h2>Seu Google, por perto</h2>
+            <h2>Seu Pingo, onde você estiver</h2>
             <p>
-              Listas do Tasks, compromissos e avisos do Gmail no mesmo lugar.
+              Tarefas, agenda e cuidados ficam salvos neste aparelho. Uma conta
+              permite sincronizar com seus outros dispositivos quando houver
+              internet.
             </p>
-            <span
-              className={`connection-status ${w.connection.connected ? "connected" : ""}`}
-            >
-              {w.connection.connected
-                ? "Conta conectada"
-                : "Ainda não conectado"}
-            </span>
-            {w.connection.error && (
-              <p className="error">{w.connection.error}</p>
-            )}
+            <p>
+              {client.localOnly
+                ? "Você está usando somente este aparelho."
+                : "Sua conta sincroniza os dados entre celular, web e computador."}
+            </p>
+            <button className="button" onClick={onConnect}>
+              {client.localOnly
+                ? "Entrar para sincronizar"
+                : "Entrar novamente"}
+            </button>
             <button
               className="button"
-              disabled={client.demo}
               onClick={() =>
-                void run(async () => {
-                  if (platform.connectWorkspace)
-                    return platform.connectWorkspace();
-                  const r = await client.api.post<{ url: string }>(
-                    "google/connect",
-                  );
-                  await openExternal(r.url);
-                })
+                download(
+                  "pingo-meus-dados.json",
+                  JSON.stringify(
+                    { format: "pingo-backup-v1", workspace: w },
+                    null,
+                    2,
+                  ),
+                )
               }
             >
-              {w.connection.connected
-                ? "Revisar permissões"
-                : "Conectar Google Workspace"}
-              <ArrowUpRight size={16} />
+              Exportar meus dados
             </button>
-            {w.connection.connected && (
-              <button
-                className="text-link danger"
-                onClick={() => {
-                  if (
-                    confirm(
-                      "Desconectar o Workspace? Seus dados no Google serão preservados.",
+            <label>
+              Importar cópia do Pingo
+              <input
+                type="file"
+                accept="application/json,.json"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  void run(async () => {
+                    if (file.size > 10000000)
+                      throw new Error("A cópia deve ter até 10 MB.");
+                    const raw = JSON.parse(await file.text());
+                    const data = pingoImportInput().parse(raw.workspace ?? raw);
+                    const count = data.tasks.filter((t) => !t.deleted).length;
+                    const events = data.events.filter(
+                      (e) => !e.deleted && !e.taskId,
+                    ).length;
+                    if (
+                      !confirm(
+                        `Importar ${count} tarefa(s) e ${events} compromisso(s) para este espaço? Conversas serão copiadas como histórico; ajustes e cuidados serão trazidos na primeira importação. Os dados atuais serão preservados.`,
+                      )
                     )
-                  )
-                    void run(async () => {
-                      await client.api.post("google/disconnect");
-                      await client.refresh();
+                      return;
+                    await act({
+                      type: "workspace.import",
+                      data,
+                      confirmed: true,
                     });
+                  });
+                  e.target.value = "";
                 }}
-              >
-                Desconectar
-              </button>
-            )}
-            <small>
-              Entrar no Pingo e autorizar o Workspace são etapas separadas.
-            </small>
+              />
+            </label>
           </section>
           <section className="panel editor-form">
             <h2>Uma ajudinha da IA</h2>
@@ -2256,7 +2146,6 @@ function SettingsPage({
                 }
               >
                 <option value="openai">OpenAI</option>
-                <option value="google">Google Gemini</option>
                 <option value="anthropic">Anthropic Claude</option>
               </select>
             </label>

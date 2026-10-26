@@ -28,9 +28,11 @@ export class PetChat {
   ) {}
   async send(text: string): Promise<PetReply> {
     if (this.running) throw new Error("Estou terminando a resposta anterior.");
+    if (typeof localStorage !== "undefined" && JSON.parse(localStorage.getItem("pingo:user") ?? "null")?.id?.startsWith("local:"))
+      throw new Error("A conversa com IA precisa de uma conta e internet. Suas tarefas e agenda funcionam sem conexão.");
     const token = this.api.token;
     if (!token)
-      throw new Error("Entre com Google no painel para conversar comigo.");
+      throw new Error("Entre na sua conta no painel para conversar comigo.");
     if (!text.trim() || text.trim().length > 6000)
       throw new Error("Escreva uma mensagem de até 6.000 caracteres.");
     this.running = true;

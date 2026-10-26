@@ -1,65 +1,68 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-export default function DesktopLogin() {
-  const [status, setStatus] = useState("Conectando seu Pingo…"),
-    [url, setUrl] = useState("");
-  const started = useRef(false);
-  useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    void (async () => {
-      try {
-        const params = new URLSearchParams(location.search),
-          id = params.get("id"),
-          state = params.get("state");
-        if (!id || !state)
-          throw new Error("Inicie o login pelo aplicativo Pingo.");
-        const session = await fetch("/api/auth/get-session").then((r) =>
-          r.json(),
-        );
-        if (!session?.user) {
-          const result = await fetch("/api/auth/sign-in/social", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              provider: "google",
-              callbackURL: location.href,
-            }),
-          }).then((r) => r.json());
-          if (!result.url) throw new Error("O Google não iniciou o login.");
-          location.assign(result.url);
-          return;
-        }
-        const r = await fetch("/api/v1/desktop-auth/authorize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, state }),
-        });
-        const result = await r.json();
-        if (!r.ok) throw new Error(result.error);
-        setUrl(result.url);
-        setStatus("Login concluído. Voltando ao Pingo…");
-        location.assign(result.url);
-      } catch (e) {
-        setStatus((e as Error).message);
+import { useEffect, useState } from "react";
+import { AccountForm } from "@pingo/ui/AccountForm";
+export default function NativeLogin() {
+  const [needsLogin, setNeedsLogin] = useState(false);
+  const [status, setStatus] = useState("Abrindo sua conta…");
+  const [url, setUrl] = useState("");
+  async function authorize() {
+    try {
+      const params = new URLSearchParams(location.search);
+      const id = params.get("id"),
+        state = params.get("state");
+      if (!id || !state)
+        throw new Error("Comece o login pelo aplicativo Pingo.");
+      const session = await fetch("/api/auth/get-session").then((r) =>
+        r.json(),
+      );
+      if (!session?.user) {
+        setNeedsLogin(true);
+        setStatus("");
+        return;
       }
-    })();
+      const response = await fetch("/api/v1/desktop-auth/authorize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, state }),
+      });
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(
+          data.error ?? "Não foi possível autorizar o aplicativo.",
+        );
+      const target = new URL(data.url);
+      if (
+        target.protocol !== "pingo:" ||
+        target.hostname !== "auth" ||
+        target.pathname !== "/callback"
+      )
+        throw new Error("Retorno inválido.");
+      setNeedsLogin(false);
+      setUrl(data.url);
+      setStatus("Tudo certo! Voltando ao Pingo…");
+      location.assign(data.url);
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "Falha de conexão.");
+    }
+  }
+  useEffect(() => {
+    void authorize();
   }, []);
   return (
     <main className="welcome">
-      <div className="welcome-brand">pingo</div>
       <section
         className="panel"
-        style={{ maxWidth: 500, margin: "10vh auto", padding: 32 }}
+        style={{ maxWidth: 480, margin: "10vh auto", padding: 28 }}
       >
-        <h1>Seu Pingo no computador</h1>
+        <h1>Sua conta Pingo</h1>
+        {needsLogin && <AccountForm onSignedIn={authorize} />}
         <p role="status">{status}</p>
         {url && (
           <a className="button primary" href={url}>
-            Abrir Pingo
+            Voltar ao aplicativo
           </a>
         )}
-        <p>Você pode fechar esta página após voltar ao aplicativo.</p>
+        <p>Você pode fechar esta página após voltar ao Pingo.</p>
       </section>
     </main>
   );

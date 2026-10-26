@@ -1,60 +1,53 @@
-# Pingo 2.4
+# Pingo 2.5 — seu dia, mesmo sem internet
 
-Um pequeno companheiro para organizar tarefas, agenda e rotina. Beta não comercial por convite, com espaços individuais e até 10 convidados.
+Companheiro pessoal para tarefas, agenda, rotina e pequenos cuidados. Beta gratuito por convite, com espaços individuais.
 
-[Abrir o Pingo](https://pingo-gilt.vercel.app)
+[Abrir o Pingo](https://pingo-gilt.vercel.app) · [Android](docs/ANDROID.md) · [Migração para Supabase](docs/OFFLINE-SUPABASE.md)
 
-O [Android beta](docs/ANDROID.md) reúne tarefas, agenda, conversas e um espaço para cuidar do Pingo. APK assinado, login Google com retorno automático, SQLite offline e notificações FCM com lembretes locais.
+**Usar neste aparelho** abre um quadro e uma agenda reais, sem conta e sem internet. Dados são guardados no SQLite do Android/Windows e no IndexedDB da web. Uma conta do Pingo, por e-mail e senha, permite sincronizar os dispositivos quando houver conexão. O primeiro acesso usa um convite privado; os logins seguintes usam a senha.
 
-A [revisão 2.4](docs/REVISION-2.4.md) reúne o quadro diário e a Agenda: tarefas de hoje e atrasadas, compromissos e feriados, eventos vinculados às tarefas, 24 cores de coluna e conversão de e-mail por metadados. No Android, as notificações oferecem Comecei, Concluir, adiamento e alteração de status, com fila offline nativa. O titular confirmou o APK 2.4 funcionando em aparelho físico; a versão 2.3 permanece recuperável.
-
-O [avatar 2.2](docs/AVATAR.md) é recortado, tem 24 estados animados, conversa pela barra abaixo do personagem e permite ajustar e guardar seu tamanho. As animações são locais e não consomem IA.
-
-Veja as [mudanças da revisão 2.1](docs/REVISION-2.1.md): Kanban inicial, etiquetas/checklists, conversas separadas, calendário mensal/anual e login desktop sem códigos manuais. Fechar o painel ou o avatar encerra o programa; minimizar mantém a companhia.
+A versão 2.5 não consulta Google Tasks, Agenda ou Gmail e não usa Firebase para notificações. Tarefas e horários pertencem ao Pingo. O avatar permanece transparente, com animações e cuidados locais. Conversa com IA é opcional e necessita de internet e uma chave OpenAI ou Claude.
 
 ## Aplicativos
 
-- `apps/web`: Next.js 16, Better Auth e API `/api/v1`.
-- `apps/desktop`: Tauri 2, Windows, avatar transparente e painel compartilhado.
-- `apps/mobile`: Capacitor 8, Android 7+, interface incorporada e integração nativa.
-- `packages/core`: contratos, revisões, Kanban, reconciliação e rotina.
-- `packages/ui`: React, painel responsivo, pet SVG animado e cache offline.
-- `workers/scheduler`: cron Cloudflare + índice D1, sem consultar Neon em minutos vazios.
-- `drizzle`: migrações PostgreSQL. Projeto Neon exclusivo do Pingo.
-- `legacy/wpf`: protótipo original preservado; referência Git `legacy/wpf-v1`.
+- `apps/web`: Next.js 16, Better Auth e API `/api/v1`, hospedados na Vercel.
+- `apps/desktop`: Tauri 2, avatar transparente e painel no Windows.
+- `apps/mobile`: Capacitor 8, Android 7+, interface incorporada, SQLite e alarmes nativos.
+- `packages/core` e `packages/ui`: contratos, Kanban, agenda, rotina, animações e fila offline compartilhados.
+- Supabase PostgreSQL: banco exclusivo do Pingo, com Drizzle, validação TLS e tabelas fechadas aos papéis públicos.
+- `workers/scheduler`: Cloudflare cron/D1 para avisos web, sem consultar o banco em minutos vazios.
+- `legacy`: versões anteriores recuperáveis. Os módulos antigos de integração têm somente testes históricos e não são chamados pela API atual.
 
-## Rodar
+## Desenvolvimento
 
-Node 24 e npm. Instale com `npm ci`. Copie `.env.example` para `apps/web/.env.local` e configure as variáveis necessárias. Nunca adicione credenciais ao Git.
+Node 24 e npm. Copie `.env.example` para `apps/web/.env.local`; valores privados ficam fora do Git.
 
 ```sh
+npm ci
 npm run db:migrate
-npm run invite -- pessoa@gmail.com
+npm run invite -- pessoa@example.com
+npx tsx scripts/create-invite-link.ts pessoa@example.com
 npm run dev
 ```
 
-O painel oferece uma demonstração local identificada, sem autenticação ou acesso ao Google. Dados reais exigem convite, OAuth e nova autorização Workspace. Veja o [estado da entrega](docs/STATUS.md), a [ativação](docs/ACTIVATION.md) e a [validação](docs/VALIDATION.md).
+O gerador salva o convite em `.verification/supabase-private/invitations.json`, sem imprimir nem enviar o link. Entregue-o em particular ao titular. Uma recuperação de senha usa um novo convite com `--recover` e invalida sessões antigas. Consulte a [ativação e a migração](docs/OFFLINE-SUPABASE.md).
 
 ```sh
 npm run check
 npm test
 npm run build
+npm run mobile:build
+npm run test:browser
 npm run check -w @pingo/scheduler
 npm run test:scheduler
 ```
 
-## Windows
+## Dados e distribuição
 
-Para compilar localmente: Rust estável, ferramentas C++ do Visual Studio e WebView2. Defina `VITE_API_URL` em `apps/desktop/.env.local` e execute `npm run desktop -- build`. O workflow `Pingo 2 — validar e empacotar` gera um instalador NSIS nos artefatos. Tags `v2.*` preparam uma pré-release em rascunho; a publicação exige homologação em aparelho físico. O instalador do beta não possui assinatura comercial.
+O salvamento local é imediato. A conta sincroniza operações com identificadores persistentes e revisões; conflitos não sobrescrevem alterações silenciosamente. Exportação e importação em Ajustes preservam a cópia original e não substituem edições mais recentes ao repetir uma importação.
 
-## Princípios
+Sessões nativas permanecem no armazenamento protegido do sistema. O backend deriva a conta da sessão e confere a identidade esperada pelo aparelho. Chaves de IA são criptografadas no servidor. A API não oferece acesso direto ao banco pelo navegador.
 
-As credenciais de IA são individuais e criptografadas com AES-256-GCM e AAD por usuário/provedor. A sessão desktop fica no Gerenciador de Credenciais do Windows; o cache usa SQLite. A web usa IndexedDB separado por conta. O backend deriva a conta da sessão; não aceita um `userId` do cliente para acessar dados.
+Instale as atualizações sobre a versão anterior, sem desinstalar. O APK mantém a chave de assinatura; Windows usa instalador NSIS. O workflow gera instaladores e uma pré-release em rascunho. Novas versões passam por homologação antes da publicação. A [2.4.1](https://github.com/felipegatoloko10/Pet/releases/tag/v2.4.1-beta.1) e o protótipo WPF permanecem recuperáveis.
 
-O servidor é a referência compartilhada. Alterações offline mantêm identificadores persistentes de operação. Conflitos exigem revisão. Criações com resultado incerto no Google são reconciliadas antes de qualquer repetição. Google Tasks não guarda colunas intermediárias nem horário de prazo; esses dados pertencem ao Pingo.
-
-Gmail alimenta somente a caixa estática de e-mails de hoje, com metadados de lidos e não lidos. O corpo não é buscado nem encaminhado à IA. As conversas têm sessões separadas e consideram a rotina semanal. Pedidos claros ou concordância com um horário agendam diretamente; exclusões, convites e mudanças na rotina pedem confirmação.
-
-As animações são locais. Som e voz começam desligados. Notificações em nuvem são de melhor esforço e dependem das cotas e permissões do dispositivo.
-
-Quadros compartilhados, Drive, Docs, iPhone e cobrança ficam fora desta versão. A homologação em aparelho Android físico e as verificações pessoais de distribuição limitada dependem dos titulares.
+Internet é necessária para primeiro download do site, login, sincronização e IA. Alarmes conhecidos funcionam localmente; restrições de bateria e encerramento forçado podem atrasá-los. Quadros compartilhados, iPhone e cobrança ficam fora deste beta.

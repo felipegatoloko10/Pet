@@ -61,11 +61,12 @@ final class TaskActions {
                     }
                     t.put("checkIn",check).put("revision",revision+1);
                 }
-                JSONArray pending=snapshot.optJSONArray("pending");if(pending==null)pending=new JSONArray();pending.put(new JSONObject().put("operation",op));snapshot.put("pending",pending);
+                JSONArray pending=snapshot.optJSONArray("pending");if(pending==null)pending=new JSONArray();if (!user.startsWith("local:")) pending.put(new JSONObject().put("operation",op));
+                else { if(t!=null)t.put("syncState","synced"); android.content.ContentValues receipt=new android.content.ContentValues();receipt.put("user_id",user);receipt.put("operation_id",opId);db.insertWithOnConflict("operation_receipts",null,receipt,android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE); }snapshot.put("pending",pending);
                 store.write(user,"snapshot",snapshot.toString());db.setTransactionSuccessful();
             }finally{db.endTransaction();}
         }
         NotificationCoordinator.afterAction(c,n,action);
-        OperationWorker.enqueue(c);
+        if (!user.startsWith("local:")) OperationWorker.enqueue(c);
     }
 }

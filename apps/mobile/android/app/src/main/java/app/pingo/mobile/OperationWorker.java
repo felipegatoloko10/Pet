@@ -24,6 +24,7 @@ public final class OperationWorker extends Worker {
     static String flush(Context c,String user)throws Exception{
         synchronized(SENDER){
             PingoDatabase store=PingoDatabase.get(c);
+            if(user.startsWith("local:"))return store.read(user,"snapshot");
             for(int n=0;n<100;n++){
                 if(!user.equals(NotificationCoordinator.prefs(c).getString("userId","")))break;
                 JSONArray queue=store.pending(user);if(queue.length()==0)break;
@@ -31,13 +32,13 @@ public final class OperationWorker extends Worker {
                 JSONObject op=entry.getJSONObject("operation");
                 String token=new SecureStore(c).get("session");if(token==null)break;
                 HttpURLConnection connection=(HttpURLConnection)new URL("https://pingo-gilt.vercel.app/api/v1/operations").openConnection();
-                connection.setRequestMethod("POST");connection.setConnectTimeout(10000);connection.setReadTimeout(65000);connection.setInstanceFollowRedirects(false);connection.setRequestProperty("Authorization","Bearer "+token);connection.setRequestProperty("Content-Type","application/json");connection.setDoOutput(true);
+                connection.setRequestMethod("POST");connection.setConnectTimeout(10000);connection.setReadTimeout(65000);connection.setInstanceFollowRedirects(false);connection.setRequestProperty("Authorization","Bearer "+token);connection.setRequestProperty("Content-Type","application/json");connection.setRequestProperty("X-Pingo-Account",user);connection.setDoOutput(true);
                 try{
                     try(java.io.OutputStream out=connection.getOutputStream()){out.write(op.toString().getBytes(StandardCharsets.UTF_8));}
                     int status=connection.getResponseCode();
-                    if(status>=500||status==429)break;
+                    if(status>=500||status==429||status==401)break;
                     if(status!=200){
-                        String message=status==401?"Sua sessão expirou. Entre novamente com Google.":"O item mudou. Abra o Pingo para revisar esta alteração.";
+                        String message=status==401?"Sua sessão expirou. Entre novamente na sua conta.":"O item mudou. Abra o Pingo para revisar esta alteração.";
                         store.error(user,op.getString("operationId"),message);
                         if(op.getJSONObject("command").optString("type").equals("task.checkIn")){
                             JSONObject snapshot=new JSONObject(store.read(user,"snapshot")),t=TaskActions.task(snapshot.getJSONObject("workspace"),op.getJSONObject("command").optString("id"));

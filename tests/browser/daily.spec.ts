@@ -174,36 +174,26 @@ test("coluna tem 24 cores, persiste escolha e exclui sem apagar cartões", async
     fullPage: true,
   });
 });
-test("e-mail abre tarefa para revisão e horário único reserva 30 minutos", async ({
+test("sem caixa de e-mails; tarefa com horário único reserva 30 minutos", async ({
   page,
 }) => {
   const state = await fixture(page);
-  await expect(page.locator(".mail-help")).toContainText(
-    "não podem ser abertas",
-  );
-  await page
-    .getByRole("button", {
-      name: "Criar tarefa do e-mail Documento para revisar",
-    })
-    .click();
-  const dialog = page.getByRole("dialog", { name: "Uma nova tarefa" });
-  await expect(dialog.getByLabel("O que você quer fazer?")).toHaveValue(
-    "Documento para revisar",
-  );
-  expect(state().tasks.some((t) => t.title === "Documento para revisar")).toBe(
-    false,
-  );
+  await expect(page.locator(".mail-help")).toHaveCount(0);
+  await expect(page.getByRole("button", {name: "Criar tarefa do e-mail Documento para revisar"})).toHaveCount(0);
+  await page.getByRole("button", {name: "Nova tarefa", exact: true}).click();
+  const dialog = page.getByRole("dialog", {name:"Uma nova tarefa"});
+  await dialog.getByLabel("O que você quer fazer?").fill("Minha tarefa com horário");
   await dialog.getByLabel("Tipo de horário").selectOption("point");
   await dialog.getByLabel("Começa às").fill("15:00");
   await dialog
     .getByRole("button", { name: "Salvar tarefa", exact: true })
     .click();
   await expect(dialog).not.toBeVisible();
-  const task = state().tasks.find((t) => t.title === "Documento para revisar")!;
+  const task = state().tasks.find((t) => t.title === "Minha tarefa com horário")!;
   expect(task.scheduledStart).toBe(
     zonedDateTime(task.dueDate!, "15:00", state().preferences.timezone),
   );
-  expect(task.sourceMail?.id).toBe("mail");
+  expect(task.sourceMail).toBeUndefined();
   expect(
     Date.parse(task.scheduledEnd!) - Date.parse(task.scheduledStart!),
   ).toBe(1800000);

@@ -6,11 +6,16 @@ import {
   normalizeScheduleKey,
 } from "./planning";
 export * from "./planning";
+export * from "./offline";
+export * from "./reminders";
+export * from "./import";
+import { pingoImportInput, importPingoData } from "./import";
 
 export function taskOrder(a: Task, b: Task) {
   return (a.position ?? 1e9) - (b.position ?? 1e9) || a.id.localeCompare(b.id);
 }
 export function normalizeWorkspace(w: Workspace): Workspace {
+  w.calendars ??= [];
   w.boards ??= [];
   w.tasks ??= [];
   w.events ??= [];
@@ -247,6 +252,8 @@ export type SyncJob = {
   sentAt?: string;
 };
 export type Workspace = {
+  storageMode?: "pingo";
+  migrationSettingsRestored?: boolean;
   petCare?: PetCare;
   conversations?: Conversation[];
   conversation?: {
@@ -449,6 +456,11 @@ export const preferenceInput = z.object({
 });
 export const commandSchema = z.discriminatedUnion("type", [
   z.object({
+    type: z.literal("workspace.import"),
+    data: pingoImportInput(),
+    confirmed: z.literal(true),
+  }),
+  z.object({
     type: z.literal("column.delete"),
     boardId: id,
     columnId: id,
@@ -603,11 +615,22 @@ export function applyCommand(
 ): Workspace {
   const w = normalizeWorkspace(structuredClone(original));
   const c = commandSchema.parse(command);
+  if (
+    w.storageMode === "pingo" &&
+    c.type === "event.upsert" &&
+    c.event.attendees?.length
+  )
+    throw new DomainError(
+      "invites",
+      "O Pingo registra seus compromissos pessoais e não envia convites externos.",
+      400,
+    );
   const enqueue = (
     kind: "task" | "event",
     entityId: string,
     action: "upsert" | "delete",
   ) => {
+    if (w.storageMode === "pingo") return;
     // Keep uncertain creates: replacing them would lose the reconciliation marker.
     if (
       w.outbox.some(
@@ -634,6 +657,12 @@ export function applyCommand(
     });
   };
   switch (c.type) {
+    case "workspace.import": {
+      if (w.storageMode !== "pingo")
+        throw new DomainError("mode", "Atualize o Pingo antes de importar.");
+      importPingoData(w, c.data);
+      break;
+    }
     case "task.calendarDecision": {
       const t = w.tasks.find((t) => t.id === c.id && !t.deleted);
       if (!t) throw new DomainError("missing", "Tarefa não encontrada.");

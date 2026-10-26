@@ -15,8 +15,6 @@ import com.getcapacitor.PermissionState;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
-import com.google.firebase.FirebaseApp;
-import com.google.firebase.messaging.FirebaseMessaging;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.Locale;
@@ -29,6 +27,7 @@ public final class PingoNative extends Plugin {
     private boolean speechReady;
     @Override public void load() {
         NotificationCoordinator.channels(getContext());
+        androidx.work.WorkManager.getInstance(getContext()).cancelUniqueWork("pingo-token-registration");
         getActivity().runOnUiThread(() -> { speech = new TextToSpeech(getContext(), status -> { speechReady = status == TextToSpeech.SUCCESS; if (speechReady) speech.setLanguage(new Locale("pt", "BR")); }); });
     }
     private void fail(PluginCall call) { call.reject("Não foi possível acessar o armazenamento protegido do Pingo."); }
@@ -47,6 +46,7 @@ public final class PingoNative extends Plugin {
             String u = call.getString("userId"); if (u == null || u.isEmpty() || u.length() > 200) throw new Exception();
             String prior = NotificationCoordinator.prefs(getContext()).getString("userId", "");
             if (!prior.equals(u)) { NotificationCoordinator.clear(getContext()); NotificationCoordinator.prefs(getContext()).edit().putString("userId", u).commit(); }
+            AccountSyncWorker.bind(getContext(), u);
             call.resolve();
         } catch (Exception ignored) { fail(call); }
     }
@@ -81,22 +81,10 @@ public final class PingoNative extends Plugin {
         NotificationCoordinator.prefs(getContext()).edit().putBoolean("enabled", true).commit(); token(call, true);
     }
     private void token(PluginCall call, boolean required) {
-        try {
-            if (FirebaseApp.getApps(getContext()).isEmpty()) {
-                if (required) call.reject("Este APK ainda precisa da configuração de notificações Android do administrador.");
-                else call.resolve(new JSObject().put("token", JSONObject.NULL));
-                return;
-            }
-            FirebaseMessaging.getInstance().getToken().addOnCompleteListener(result -> {
-                if (!result.isSuccessful()) { if (required) call.reject("Não consegui registrar este aparelho. Verifique sua conexão."); else call.resolve(new JSObject().put("token", JSONObject.NULL)); }
-                else { NotificationCoordinator.restore(getContext()); call.resolve(new JSObject().put("token", result.getResult())); }
-            });
-        } catch (Exception ignored) { call.reject("O serviço de notificações não está disponível."); }
+        NotificationCoordinator.restore(getContext());
+        call.resolve(new JSObject().put("token", JSONObject.NULL));
     }
-    @PluginMethod public void getPushToken(PluginCall call) {
-        if (!NotificationCoordinator.prefs(getContext()).getBoolean("enabled", false)) { call.resolve(new JSObject().put("token", JSONObject.NULL)); return; }
-        token(call, false);
-    }
+    @PluginMethod public void getPushToken(PluginCall call) { call.resolve(new JSObject().put("token", JSONObject.NULL)); }
     @PluginMethod public void settings(PluginCall call) {
         getActivity().runOnUiThread(() -> {
             boolean allowed = Build.VERSION.SDK_INT < 31 || getContext().getSystemService(AlarmManager.class).canScheduleExactAlarms();
@@ -113,14 +101,13 @@ public final class PingoNative extends Plugin {
     @PluginMethod public void setPrivacy(PluginCall call) { NotificationCoordinator.prefs(getContext()).edit().putBoolean("hidden", Boolean.TRUE.equals(call.getBoolean("hidden"))).commit(); call.resolve(); }
     @PluginMethod public void logout(PluginCall call) {
         try {
-            SecureStore secure = new SecureStore(getContext()); String token = secure.get("session"), install = secure.get("installation");
-            if (token != null && install != null) secure.put("pending-unregister", new JSONObject().put("token", token).put("installation", install).toString());
-            String prior = NotificationCoordinator.prefs(getContext()).getString("userId", "");
-            NotificationCoordinator.clear(getContext()); PingoDatabase.get(getContext()).clear(prior);
+            SecureStore secure = new SecureStore(getContext());
+            secure.put("pending-unregister", null);
+            NotificationCoordinator.clear(getContext());
+            androidx.work.WorkManager.getInstance(getContext()).cancelUniqueWork("pingo-account-sync");
             NotificationCoordinator.prefs(getContext()).edit().putBoolean("enabled", false).commit();
             secure.put("session", null); secure.put("login", null);
-            if (!FirebaseApp.getApps(getContext()).isEmpty()) FirebaseMessaging.getInstance().deleteToken();
-            TokenRegistrationWorker.enqueue(getContext()); stopSpeechNow(); call.resolve();
+            stopSpeechNow(); call.resolve();
         } catch (Exception ignored) { fail(call); }
     }
     @PluginMethod public void speak(PluginCall call) {

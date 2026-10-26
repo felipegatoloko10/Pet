@@ -15,6 +15,7 @@ if (isPet) {
   document.body.classList.add("pet-body-transparent");
 }
 const platform = {
+  kind: "desktop" as const,
   api,
   onOpenConversation: (handler: (id: string) => void) => {
     const stop = listen<{ id: string }>("open-conversation", (event) =>
@@ -171,7 +172,7 @@ async function browserLogin() {
           () =>
             reject(
               new Error(
-                "O login expirou. Clique em Entrar com Google para tentar novamente.",
+                "O login expirou. Clique em Entrar para sincronizar para tentar novamente.",
               ),
             ),
           600000,

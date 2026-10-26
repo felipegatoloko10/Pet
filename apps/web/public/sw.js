@@ -1,7 +1,97 @@
 /* Cache only the public shell and static assets. Private API data lives in account-scoped IndexedDB. */
-const CACHE='pingo-shell-v2.2-beta1';
-self.addEventListener('install',event=>{event.waitUntil((async()=>{const cache=await caches.open(CACHE);const response=await fetch('/');if(!response.ok)throw new Error('shell_unavailable');const html=await response.clone().text();const assets=[...new Set([...html.matchAll(/(?:src|href)="(\/_next\/static\/[^\"]+)"/g)].map(m=>m[1].replaceAll('&amp;','&')))];await cache.put('/',response);await cache.addAll(['/icon.svg','/manifest.webmanifest',...assets]);})());self.skipWaiting();});
-self.addEventListener('activate',event=>event.waitUntil(clients.claim()));
-self.addEventListener('fetch',event=>{const u=new URL(event.request.url);if(event.request.method!=='GET'||u.origin!==self.location.origin||u.pathname.startsWith('/api/')||u.pathname==='/push-key')return;if(event.request.mode==='navigate'){event.respondWith(fetch(event.request).catch(()=>caches.match('/')));return;}if(u.pathname.startsWith('/_next/static/')||['/icon.svg','/manifest.webmanifest'].includes(u.pathname))event.respondWith(caches.open(CACHE).then(async cache=>{const hit=await cache.match(event.request);if(hit)return hit;const response=await fetch(event.request);if(response.ok)await cache.put(event.request,response.clone());return response;}));});
-self.addEventListener('push',event=>{if(!event.data)return;const n=event.data.json();event.waitUntil(self.registration.showNotification(n.title,{body:n.body,icon:'/icon.svg',tag:n.id,renotify:false,silent:!!n.silent,data:{id:n.id,url:'/'}}));});
-self.addEventListener('notificationclick',event=>{event.notification.close();event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(windows=>{const existing=windows.find(w=>new URL(w.url).origin===self.location.origin);return existing?existing.focus():clients.openWindow('/');}));});
+const CACHE = "pingo-shell-v2.5-beta1";
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE);
+      const response = await fetch("/");
+      if (!response.ok) throw new Error("shell_unavailable");
+      const html = await response.clone().text();
+      const assets = [
+        ...new Set(
+          [...html.matchAll(/(?:src|href)="(\/_next\/static\/[^\"]+)"/g)].map(
+            (m) => m[1].replaceAll("&amp;", "&"),
+          ),
+        ),
+      ];
+      await cache.put("/", response);
+      const manifest = await fetch("/offline-assets.json", {
+        cache: "no-store",
+      }).then((r) => {
+        if (!r.ok) throw new Error("offline_assets_unavailable");
+        return r.json();
+      });
+      if (
+        !Array.isArray(manifest) ||
+        manifest.some(
+          (p) =>
+            typeof p !== "string" ||
+            !p.startsWith("/_next/static/") ||
+            p.includes(".."),
+        )
+      )
+        throw new Error("offline_assets_invalid");
+      await cache.addAll([
+        "/icon.svg",
+        "/manifest.webmanifest",
+        ...new Set([...assets, ...manifest]),
+      ]);
+    })(),
+  );
+  self.skipWaiting();
+});
+self.addEventListener("activate", (event) => event.waitUntil(clients.claim()));
+self.addEventListener("fetch", (event) => {
+  const u = new URL(event.request.url);
+  if (
+    event.request.method !== "GET" ||
+    u.origin !== self.location.origin ||
+    u.pathname.startsWith("/api/") ||
+    u.pathname === "/push-key"
+  )
+    return;
+  if (event.request.mode === "navigate") {
+    event.respondWith(fetch(event.request).catch(() => caches.match("/")));
+    return;
+  }
+  if (
+    u.pathname.startsWith("/_next/static/") ||
+    ["/icon.svg", "/manifest.webmanifest"].includes(u.pathname)
+  )
+    event.respondWith(
+      caches.open(CACHE).then(async (cache) => {
+        const hit = await cache.match(event.request);
+        if (hit) return hit;
+        const response = await fetch(event.request);
+        if (response.ok) await cache.put(event.request, response.clone());
+        return response;
+      }),
+    );
+});
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+  const n = event.data.json();
+  event.waitUntil(
+    self.registration.showNotification(n.title, {
+      body: n.body,
+      icon: "/icon.svg",
+      tag: n.id,
+      renotify: false,
+      silent: !!n.silent,
+      data: { id: n.id, url: "/" },
+    }),
+  );
+});
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((windows) => {
+        const existing = windows.find(
+          (w) => new URL(w.url).origin === self.location.origin,
+        );
+        return existing ? existing.focus() : clients.openWindow("/");
+      }),
+  );
+});

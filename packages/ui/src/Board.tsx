@@ -32,13 +32,21 @@ import {
   pastelColors,
 } from "@pingo/core";
 type Props = {
+  localOnly?: boolean;
   w: Workspace;
   today: string;
   act: (c: Command) => Promise<void>;
   onEdit: (t: Partial<Task>) => void;
   onEventEdit?: (e: import("@pingo/core").CalendarEvent) => void;
 };
-export function Board({ w, today, act, onEdit, onEventEdit }: Props) {
+export function Board({
+  w,
+  today,
+  act,
+  onEdit,
+  onEventEdit,
+  localOnly,
+}: Props) {
   const [query, setQuery] = useState(""),
     [priority, setPriority] = useState(""),
     [label, setLabel] = useState(""),
@@ -338,6 +346,7 @@ export function Board({ w, today, act, onEdit, onEventEdit }: Props) {
                         <Card
                           key={t.id}
                           task={t}
+                          localOnly={localOnly}
                           columns={b.columns}
                           archive={archive}
                           today={today}
@@ -392,7 +401,7 @@ export function Board({ w, today, act, onEdit, onEventEdit }: Props) {
         </DndContext>
       ) : (
         <div className="panel">
-          <p>Conecte suas listas Google em Ajustes para começar.</p>
+          <p>Seu quadro está sendo preparado.</p>
         </div>
       )}
       {b && (
@@ -697,6 +706,7 @@ function BoardColumn({
   );
 }
 function Card({
+  localOnly,
   today,
   calendarState,
   task: t,
@@ -708,6 +718,7 @@ function Card({
   onReorder,
 }: {
   today: string;
+  localOnly?: boolean;
   calendarState?: import("@pingo/core").SyncState;
   task: Task;
   columns: Column[];
@@ -798,18 +809,18 @@ function Card({
           </small>
         )}
         <small className={`sync-state state-${t.syncState}`}>
-          {calendarState ? "Tasks: " : ""}
+          {calendarState && !localOnly ? "Tarefa: " : ""}
           {
             {
               pending: "Pendente",
-              synced: "Sincronizado",
+              synced: localOnly ? "Salvo neste aparelho" : "Sincronizado",
               error: "Erro",
               conflict: "Conflito",
               syncing: "Sincronizando",
             }[t.syncState]
           }
         </small>
-        {calendarState && (
+        {calendarState && !localOnly && (
           <small className={`sync-state state-${calendarState}`}>
             Agenda:{" "}
             {

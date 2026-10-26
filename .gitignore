@@ -31,3 +31,6 @@ test-results/
 *.keystore
 **/google-services.json
 **/signing.properties
+
+# Generated offline asset index
+/apps/web/public/offline-assets.json

@@ -1,85 +1,68 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-export default function MobileLogin() {
-  const [status, setStatus] = useState("Entrando no seu Pingo…");
-  const [returnUrl, setReturnUrl] = useState("");
-  const started = useRef(false);
-  useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    void (async () => {
+import { useEffect, useState } from "react";
+import { AccountForm } from "@pingo/ui/AccountForm";
+export default function NativeLogin() {
+  const [needsLogin, setNeedsLogin] = useState(false);
+  const [status, setStatus] = useState("Abrindo sua conta…");
+  const [url, setUrl] = useState("");
+  async function authorize() {
+    try {
       const params = new URLSearchParams(location.search);
       const id = params.get("id"),
-        state = params.get("state"),
-        ticket = params.get("ticket");
-      if ((!id || !state) && !ticket)
-        throw new Error("Comece esta etapa pelo aplicativo Pingo.");
+        state = params.get("state");
+      if (!id || !state)
+        throw new Error("Comece o login pelo aplicativo Pingo.");
       const session = await fetch("/api/auth/get-session").then((r) =>
         r.json(),
       );
       if (!session?.user) {
-        const result = await fetch("/api/auth/sign-in/social", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            provider: "google",
-            callbackURL: location.href,
-          }),
-        }).then((r) => r.json());
-        if (
-          !result.url ||
-          new URL(result.url).origin !== "https://accounts.google.com"
-        )
-          throw new Error("O Google não iniciou o login.");
-        location.assign(result.url);
+        setNeedsLogin(true);
+        setStatus("");
         return;
       }
-      const response = await fetch(
-        ticket
-          ? "/api/v1/mobile/workspace/authorize"
-          : "/api/v1/mobile-auth/authorize",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(ticket ? { ticket } : { id, state }),
-        },
-      );
-      const result = await response.json();
+      const response = await fetch("/api/v1/mobile-auth/authorize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, state }),
+      });
+      const data = await response.json();
       if (!response.ok)
         throw new Error(
-          result.error ?? "Não foi possível autorizar o aplicativo.",
+          data.error ?? "Não foi possível autorizar o aplicativo.",
         );
-      const u = new URL(result.url);
-      if (ticket && u.origin === "https://accounts.google.com") {
-        location.assign(result.url);
-        return;
-      }
+      const target = new URL(data.url);
       if (
-        u.protocol !== "app.pingo.mobile:" ||
-        u.hostname !== "auth" ||
-        u.pathname !== "/callback"
+        target.protocol !== "app.pingo.mobile:" ||
+        target.hostname !== "auth" ||
+        target.pathname !== "/callback"
       )
         throw new Error("Retorno inválido.");
-      setReturnUrl(result.url);
-      setStatus("Tudo certo! Voltando ao Pingo no seu celular…");
-      location.assign(result.url);
-    })().catch((e) => setStatus(e.message));
+      setNeedsLogin(false);
+      setUrl(data.url);
+      setStatus("Tudo certo! Voltando ao Pingo…");
+      location.assign(data.url);
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "Falha de conexão.");
+    }
+  }
+  useEffect(() => {
+    void authorize();
   }, []);
   return (
     <main className="welcome">
       <section
         className="panel"
-        style={{ maxWidth: 460, margin: "15vh auto", padding: 28 }}
+        style={{ maxWidth: 480, margin: "10vh auto", padding: 28 }}
       >
-        <div className="welcome-brand">pingo</div>
-        <h1>Seu companheiro no celular</h1>
+        <h1>Sua conta Pingo</h1>
+        {needsLogin && <AccountForm onSignedIn={authorize} />}
         <p role="status">{status}</p>
-        {returnUrl && (
-          <a className="button primary" href={returnUrl}>
-            Voltar ao Pingo
+        {url && (
+          <a className="button primary" href={url}>
+            Voltar ao aplicativo
           </a>
         )}
-        <p>Você pode fechar esta página após voltar ao aplicativo.</p>
+        <p>Você pode fechar esta página após voltar ao Pingo.</p>
       </section>
     </main>
   );

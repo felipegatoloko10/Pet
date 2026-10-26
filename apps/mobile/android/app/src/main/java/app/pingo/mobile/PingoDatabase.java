@@ -12,7 +12,7 @@ final class PingoDatabase extends SQLiteOpenHelper {
         if (instance == null) synchronized (PingoDatabase.class) { if (instance == null) instance = new PingoDatabase(c.getApplicationContext()); }
         return instance;
     }
-    private PingoDatabase(Context c) { super(c, "pingo-mobile.db", null, 3); setWriteAheadLoggingEnabled(true); }
+    private PingoDatabase(Context c) { super(c, "pingo-mobile.db", null, 4); setWriteAheadLoggingEnabled(true); }
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE cache(user_id TEXT NOT NULL,k TEXT NOT NULL,v TEXT NOT NULL,PRIMARY KEY(user_id,k))");
         db.execSQL("CREATE TABLE reminders(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,data TEXT NOT NULL)");
@@ -31,6 +31,7 @@ final class PingoDatabase extends SQLiteOpenHelper {
             }
         }
         if(oldVersion < 3) retryCheckIns(db);
+        if(oldVersion < 4) db.execSQL("UPDATE pending_operations SET error=NULL WHERE error LIKE 'Sua sessão expirou.%'");
     }
     private void retryCheckIns(SQLiteDatabase db) {
         try(Cursor rows=db.rawQuery("SELECT user_id,operation_id,data FROM pending_operations WHERE error IS NOT NULL",null)){while(rows.moveToNext())try{if("task.checkIn".equals(new org.json.JSONObject(rows.getString(2)).getJSONObject("command").optString("type"))){ContentValues v=new ContentValues();v.putNull("error");db.update("pending_operations",v,"user_id=? AND operation_id=?",new String[]{rows.getString(0),rows.getString(1)});}}catch(org.json.JSONException ignored){}}
@@ -66,7 +67,7 @@ final class PingoDatabase extends SQLiteOpenHelper {
         SQLiteDatabase db=getWritableDatabase();db.beginTransaction();try {
             ContentValues receipt=new ContentValues();receipt.put("user_id",user);receipt.put("operation_id",id);db.insertWithOnConflict("operation_receipts",null,receipt,SQLiteDatabase.CONFLICT_IGNORE);
             db.delete("pending_operations","user_id=? AND operation_id=?",new String[]{user,id});
-            if(pending(user).length()==0)write(user,"snapshot",new org.json.JSONObject().put("workspace",workspace).put("pending",new org.json.JSONArray()).toString());
+            if(pending(user).length()==0)write(user,"snapshot",new org.json.JSONObject().put("workspace",workspace).put("serverRevision",workspace.optLong("revision")).put("pending",new org.json.JSONArray()).toString());
             db.setTransactionSuccessful();
         }finally{db.endTransaction();}
     }

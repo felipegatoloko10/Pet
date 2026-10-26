@@ -1,3 +1,5 @@
+> Atualização 2.5: consulte [operação offline e Supabase](OFFLINE-SUPABASE.md). O conteúdo abaixo documenta a entrega anterior com Google.
+
 # Verificação do Pingo 2
 
 ## Revisão 2.4 — 23/10/2026

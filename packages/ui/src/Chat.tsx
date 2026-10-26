@@ -66,6 +66,12 @@ export function Chat({
   }
   async function send(text: string, id = crypto.randomUUID()) {
     if (!text.trim() || busy) return;
+    if (client.localOnly) {
+      setError(
+        "Para conversar com IA, entre em uma conta e configure sua chave. Tarefas, agenda e cuidados funcionam sem internet.",
+      );
+      return;
+    }
     if (!client.demo && !navigator.onLine) {
       setError(
         "A conversa com IA precisa de internet. Suas tarefas e os cuidados com Pingo continuam disponíveis offline.",

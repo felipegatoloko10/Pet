@@ -1,6 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import {
   emptyWorkspace,
+  localWorkspace,
+  preparePingoWorkspace,
+  acknowledgePingoWorkspace,
   normalizeWorkspace,
   applyCommand,
   DomainError,
@@ -15,7 +18,16 @@ export async function readWorkspace(userId: string) {
     .select()
     .from(workspaces)
     .where(eq(workspaces.userId, userId));
-  return normalizeWorkspace(rows[0]?.data ?? emptyWorkspace());
+  return acknowledgePingoWorkspace(
+    preparePingoWorkspace(rows[0]?.data ?? localWorkspace()),
+  );
+}
+export async function workspaceRevision(userId: string) {
+  const [row] = await db()
+    .select({ revision: workspaces.revision })
+    .from(workspaces)
+    .where(eq(workspaces.userId, userId));
+  return row?.revision ?? -1;
 }
 export async function mutateWorkspace<T>(
   userId: string,
@@ -24,18 +36,24 @@ export async function mutateWorkspace<T>(
   return db().transaction(async (tx) => {
     await tx
       .insert(workspaces)
-      .values({ userId, data: emptyWorkspace() })
+      .values({ userId, data: localWorkspace() })
       .onConflictDoNothing();
     const [row] = await tx
       .select()
       .from(workspaces)
       .where(eq(workspaces.userId, userId))
       .for("update");
-    normalizeWorkspace(row.data);
+    row.data = preparePingoWorkspace(row.data);
+    const before = row.data.revision;
     const result = await fn(row.data);
+    row.data.revision = Math.max(row.data.revision, before + 1);
     await tx
       .update(workspaces)
-      .set({ data: row.data, updatedAt: new Date() })
+      .set({
+        data: row.data,
+        revision: row.data.revision,
+        updatedAt: new Date(),
+      })
       .where(eq(workspaces.userId, userId));
     return result;
   });
@@ -53,7 +71,7 @@ export async function runOperationIn(
 ) {
   await tx
     .insert(workspaces)
-    .values({ userId, data: emptyWorkspace() })
+    .values({ userId, data: localWorkspace() })
     .onConflictDoNothing();
   const [row] = await tx
     .select()
@@ -77,9 +95,15 @@ export async function runOperationIn(
         "Identificador já usado para outra alteração.",
         409,
       );
-    return row.data;
+    return acknowledgePingoWorkspace(preparePingoWorkspace(row.data));
   }
-  const next = applyCommand(row.data, operation.command, operation.operationId);
+  const next = acknowledgePingoWorkspace(
+    applyCommand(
+      preparePingoWorkspace(row.data),
+      operation.command,
+      operation.operationId,
+    ),
+  );
   if (next.tasks.length > 10000 || next.events.length > 10000)
     throw new DomainError("quota", "Limite do beta atingido.", 429);
   await tx
@@ -87,7 +111,7 @@ export async function runOperationIn(
     .values({ userId, operationId: operation.operationId, digest: hash });
   await tx
     .update(workspaces)
-    .set({ data: next, updatedAt: new Date() })
+    .set({ data: next, revision: next.revision, updatedAt: new Date() })
     .where(eq(workspaces.userId, userId));
   return next;
 }

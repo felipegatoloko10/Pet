@@ -64,7 +64,7 @@ it("retries transient push failures without repeating successful deliveries", as
   await processJob(input); await processJob(input);
   expect(webpush.sendNotification).toHaveBeenCalledTimes(2);
 });
-it("loads recurring instances for the next 48 hours during background routine", async () => {
+it("não consulta o Google na rotina de segundo plano", async () => {
   await processJob(jobsFor("alice", memory.workspace!)[0]);
-  expect(calendarRange).toHaveBeenCalledWith("alice", "2026-10-23T12:00:00.000Z", "2026-10-25T12:00:00.000Z");
+  expect(calendarRange).not.toHaveBeenCalled();
 });

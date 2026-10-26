@@ -12,7 +12,7 @@ export function cors(request: Request, response: Response) {
     response.headers.set("Vary", "Origin");
     response.headers.set(
       "Access-Control-Allow-Headers",
-      "Content-Type, Authorization",
+      "Content-Type, Authorization, X-Pingo-Account",
     );
     response.headers.set(
       "Access-Control-Allow-Methods",

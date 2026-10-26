@@ -1,5 +1,6 @@
 import {
   pgTable,
+  customType,
   text,
   timestamp,
   boolean,
@@ -8,6 +9,13 @@ import {
   primaryKey,
 } from "drizzle-orm/pg-core";
 import type { Workspace } from "@pingo/core";
+import { packWorkspace, unpackWorkspace } from "./workspace-codec";
+const packedWorkspace = customType<{ data: Workspace; driverData: string }>({
+  dataType: () => "jsonb",
+  toDriver: (value) => JSON.stringify(packWorkspace(value)),
+  fromDriver: (value) =>
+    unpackWorkspace(typeof value === "string" ? JSON.parse(value) : value),
+});
 export const user = pgTable("auth_user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -88,6 +96,12 @@ export const deviceCode = pgTable("auth_device_code", {
 });
 export const invitations = pgTable("invitations", {
   email: text("email").primaryKey(),
+  activationHash: text("activation_hash"),
+  activationExpiresAt: timestamp("activation_expires_at", {
+    withTimezone: true,
+  }),
+  activationUsedAt: timestamp("activation_used_at", { withTimezone: true }),
+  activationPurpose: text("activation_purpose").notNull().default("register"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -96,7 +110,8 @@ export const workspaces = pgTable("workspaces", {
   userId: text("user_id")
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
-  data: jsonb("data").$type<Workspace>().notNull(),
+  data: packedWorkspace("data").notNull(),
+  revision: integer("revision").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

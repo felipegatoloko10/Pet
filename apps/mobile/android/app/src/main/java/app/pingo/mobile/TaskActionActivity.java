@@ -20,7 +20,7 @@ public final class TaskActionActivity extends Activity {
             return;
         }
         executed=true;
-        try{TaskActions.enqueue(this,new JSONObject(getIntent().getStringExtra("payload")),getIntent().getStringExtra("taskAction"));Toast.makeText(this,"Alteração guardada no Pingo. Vou sincronizar com o Google.",Toast.LENGTH_LONG).show();}catch(Exception ignored){Toast.makeText(this,"A tarefa mudou. Abra o Pingo para revisar.",Toast.LENGTH_LONG).show();}
+        try{TaskActions.enqueue(this,new JSONObject(getIntent().getStringExtra("payload")),getIntent().getStringExtra("taskAction"));Toast.makeText(this,"Alteração salva no Pingo.",Toast.LENGTH_LONG).show();}catch(Exception ignored){Toast.makeText(this,"A tarefa mudou. Abra o Pingo para revisar.",Toast.LENGTH_LONG).show();}
         finish();
     }
     @Override protected void onActivityResult(int r,int result,android.content.Intent data){super.onActivityResult(r,result,data);requested=false;if(result==RESULT_OK)runAfterUnlock();else finish();}

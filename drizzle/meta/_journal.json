@@ -15,6 +15,20 @@
       "when": 1792701094815,
       "tag": "0001_lean_loki",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793033460735,
+      "tag": "0002_rapid_wither",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793034977413,
+      "tag": "0003_wooden_joseph",
+      "breakpoints": true
     }
   ]
 }

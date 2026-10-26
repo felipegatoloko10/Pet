@@ -1,9 +1,17 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Pingo",
-  "version": "2.4.1-beta.1",
+  "version": "2.5.0-beta.1",
   "identifier": "app.pingo.companion",
-  "plugins": { "deep-link": { "desktop": { "schemes": ["pingo"] } } },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "pingo"
+        ]
+      }
+    }
+  },
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://127.0.0.1:1420",
@@ -47,7 +55,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -57,9 +67,13 @@
     "windows": {
       "nsis": {
         "displayLanguageSelector": false,
-        "languages": ["PortugueseBR"]
+        "languages": [
+          "PortugueseBR"
+        ]
       },
-      "webviewInstallMode": { "type": "downloadBootstrapper" }
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
     }
   }
 }

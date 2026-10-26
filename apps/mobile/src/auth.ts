@@ -73,7 +73,7 @@ export class MobileAuth {
           () =>
             reject(
               new Error(
-                "O login expirou. Toque em Entrar com Google para tentar novamente.",
+                "O login expirou. Toque em Entrar para sincronizar para tentar novamente.",
               ),
             ),
           600000,
@@ -94,7 +94,7 @@ export class MobileAuth {
       if (this.active && !this.redeem)
         this.reject?.(
           new Error(
-            "Login interrompido. Toque em Entrar com Google para tentar novamente.",
+            "Login interrompido. Toque em Entrar para sincronizar para tentar novamente.",
           ),
         );
     }, 2000);

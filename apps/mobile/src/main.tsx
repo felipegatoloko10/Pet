@@ -4,8 +4,8 @@ import { Browser } from "@capacitor/browser";
 import { Network } from "@capacitor/network";
 import { PingoApp, type Platform } from "@pingo/ui";
 import { Api, webStorage, type Storage } from "@pingo/ui/client";
-import { type Workspace, taskAlarms } from "@pingo/core";
-import { Native, native, type NoticeTarget, type Reminder } from "./native";
+import { type Workspace, deviceReminderPlan } from "@pingo/core";
+import { Native, native, type NoticeTarget } from "./native";
 import { MobileAuth } from "./auth";
 import "@pingo/ui/styles.css";
 const base = import.meta.env.VITE_API_URL ?? "https://pingo-gilt.vercel.app";
@@ -18,8 +18,6 @@ let pendingNotice: NoticeTarget | undefined;
 let activeUser = "";
 let remindersSignature = "";
 let serial = Promise.resolve();
-let rangeAt = 0;
-let rangeLoading = false;
 const auth = new MobileAuth(api, changed);
 async function storage(userId: string): Promise<Storage> {
   if (!native) return webStorage(`mobile-preview:${userId}`);
@@ -42,100 +40,10 @@ async function storage(userId: string): Promise<Storage> {
     },
   };
 }
-async function installationId() {
-  const saved = (await Native.readSecure({ key: "installation" })).value;
-  if (saved) return saved;
-  const id = crypto.randomUUID();
-  await Native.writeSecure({ key: "installation", value: id });
-  return id;
-}
-async function registerToken(token: string) {
-  await api.post("mobile/devices", {
-    installationId: await installationId(),
-    token,
-    protocol: 2,
-  });
-}
 function syncLocal(w: Workspace, userId: string) {
   if (!native || userId === "demo") return;
-  const now = Date.now();
-  if (
-    api.token &&
-    navigator.onLine &&
-    !rangeLoading &&
-    now - rangeAt > 15 * 60000
-  ) {
-    rangeLoading = true;
-    void api
-      .request(
-        `calendar/range?start=${encodeURIComponent(new Date(now).toISOString())}&end=${encodeURIComponent(new Date(now + 7 * 86400000).toISOString())}`,
-      )
-      .then(() => {
-        rangeAt = Date.now();
-        changed();
-      })
-      .catch(() => {
-        rangeAt = Date.now() - 14 * 60000;
-      })
-      .finally(() => {
-        rangeLoading = false;
-      });
-  }
-  const reminders: Reminder[] = w.events
-    .filter(
-      (e) =>
-        !e.deleted &&
-        !e.allDay &&
-        !e.recurrence &&
-        !(e.taskId && w.preferences.taskCheckIns !== false) &&
-        Date.parse(e.start) > now &&
-        Date.parse(e.start) <= now + 7 * 86400000,
-    )
-    .map((e) => ({
-      noticeId: `reminder:${userId}:${e.id}:${e.start}`,
-      eventId: e.id,
-      title: e.title,
-      startAt: Date.parse(e.start),
-      dueAt: Math.max(
-        now,
-        Date.parse(e.start) - w.preferences.reminderMinutes * 60000,
-      ),
-    }));
-  reminders.push(
-    ...taskAlarms(w, userId, now).map((a) => ({
-      noticeId: a.id,
-      eventId:
-        w.events.find((e) => e.taskId === a.taskId && !e.deleted)?.id ?? "",
-      taskId: a.taskId,
-      phase: a.phase,
-      snoozePhase: a.snoozePhase,
-      scheduleKey: a.scheduleKey,
-      taskRevision: w.tasks.find((t) => t.id === a.taskId)?.revision,
-      body: a.body,
-      title: a.title,
-      dueAt: Math.max(now, a.dueAt),
-      startAt: a.expiresAt,
-      expiresAt: a.expiresAt,
-    })),
-  );
-  const payload = {
-    userId,
-    timezone: w.preferences.timezone,
-    quietStart: w.preferences.quietStart,
-    quietEnd: w.preferences.quietEnd,
-    reminders,
-  };
-  // Ignore moving "now" for already-due reminders when comparing snapshots.
-  const signature = JSON.stringify({
-    ...payload,
-    reminders: reminders.map((r) => ({
-      ...r,
-      dueAt: r.taskId
-        ? (taskAlarms(w, userId, now).find((a) => a.id === r.noticeId)?.dueAt ??
-          r.dueAt)
-        : Math.max(0, r.startAt - w.preferences.reminderMinutes * 60000),
-    })),
-  });
+  const payload = deviceReminderPlan(w, userId);
+  const signature = JSON.stringify(payload);
   if (signature === remindersSignature) return;
   remindersSignature = signature;
   serial = serial
@@ -189,18 +97,11 @@ const platform: Platform = {
     if (native) await Browser.open({ url });
     else window.open(url, "_blank", "noopener,noreferrer");
   },
-  connectWorkspace: async () => {
-    const result = await api.post<{ url: string }>("mobile/workspace");
-    if (new URL(result.url).origin !== new URL(base).origin)
-      throw new Error("Destino inválido.");
-    await Browser.open({ url: result.url });
-  },
   logout: async () => {
     if (native) {
       // Native cleanup enqueues durable server unregistration and rejects queued push payloads immediately.
       activeUser = "";
       remindersSignature = "";
-      rangeAt = 0;
       await serial.catch(() => {});
       await Native.logout();
     }
@@ -228,10 +129,7 @@ const platform: Platform = {
   notifications: native
     ? {
         enable: async () => {
-          if (!api.token)
-            throw new Error("Entre na conta antes de ativar os avisos.");
-          const { token } = await Native.enableNotifications();
-          await registerToken(token);
+          await Native.enableNotifications();
         },
         settings: async () => {
           await Native.settings();
@@ -257,11 +155,6 @@ async function main() {
       } else {
         auth.resumed();
         changed();
-        void Native.getPushToken()
-          .then(({ token }) => {
-            if (token && api.token) return registerToken(token);
-          })
-          .catch(() => {});
       }
     });
     await Network.addListener("networkStatusChange", ({ connected }) => {

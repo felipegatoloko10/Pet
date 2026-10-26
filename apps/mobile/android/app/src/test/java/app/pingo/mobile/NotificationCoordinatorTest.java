@@ -110,4 +110,39 @@ public class NotificationCoordinatorTest {
         assertEquals("next",OperationWorker.nextEntry(new JSONArray().put(bad).put(good)).getJSONObject("operation").getString("operationId"));
         good.getJSONObject("operation").getJSONObject("command").put("id","a");assertNull(OperationWorker.nextEntry(new JSONArray().put(bad).put(good)));
     }
+    @Test public void localOnlyNotificationCompletesWithoutAnAccountOrNetworkQueue()throws Exception{
+        JSONObject n=timedTask();String raw=PingoDatabase.get(c).read("alice","snapshot");
+        NotificationCoordinator.clear(c);NotificationCoordinator.prefs(c).edit().putString("userId","local:personal").putBoolean("enabled",true).commit();
+        PingoDatabase.get(c).clear("local:personal");PingoDatabase.get(c).write("local:personal","snapshot",raw);
+        n.put("userId","local:personal").put("phase","end");TaskActions.enqueue(c,n,"complete");
+        JSONObject saved=new JSONObject(PingoDatabase.get(c).read("local:personal","snapshot"));
+        assertTrue(saved.getJSONObject("workspace").getJSONArray("tasks").getJSONObject(0).getBoolean("completed"));
+        assertEquals(0,saved.getJSONArray("pending").length());
+        assertEquals("synced",saved.getJSONObject("workspace").getJSONArray("tasks").getJSONObject(0).getString("syncState"));
+    }
+    @Test public void summaryReadsLatestOfflineCompletionInsteadOfScheduledSnapshot()throws Exception{
+        timedTask();JSONObject snapshot=new JSONObject(PingoDatabase.get(c).read("alice","snapshot"));
+        snapshot.getJSONObject("workspace").getJSONArray("tasks").getJSONObject(0).put("completed",true);
+        PingoDatabase.get(c).write("alice","snapshot",snapshot.toString());
+        String body=NotificationCoordinator.localSummary(c,"alice",System.currentTimeMillis(),"Resumo antigo");
+        assertTrue(body.contains("0 tarefa(s)"));assertTrue(body.contains("0 atrasada(s)"));
+    }
+
+    @Test public void backgroundResponseCannotOverwriteAnOfflineEditOrAnotherAccount()throws Exception{
+        timedTask();PingoDatabase db=PingoDatabase.get(c);String before=db.read("alice","snapshot");
+        JSONObject response=new JSONObject().put("workspace",new JSONObject().put("revision",12)).put("day","2026-10-27").put("plan",new JSONObject().put("userId","alice").put("reminders",new JSONArray()));
+        JSONObject edited=new JSONObject(before);edited.getJSONObject("workspace").put("revision",13);db.write("alice","snapshot",edited.toString());
+        assertFalse(AccountSyncWorker.accept(c,"alice",before,response));
+        assertEquals(13,new JSONObject(db.read("alice","snapshot")).getJSONObject("workspace").getInt("revision"));
+        assertFalse(AccountSyncWorker.accept(c,"bob",before,response));
+    }
+
+    @Test public void backgroundResponsePersistsConfirmedSnapshotAndItsRevision()throws Exception{
+        timedTask();PingoDatabase db=PingoDatabase.get(c);String before=db.read("alice","snapshot");
+        JSONObject plan=new JSONObject().put("userId","alice").put("timezone","UTC").put("quietStart","22:00").put("quietEnd","08:00").put("reminders",new JSONArray());
+        JSONObject response=new JSONObject().put("workspace",new JSONObject().put("revision",12)).put("day","2026-10-27").put("plan",plan);
+        assertTrue(AccountSyncWorker.accept(c,"alice",before,response));
+        JSONObject saved=new JSONObject(db.read("alice","snapshot"));assertEquals(12,saved.getInt("serverRevision"));assertEquals(12,saved.getJSONObject("workspace").getInt("revision"));
+    }
+
 }

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { AccountForm } from "@pingo/ui/AccountForm";
 export default function Device() {
   const [code, setCode] = useState("");
   const [status, setStatus] = useState("");
@@ -70,23 +71,7 @@ export default function Device() {
             </button>
           </>
         ) : (
-          <button
-            className="button primary"
-            onClick={async () => {
-              const r = await fetch("/api/auth/sign-in/social", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  provider: "google",
-                  callbackURL: location.href,
-                }),
-              });
-              const data = await r.json();
-              if (data.url) location.assign(data.url);
-            }}
-          >
-            Entrar com Google para continuar
-          </button>
+          <AccountForm onSignedIn={() => setLogged(true)} />
         )}
         <p role="status">{status}</p>
       </div>

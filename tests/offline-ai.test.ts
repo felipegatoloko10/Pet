@@ -45,7 +45,7 @@ it("a fila sobrevive ao reinício offline e repete o mesmo operationId", async (
   expect(second.pending[0].operation.operationId).toBe(id);
   vi.unstubAllGlobals();
 });
-it.each(["openai", "google", "anthropic"] as const)(
+it.each(["openai", "anthropic"] as const)(
   "mesmas ferramentas para %s",
   (provider) => {
     const model = makeModel(provider, "test-model", "fake-key");
@@ -105,3 +105,5 @@ it.each([true, false])(
     expect(suggest).toHaveBeenCalledTimes(bodyIncluded ? 1 : 0);
   },
 );
+
+it("credenciais antigas Gemini não ativam chamadas ao Google", () => { expect(() => makeModel("google", "test", "fake-key")).toThrow("OpenAI ou Claude"); });

@@ -1,14 +1,16 @@
-Pingo 2.4.1-beta.1 — correções de tarefas e notificações Android.
+Pingo 2.5.0-beta.1 — tarefas e agenda próprias, com uso offline e Supabase.
 
-- Notificações com título e botões A fazer, Fazendo, Aguardar e Concluir no conteúdo recolhido. Tocar no corpo abre Meu dia. Aguardar aparece quando essa coluna existe.
-- Conclusão pelo aviso tolera revisões de metadados e formatos de fuso equivalentes, sem aceitar avisos de horários antigos. Falhas de outra tarefa não bloqueiam uma ação independente.
-- Corrigido “Cannot read properties of undefined (reading 'some')” após sincronização Android. Respostas do backend também protegem clientes 2.4 já instalados.
-- Dia inteiro usa Último dia e converte corretamente o fim exclusivo exigido pelo Google.
-- Salvamento local imediato, com envio em segundo plano, proteção contra respostas atrasadas e mensagens de erro legíveis.
-- Removido Organizar datas; tarefas antigas sem data continuam acessíveis. Formulários bloqueiam a rolagem do fundo.
+- Quadro e agenda disponíveis sem conta em **Usar neste aparelho**.
+- Conta do Pingo por e-mail e senha; primeiro cadastro por convite privado, sem Google ou servidor de e-mails.
+- Sincronização entre Android, web e Windows com fila persistente, revisões e proteção contra respostas de outra conta.
+- Supabase PostgreSQL exclusivo, conexão TLS verificada, RLS e dados compactados para reduzir tráfego.
+- Importação com prévia das cópias anteriores, exportação JSON e repetição sem duplicar ou substituir itens existentes.
+- Android sem Firebase: alarmes locais, resumos básicos e busca de alterações em segundo plano quando houver internet.
+- Mantidos os botões de status das notificações, silêncio, cuidados e avatar transparente.
+- Removidos o acesso ao Google Tasks, Agenda e Gmail e os painéis de e-mail. IA OpenAI/Claude é opcional e precisa de conexão.
 
-Instale sobre a versão anterior, sem desinstalar. O APK conserva a assinatura e migra o SQLite para v3 preservando cache e fila. Confira os arquivos SHA256SUMS. Versões 2.3 e 2.4 continuam recuperáveis.
+Instale sobre a versão anterior. A chave Android foi preservada; SQLite migra para v4 sem apagar cache ou fila. Não desinstale antes de conferir sua cópia de dados. Convites são entregues em particular e nunca fazem parte dos arquivos públicos desta release.
 
-Validação: 114 testes de domínio/cliente, 21 de navegador, 12 Android unitários e instrumentação Android 16. Também passaram 38 verificações reais API/Neon e o CI completo de Android e Windows. FCM real, Comecei e Concluir pelo conteúdo recolhido confirmaram a fila nativa na API de produção. Tarefa às 18h e compromisso de dia inteiro sincronizaram com Google. Em 24/10/2026, o titular confirmou que testou esta versão no celular e que funcionou, autorizando a publicação da pré-release.
+O Neon antigo permaneceu bloqueado por cota durante a migração. O banco original e a versão 2.4.1 foram preservados; as cópias já carregadas nos dispositivos podem ser importadas. Não é declarada uma exportação integral do histórico remoto indisponível.
 
-O Android controla agrupamento e apresentação final da notificação, conforme versão, fabricante e privacidade da tela bloqueada. Notificações continuam de melhor esforço. Beta gratuito por convite; nenhum serviço pago ativado.
+Rascunho para homologação da versão nova. A aprovação física da 2.4.1 não substitui o teste desta atualização. Notificações e execução em segundo plano dependem do Android e são de melhor esforço. Nenhum plano pago ativado.

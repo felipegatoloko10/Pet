@@ -7,7 +7,9 @@ import { Pool } from "pg";
 const email = process.argv[2]?.trim().toLowerCase();
 if (!email || !/^\S+@\S+\.\S+$/.test(email))
   throw new Error("Uso: npm run invite -- pessoa@gmail.com");
-const pool = new Pool({ connectionString: process.env.DATABASE_URL_UNPOOLED });
+import { databaseConnection } from "../apps/web/src/server/database-connection";
+if (!process.env.DATABASE_URL_UNPOOLED) throw new Error("Configure o banco privado antes de autorizar convites.");
+const pool = new Pool(databaseConnection(process.env.DATABASE_URL_UNPOOLED));
 const c = await pool.connect();
 try {
   await c.query("BEGIN");

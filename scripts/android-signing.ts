@@ -85,13 +85,6 @@ if (mode === "init") {
     PINGO_ANDROID_STORE_PASSWORD: password,
     PINGO_ANDROID_KEY_PASSWORD: password,
   };
-  try {
-    values.PINGO_ANDROID_GOOGLE_SERVICES_BASE64 = (
-      await readFile("apps/mobile/android/app/google-services.json")
-    ).toString("base64");
-  } catch {
-    throw new Error("Configuração FCM ausente. Configure-a antes de publicar.");
-  }
   for (const [name, value] of Object.entries(values))
     await run(
       "gh",
@@ -100,7 +93,7 @@ if (mode === "init") {
       value,
     );
   console.log(
-    "Quatro segredos Android configurados no repositório Pet. Nenhum valor exibido.",
+    "Três segredos Android configurados no repositório Pet. Nenhum valor exibido.",
   );
 } else if (mode === "build") {
   const { password } = JSON.parse(await readFile(configFile, "utf8"));
@@ -110,12 +103,14 @@ if (mode === "init") {
       ? [
           "/d",
           "/c",
-          "gradlew.bat :app:assembleRelease :app:testDebugUnitTest --console=plain",
+          "gradlew.bat :app:assembleRelease :app:testDebugUnitTest --max-workers=1 -Dorg.gradle.jvmargs=-Xmx768m --console=plain",
         ]
       : [
           "./gradlew",
           ":app:assembleRelease",
           ":app:testDebugUnitTest",
+          "--max-workers=1",
+          "-Dorg.gradle.jvmargs=-Xmx768m",
           "--console=plain",
         ],
     {

@@ -1,6 +1,6 @@
 {
   "name": "@pingo/ui",
-  "version": "2.4.1-beta.1",
+  "version": "2.5.0-beta.1",
   "private": true,
   "type": "module",
   "exports": {
@@ -8,7 +8,8 @@
     "./Pet": "./src/Pet.tsx",
     "./client": "./src/client.ts",
     "./avatar.css": "./src/avatar.css",
-    "./styles.css": "./src/styles.css"
+    "./styles.css": "./src/styles.css",
+    "./AccountForm": "./src/AccountForm.tsx"
   },
   "dependencies": {
     "react": "^19.2.0",

@@ -89,12 +89,10 @@ jobs:
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v2.')
         env:
           KEYSTORE: ${{ secrets.PINGO_ANDROID_KEYSTORE_BASE64 }}
-          GOOGLE_SERVICES: ${{ secrets.PINGO_ANDROID_GOOGLE_SERVICES_BASE64 }}
         run: |
-          test -n "$KEYSTORE" && test -n "$GOOGLE_SERVICES"
+          test -n "$KEYSTORE"
           umask 077
           printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/pingo-release.jks"
-          printf '%s' "$GOOGLE_SERVICES" | base64 --decode > apps/mobile/android/app/google-services.json
       - name: Compilar APK assinado
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v2.')
         working-directory: apps/mobile/android
@@ -107,9 +105,9 @@ jobs:
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v2.')
         run: |
           mkdir -p .verification/android-release
-          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk .verification/android-release/Pingo_2.4.1-beta.1_android.apk
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk .verification/android-release/Pingo_2.5.0-beta.1_android.apk
           cd .verification/android-release
-          sha256sum Pingo_2.4.1-beta.1_android.apk > SHA256SUMS-Android.txt
+          sha256sum Pingo_2.5.0-beta.1_android.apk > SHA256SUMS-Android.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v2.')
         with:

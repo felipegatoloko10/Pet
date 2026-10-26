@@ -61,7 +61,7 @@ export function Calendar({
       try {
         const cached = await client.storage.get(cacheKey);
         if (live) setExtra(cached ? JSON.parse(cached) : []);
-        if (client.demo) return;
+        if (client.demo || w.storageMode === "pingo") return;
         if (!navigator.onLine) {
           if (!cached)
             throw new Error(

@@ -1,6 +1,8 @@
 import { openDB } from "idb";
 import {
   applyCommand,
+  preparePingoWorkspace,
+  acknowledgePingoWorkspace,
   normalizeWorkspace,
   emptyWorkspace,
   type Workspace,
@@ -58,6 +60,7 @@ export class Api {
   constructor(
     public base = "",
     public token?: string,
+    public accountId?: string,
   ) {}
   async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(`${this.base}/api/v1/${path}`, {
@@ -65,6 +68,9 @@ export class Api {
       credentials: this.token ? "omit" : "same-origin",
       headers: {
         "Content-Type": "application/json",
+        ...(this.accountId && !this.accountId.startsWith("local:")
+          ? { "X-Pingo-Account": this.accountId }
+          : {}),
         ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
       },
       signal: AbortSignal.timeout(65000),
@@ -85,10 +91,12 @@ export type Pending = { operation: Operation; error?: string };
 export class PingoClient {
   workspace: Workspace = emptyWorkspace();
   pending: Pending[] = [];
+  serverRevision?: number;
   error = "";
   syncing = false;
   online = typeof navigator === "undefined" ? true : navigator.onLine;
   listeners = new Set<() => void>();
+  private active = true;
   private running = false;
   private generation = 0;
   private flushAgain = false;
@@ -97,7 +105,13 @@ export class PingoClient {
     public api: Api,
     public storage: Storage,
     public demo = false,
+    public localOnly = false,
   ) {}
+  dispose() {
+    this.active = false;
+    this.generation++;
+    this.listeners.clear();
+  }
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
     return () => {
@@ -111,7 +125,11 @@ export class PingoClient {
     // A single IndexedDB/SQLite write commits the optimistic view and queue together.
     await this.storage.set(
       "snapshot",
-      JSON.stringify({ workspace: this.workspace, pending: this.pending }),
+      JSON.stringify({
+        workspace: this.workspace,
+        pending: this.pending,
+        serverRevision: this.serverRevision,
+      }),
     );
   }
   async init() {
@@ -122,9 +140,13 @@ export class PingoClient {
         ...emptyWorkspace(),
         ...saved.workspace,
       });
-      this.pending = saved.pending;
+      this.pending = Array.isArray(saved.pending) ? saved.pending : [];
+      this.serverRevision = Number.isInteger(saved.serverRevision)
+        ? saved.serverRevision
+        : undefined;
       this.emit();
-      await this.refresh();
+      if (!this.demo) this.workspace = preparePingoWorkspace(this.workspace);
+      void this.refresh();
       return;
     }
     const cached = await this.storage.get("workspace");
@@ -135,11 +157,13 @@ export class PingoClient {
         ...JSON.parse(cached),
       });
     if (queue) this.pending = JSON.parse(queue);
+    if (!this.demo) this.workspace = preparePingoWorkspace(this.workspace);
     this.emit();
     await this.refresh();
   }
   async refresh() {
-    if (this.demo) {
+    if (!this.active) return;
+    if (this.demo || this.localOnly) {
       this.emit();
       return;
     }
@@ -153,12 +177,25 @@ export class PingoClient {
       await this.flush();
       if (this.pending.length || this.running) return;
       const generation = this.generation;
-      const r = await this.api.request<{ workspace: Workspace }>("workspace");
+      const r = await this.api.request<{
+        workspace?: Workspace;
+        unchanged?: boolean;
+      }>(
+        this.serverRevision === undefined
+          ? "workspace"
+          : `workspace?revision=${this.serverRevision}`,
+      );
+      if (r.unchanged || !r.workspace) {
+        this.error = "";
+        this.emit();
+        return;
+      }
       if (generation !== this.generation) return;
       this.workspace = normalizeWorkspace({
         ...emptyWorkspace(),
         ...r.workspace,
       });
+      this.serverRevision = this.workspace.revision;
       this.error = "";
       await this.persist();
     } catch (e) {
@@ -167,17 +204,23 @@ export class PingoClient {
     this.emit();
   }
   async command(command: Command) {
+    if (!this.active)
+      throw new Error(
+        "Sua conta mudou. Abra novamente o item antes de salvar.",
+      );
     const operation = { operationId: crypto.randomUUID(), command };
     this.workspace = applyCommand(
       this.workspace,
       command,
       operation.operationId,
     );
-    this.pending.push({ operation });
+    if (!this.localOnly) this.pending.push({ operation });
+    else acknowledgePingoWorkspace(this.workspace);
     this.generation++;
     await this.persist();
     this.emit();
-    if (this.demo) {
+    if (this.demo || this.localOnly) {
+      if (this.localOnly) acknowledgePingoWorkspace(this.workspace);
       this.pending = [];
       this.workspace.outbox = [];
       await this.persist();
@@ -189,7 +232,8 @@ export class PingoClient {
       await new Promise<void>((resolve) => this.flushWaiters.push(resolve));
       return;
     }
-    if (this.demo || !navigator.onLine) return;
+    if (!this.active || this.demo || this.localOnly || !navigator.onLine)
+      return;
     this.running = true;
     this.syncing = true;
     this.emit();
@@ -202,14 +246,16 @@ export class PingoClient {
           return;
         }
         this.pending = result.pending;
-        if (result.workspace)
+        if (result.workspace) {
           this.workspace = normalizeWorkspace(result.workspace);
+          this.serverRevision = this.workspace.revision;
+        }
         this.error =
           this.pending.find((p) => p.error)?.error ??
           (this.pending.length ? "Alterações guardadas para sincronizar." : "");
         return;
       }
-      while (this.pending.length && !this.pending[0].error) {
+      while (this.active && this.pending.length && !this.pending[0].error) {
         const entry = this.pending[0];
         try {
           const result = await this.api.post<{ workspace: Workspace }>(
@@ -217,6 +263,7 @@ export class PingoClient {
             entry.operation,
           );
           this.pending.shift();
+          this.serverRevision = result.workspace.revision;
           let next = { ...emptyWorkspace(), ...result.workspace };
           for (const p of this.pending) {
             try {
@@ -259,27 +306,8 @@ export class PingoClient {
     }
   }
   async sync() {
-    await this.flush();
-    if (this.demo || this.pending.length || this.running || !navigator.onLine)
-      return;
-    this.syncing = true;
-    this.emit();
-    try {
-      const generation = this.generation;
-      const r = await this.api.post<{ workspace: Workspace }>("sync");
-      if (generation !== this.generation) return;
-      this.workspace = normalizeWorkspace({
-        ...emptyWorkspace(),
-        ...r.workspace,
-      });
-      await this.persist();
-      this.error = "";
-    } catch (e) {
-      this.error = e instanceof Error ? e.message : "Falha de sincronização.";
-    } finally {
-      this.syncing = false;
-      this.emit();
-    }
+    if (this.demo || this.localOnly) return;
+    await this.refresh();
   }
   async discardConflict() {
     await this.storage.discardPending?.();

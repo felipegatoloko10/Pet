@@ -1,3 +1,5 @@
+> Atualização 2.5: consulte [operação offline e Supabase](OFFLINE-SUPABASE.md). O conteúdo abaixo documenta a entrega anterior com Google.
+
 # Estado da entrega
 
 ## Correção 2.4.1

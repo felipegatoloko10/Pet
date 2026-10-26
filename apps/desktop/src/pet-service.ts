@@ -5,6 +5,7 @@ import { Api, type Storage } from "@pingo/ui/client";
 import { cachedPetUser, petSessionHash } from "./pet-cache";
 import {
   emptyWorkspace,
+  preparePingoWorkspace,
   localNotices,
   isQuiet,
   type Workspace,
@@ -43,12 +44,13 @@ export function useDesktopPet(
     }
     async function display(w: Workspace, userId: string, online: boolean) {
       const token = api.token;
-      if (!live || !token) return;
+      const localOnly = userId.startsWith("local:");
+      if (!live || (!token && !localOnly)) return;
       // A delayed poll must not replace newer preferences received from the panel.
       if (cachedUser === userId && cached && cached.revision > w.revision) return;
       const signedApi = new Api(api.base, token);
       const storage = await storageFor(userId);
-      const sessionHash = await petSessionHash(token);
+      const sessionHash = localOnly ? "local" : await petSessionHash(token!);
       if (!live || api.token !== token) return;
       if (cachedUser === userId && cached && cached.revision > w.revision) return;
       cached = w;
@@ -71,7 +73,7 @@ export function useDesktopPet(
           continue;
         }
         const serverNotice = w.notices.some((x) => x.id === n.id);
-        if (serverNotice && online) {
+        if (serverNotice && online && !localOnly) {
           try {
             const claim = await signedApi.post<{ claimed: boolean }>(
               "notifications/claim",
@@ -94,6 +96,13 @@ export function useDesktopPet(
       if (busy) return;
       busy = true;
       try {
+        const profile = JSON.parse(localStorage.getItem("pingo:user") ?? "null");
+        if (profile?.id?.startsWith("local:")) {
+          const disk = await storageFor(profile.id);
+          const raw = await disk.get("snapshot");
+          if (raw) await display(preparePingoWorkspace(JSON.parse(raw).workspace), profile.id, false);
+          return;
+        }
         const token = await invoke<string>("read_session");
         if (!live) return;
         api.token = token;
@@ -103,7 +112,7 @@ export function useDesktopPet(
           setWorkspace(emptyWorkspace());
           if (!signInHintShown) {
             signInHintShown = true;
-            setBubble("Oi! Entre com Google no meu painel para conversarmos.");
+            setBubble("Oi! Entre na sua conta no meu painel para conversarmos.");
             hideTimer = setTimeout(() => setBubble(""), 7000);
           }
           return;

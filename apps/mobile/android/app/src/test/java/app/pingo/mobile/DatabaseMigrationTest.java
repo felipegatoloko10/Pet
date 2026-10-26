@@ -17,6 +17,6 @@ public class DatabaseMigrationTest {
         String snapshot=new JSONObject().put("workspace",new JSONObject().put("revision",7)).put("pending",new JSONArray().put(new JSONObject().put("operation",new JSONObject().put("operationId","preserved").put("command",new JSONObject().put("type","pet.care").put("action","pet"))))).toString();
         old.getWritableDatabase().execSQL("INSERT INTO cache(user_id,k,v) VALUES(?,?,?)",new Object[]{"alice","snapshot",snapshot});old.close();
         PingoDatabase migrated=PingoDatabase.get(c);JSONObject value=new JSONObject(migrated.read("alice","snapshot"));
-        assertEquals(7,value.getJSONObject("workspace").getInt("revision"));assertEquals("preserved",value.getJSONArray("pending").getJSONObject(0).getJSONObject("operation").getString("operationId"));assertEquals(3,migrated.getReadableDatabase().getVersion());
+        assertEquals(7,value.getJSONObject("workspace").getInt("revision"));assertEquals("preserved",value.getJSONArray("pending").getJSONObject(0).getJSONObject("operation").getString("operationId"));assertEquals(4,migrated.getReadableDatabase().getVersion());
     }
 }

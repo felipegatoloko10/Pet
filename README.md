@@ -4,6 +4,8 @@ Companheiro pessoal para tarefas, agenda, rotina e pequenos cuidados. Beta gratu
 
 [Abrir o Pingo](https://pingo-gilt.vercel.app) · [Android](docs/ANDROID.md) · [Migração para Supabase](docs/OFFLINE-SUPABASE.md)
 
+O visual da **2.5.0-beta.2** combina cores pastel, contornos de adesivo e navegação adaptada ao celular. As cores das colunas continuam personalizáveis. A fonte [Fredoka](https://github.com/google/fonts/tree/main/ofl/fredoka) é incorporada ao app sob a [licença OFL](packages/ui/src/fonts/OFL-Fredoka.txt), e os adesivos são vetores locais. Não é necessária conexão para carregar esses recursos.
+
 **Usar neste aparelho** abre um quadro e uma agenda reais, sem conta e sem internet. Dados são guardados no SQLite do Android/Windows e no IndexedDB da web. Uma conta do Pingo, por e-mail e senha, permite sincronizar os dispositivos quando houver conexão. Selecione **Não tem conta? Criar conta**, preencha nome, e-mail e senha e comece com um espaço vazio, sem convite ou autorização Google.
 
 A versão 2.5 não consulta Google Tasks, Agenda ou Gmail e não usa Firebase para notificações. Tarefas e horários pertencem ao Pingo. O avatar permanece transparente, com animações e cuidados locais. Conversa com IA é opcional e necessita de internet e uma chave OpenAI ou Claude.

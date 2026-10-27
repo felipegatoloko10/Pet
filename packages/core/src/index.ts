@@ -321,10 +321,20 @@ export function newBoard(id: string, title: string, googleId?: string): Board {
     googleId,
     revision: 1,
     columns: [
-      { id: `${id}:todo`, title: "A fazer", kind: "todo" },
-      { id: `${id}:active`, title: "Em andamento", kind: "active" },
-      { id: `${id}:waiting`, title: "Aguardando", kind: "waiting" },
-      { id: `${id}:done`, title: "Concluído", kind: "done" },
+      { id: `${id}:todo`, title: "A fazer", kind: "todo", color: "#FFC8DD" },
+      {
+        id: `${id}:active`,
+        title: "Fazendo",
+        kind: "active",
+        color: "#FFF3A8",
+      },
+      {
+        id: `${id}:waiting`,
+        title: "Aguardando",
+        kind: "waiting",
+        color: "#C9B6FF",
+      },
+      { id: `${id}:done`, title: "Feito", kind: "done", color: "#A8F0E0" },
     ],
   };
 }

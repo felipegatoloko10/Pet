@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   addDays,
   addMonths,
@@ -173,6 +174,15 @@ export function Calendar({
                   +{items.length - 3} compromissos
                 </button>
               )}
+              {!mini && items.length > 0 && (
+                <button
+                  className="month-summary"
+                  aria-label={`${items.length} compromissos em ${format(day, "d 'de' MMMM", { locale: ptBR })}`}
+                  onClick={() => openDay(dayKey)}
+                >
+                  <span aria-hidden="true">•</span> {items.length}
+                </button>
+              )}
             </div>
           );
         })}
@@ -199,7 +209,7 @@ export function Calendar({
             aria-label="Período anterior"
             onClick={() => change(-1)}
           >
-            ‹
+            <ChevronLeft size={20} aria-hidden="true" />
           </button>
           <h2>
             {view === "year"
@@ -211,7 +221,7 @@ export function Calendar({
             aria-label="Próximo período"
             onClick={() => change(1)}
           >
-            ›
+            <ChevronRight size={20} aria-hidden="true" />
           </button>
           <button className="button small" onClick={() => setDate(today)}>
             Hoje

@@ -1,0 +1,2013 @@
+/* Shared sticker-book theme. Scoped surfaces preserve the transparent desktop pet. */
+@font-face {
+  font-family: Fredoka;
+  src: url("./fonts/Fredoka-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+}
+:root {
+  --ink: #25232b;
+  --muted: #625b6a;
+  --pink: #ffc8dd;
+  --lilac: #c9b6ff;
+  --yellow: #fff3a8;
+  --sky: #b8e0ff;
+  --mint: #a8f0e0;
+  --paper: #fffefa;
+  --line: #25232b;
+  --green: #285e53;
+  --cream: #fffefa;
+  font-family: Fredoka, ui-rounded, system-ui, sans-serif;
+  color: var(--ink);
+  background: transparent;
+}
+body:has(.app-shell),
+body:has(.welcome),
+body:has(.loading) {
+  background: radial-gradient(#ffffffbd 2.5px, transparent 2.5px) 0 0 / 24px
+    24px var(--mint);
+  display: flow-root;
+}
+:where(.app-shell, .welcome, .dialog, .modal) {
+  color: var(--ink);
+  font-family: Fredoka, ui-rounded, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+:is(.app-shell, .welcome, .dialog, .modal)
+  :is(h1, h2, h3, h4, button, input, select, textarea, strong, em) {
+  font-family: inherit;
+}
+:where(.app-shell, .welcome) :where(h1, h2, h3) {
+  color: var(--ink);
+  letter-spacing: -0.025em;
+}
+:where(.app-shell, .welcome) :where(button, a) {
+  -webkit-tap-highlight-color: transparent;
+}
+:where(.app-shell, .welcome, .modal, .dialog) :focus-visible {
+  outline: 3px solid #6550a6;
+  outline-offset: 4px;
+}
+::selection {
+  background: var(--lilac);
+  color: var(--ink);
+}
+.app-shell.app-shell {
+  width: calc(100% - 40px);
+  max-width: 1660px;
+  min-height: calc(100dvh - 40px);
+  margin: 20px auto;
+  background: #fffef7f5;
+  border: 2.5px solid var(--ink);
+  border-radius: 32px;
+  box-shadow: 6px 8px 0 #25232b15;
+}
+.app-shell .sidebar {
+  width: 108px;
+  inset: 22px auto 22px max(22px, calc((100vw - 1660px) / 2 + 2px));
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.app-shell .brand {
+  flex-direction: column;
+  gap: 0;
+  padding: 22px 8px 25px;
+}
+.app-shell .logo-dot {
+  width: 46px;
+  height: 46px;
+}
+.app-shell .brand > span:last-child {
+  font-size: 27px;
+  color: var(--ink);
+  letter-spacing: -1px;
+}
+.app-shell :is(.brand small, .space-label, .little-note) {
+  display: none;
+}
+.app-shell nav {
+  margin: 0 11px;
+  padding: 7px;
+  background: #fff;
+  border: 2px solid var(--ink);
+  border-radius: 26px;
+  gap: 8px;
+  box-shadow: 3px 4px 0 #25232b18;
+}
+.app-shell .nav-item {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 11px 2px;
+  gap: 5px;
+  min-height: 64px;
+  border: 2px solid transparent;
+  border-radius: 18px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.app-shell .nav-item span {
+  display: block;
+}
+.app-shell .nav-item svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.3;
+}
+.app-shell .nav-item.selected {
+  color: var(--ink);
+  background: var(--pink);
+  border-color: var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.app-shell .nav-item:nth-child(2).selected {
+  background: var(--yellow);
+}
+.app-shell .nav-item:nth-child(3).selected {
+  background: var(--mint);
+}
+.app-shell .nav-item:nth-child(4).selected {
+  background: var(--sky);
+}
+.app-shell .nav-item:nth-child(5).selected {
+  background: var(--lilac);
+}
+.app-shell .nav-item:hover:not(.selected) {
+  background: #f3edff;
+  color: var(--ink);
+}
+.app-shell .sidebar-bottom {
+  padding: 20px 26px;
+}
+.app-shell .account {
+  padding: 6px;
+  border: 0;
+  background: transparent;
+  justify-content: center;
+}
+.app-shell .account > :not(:first-child) {
+  display: none;
+}
+.app-shell :is(.avatar-letter, .top-avatar) {
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--ink);
+  color: var(--ink);
+  background: var(--lilac);
+  font-weight: 600;
+}
+.app-shell .main-area {
+  margin-left: 108px;
+  width: calc(100% - 108px);
+  min-width: 0;
+}
+.app-shell .topbar {
+  height: 86px;
+  padding: 0 32px;
+  background: transparent;
+  border: 0;
+}
+.app-shell .topbar > span {
+  font-size: 13px;
+  color: var(--muted);
+  gap: 8px;
+}
+.app-shell .online-dot {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--ink);
+  background: var(--mint);
+}
+.app-shell .topbar > div {
+  background: #fff;
+  border: 2px solid var(--ink);
+  border-radius: 24px;
+  gap: 4px;
+  padding: 4px 8px;
+  box-shadow: 2px 3px 0 #25232b12;
+}
+.app-shell .top-account-name {
+  font-size: 13px;
+  margin: 0 7px;
+}
+.app-shell .topbar-mark {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+}
+.app-shell .topbar-mark svg {
+  width: 100%;
+  height: 100%;
+}
+.month-summary {
+  display: none;
+}
+.app-shell .page-heading h1 {
+  text-wrap: balance;
+}
+@media (min-width: 761px) {
+  .app-shell.mobile-app .sidebar {
+    height: auto;
+    box-shadow: none;
+    backdrop-filter: none;
+    border-radius: 0;
+  }
+  .app-shell.mobile-app .sidebar .brand {
+    display: flex;
+  }
+  .app-shell.mobile-app .sidebar-bottom {
+    display: block;
+  }
+  .app-shell.mobile-app nav {
+    display: flex;
+    flex-direction: column;
+  }
+}
+.app-shell .workspace {
+  max-width: 1500px;
+  padding: 5px 32px 32px;
+}
+.app-shell .page-heading {
+  gap: 16px;
+  margin-bottom: 24px;
+  align-items: center;
+}
+.app-shell .page-heading h1 {
+  font-size: clamp(28px, 3.1vw, 42px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+.app-shell .page-heading h1 em {
+  font: inherit;
+  color: inherit;
+  background: linear-gradient(
+    transparent 63%,
+    var(--pink) 63%,
+    var(--pink) 91%,
+    transparent 91%
+  );
+}
+.app-shell .page-heading p {
+  color: var(--muted);
+  font-size: 15px;
+  margin-top: 10px;
+}
+.eyebrow {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.6px;
+  color: var(--muted);
+}
+:is(.app-shell, .welcome, .dialog, .modal) .button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 10px 18px;
+  border: 2px solid var(--ink);
+  border-radius: 17px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+  background: #fff;
+  box-shadow: 2px 3px 0 var(--ink);
+  transition:
+    transform 180ms,
+    box-shadow 180ms,
+    background 180ms;
+}
+:is(.app-shell, .welcome, .dialog, .modal) .button.primary {
+  color: var(--ink);
+  background: var(--yellow);
+  border-color: var(--ink);
+}
+:is(.app-shell, .welcome, .dialog, .modal) .button.small {
+  min-height: 40px;
+  padding: 7px 13px;
+  font-size: 13px;
+}
+:is(.app-shell, .welcome, .dialog, .modal) .button.danger {
+  background: #ffe1e8;
+  color: #8a2442;
+}
+:is(.app-shell, .welcome, .dialog, .modal) .button:active:not(:disabled) {
+  transform: translate(2px, 3px);
+  box-shadow: 0 0 0 var(--ink);
+}
+:is(.app-shell, .welcome, .dialog, .modal) button:disabled {
+  opacity: 0.5;
+}
+:is(.app-shell, .welcome, .dialog, .modal) .icon-button {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  color: var(--ink);
+}
+:is(.app-shell, .welcome, .dialog, .modal) .icon-button:hover {
+  background: #f0e9ff;
+}
+.app-shell .notification-button i {
+  background: var(--pink);
+  border: 1.5px solid var(--ink);
+  width: 8px;
+  height: 8px;
+}
+:is(.app-shell, .welcome, .dialog, .modal) .text-link {
+  font-size: 14px;
+  color: #534278;
+  text-underline-offset: 4px;
+}
+:is(.app-shell, .welcome, .dialog, .modal) :is(input, select, textarea) {
+  font-family: inherit;
+  color: var(--ink);
+  font-size: 16px;
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  background: #fff;
+  min-width: 0;
+  min-height: 46px;
+  padding: 10px 12px;
+  box-shadow: none;
+}
+:is(.app-shell, .welcome, .dialog, .modal) input::placeholder,
+:is(.app-shell, .welcome, .dialog, .modal) textarea::placeholder {
+  color: #766d7f;
+  opacity: 1;
+}
+:is(.app-shell, .welcome, .dialog, .modal) input[type="checkbox"] {
+  min-height: 20px;
+  width: 20px;
+  height: 20px;
+  accent-color: #6550a6;
+  flex-shrink: 0;
+}
+.app-shell .demo-banner {
+  background: var(--yellow);
+  border: 1.5px solid var(--ink);
+  border-radius: 14px;
+  font-size: 12px;
+  color: var(--ink);
+}
+.app-shell .demo-banner button {
+  color: var(--ink);
+  font: inherit;
+  text-decoration: underline;
+}
+.app-shell :is(.error-banner, .conflict-banner) {
+  border: 2px solid #8a2442;
+  border-radius: 16px;
+  background: #fff0f3;
+  color: #8a2442;
+  font-size: 14px;
+}
+.error {
+  color: #9d2446;
+  font-size: 14px;
+}
+/* Local vector stickers stay sharp at every density. */
+.sticker {
+  display: block;
+  width: 52px;
+  height: 52px;
+  overflow: visible;
+  filter: drop-shadow(0 3px 0 #fff) drop-shadow(2px 0 0 #fff)
+    drop-shadow(-2px -2px 0 #fff);
+}
+.sticker-cluster {
+  position: relative;
+  width: 170px;
+  height: 105px;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+.sticker-cluster .sticker {
+  position: absolute;
+}
+.sticker-cluster .sticker-cloud {
+  width: 76px;
+  height: 76px;
+  left: 0;
+  top: 23px;
+  transform: rotate(-11deg);
+}
+.sticker-cluster .sticker-star {
+  left: 78px;
+  top: 0;
+  transform: rotate(12deg);
+}
+.sticker-cluster .sticker-heart {
+  width: 35px;
+  height: 35px;
+  left: 110px;
+  top: 67px;
+  transform: rotate(15deg);
+}
+.sticker-cluster .sticker-bow {
+  width: 34px;
+  height: 34px;
+  left: 136px;
+  top: 27px;
+  transform: rotate(-15deg);
+}
+.board-heading-copy {
+  position: relative;
+}
+.board-heading-art {
+  margin-left: auto;
+}
+.board-date {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  color: var(--muted);
+  text-transform: capitalize;
+  margin-bottom: 8px;
+}
+.app-shell .home-board {
+  margin-bottom: 32px;
+}
+.app-shell .home-board .board-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 190px 190px 48px;
+  gap: 10px;
+  margin: 0 0 20px;
+}
+.board-search {
+  display: flex;
+  align-items: center;
+  position: relative;
+  min-width: 0;
+}
+.board-search > svg {
+  position: absolute;
+  left: 14px;
+  pointer-events: none;
+  color: var(--muted);
+}
+.app-shell .home-board .board-toolbar :is(input, select) {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  min-height: 48px;
+  font-size: 14px;
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+  background: #fff;
+}
+.app-shell .home-board .board-search input {
+  padding-left: 42px;
+}
+.app-shell .home-board .archive-toggle {
+  min-height: 48px;
+  padding: 0;
+  border-radius: 16px;
+  box-shadow: none;
+}
+.app-shell .archive-toggle[aria-pressed="true"] {
+  background: var(--lilac);
+}
+.board-shortcuts,
+.board-scroll-note {
+  display: none;
+}
+.app-shell .home-board .kanban {
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+  gap: 18px;
+  padding: 5px 5px 14px 0;
+  scrollbar-color: #9284ac transparent;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+}
+.app-shell .home-board .kanban-column {
+  flex: 1 0 266px;
+  width: auto;
+  min-width: 266px;
+  min-height: 330px;
+  border: 2.5px solid var(--ink);
+  border-radius: 24px;
+  padding: 12px;
+  box-shadow: 3px 4px 0 #25232b24;
+}
+.app-shell .home-board .kanban-column.drop-target {
+  outline: 3px dashed #6550a6;
+  outline-offset: -7px;
+}
+.app-shell .kanban-column > header {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 12px;
+  min-height: 42px;
+}
+.app-shell .column-title {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.25;
+  padding: 4px 0;
+  min-height: 40px;
+}
+.app-shell .kanban-column > header > small {
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 5px;
+  border: 1.5px solid var(--ink);
+  border-radius: 9px;
+  background: #ffffffb3;
+  font-size: 12px;
+}
+.app-shell .kanban-column > header .icon-button {
+  width: 32px;
+  min-width: 32px;
+  height: 40px;
+}
+.app-shell .kanban-column > header .drag-handle {
+  width: 24px;
+  padding: 0;
+  font-size: 21px;
+  color: #514556;
+}
+.app-shell .task-card {
+  background: #fffefa;
+  border: 2px solid var(--ink);
+  border-radius: 19px;
+  box-shadow: 2px 3px 0 #25232b;
+  margin-bottom: 13px;
+  overflow: hidden;
+}
+.app-shell .card-controls {
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px 0;
+}
+.app-shell .card-controls .drag-handle {
+  min-width: 32px;
+  min-height: 36px;
+  padding: 4px;
+  color: #766d7f;
+  font-size: 22px;
+}
+.app-shell .card-controls .priority {
+  margin-right: auto;
+  border: 1px solid #25232b44;
+  border-radius: 8px;
+  background: var(--yellow);
+  font-size: 11px;
+  color: var(--ink);
+  padding: 3px 7px;
+}
+.app-shell .card-controls .priority-high {
+  background: var(--pink);
+}
+.app-shell .card-controls .priority-low {
+  background: var(--sky);
+}
+.app-shell .card-controls .text-link {
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+  color: var(--ink);
+}
+.app-shell .card-main {
+  padding: 7px 15px 14px;
+  text-align: left;
+}
+.app-shell .task-card h3 {
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.4;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.app-shell .task-card p {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 8px 0;
+  max-height: 3em;
+}
+.app-shell .task-card .card-main small {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.app-shell .task-card .card-due {
+  margin: 12px 0 4px;
+}
+.app-shell .task-card .card-main .sync-state {
+  font-size: 11px;
+  color: #285e53;
+}
+.app-shell .task-card .card-main :is(.state-error, .state-conflict) {
+  color: #9d2446;
+}
+.app-shell .task-card .card-main :is(.state-pending, .state-syncing) {
+  color: #71551c;
+}
+.app-shell .task-card select {
+  border: 0;
+  border-top: 1.5px solid var(--ink);
+  border-radius: 0;
+  background: #fff;
+  color: var(--ink);
+  min-height: 44px;
+  font-size: 13px;
+  padding: 9px 14px;
+}
+.app-shell .card-labels:empty {
+  display: none;
+}
+.app-shell .card-labels:not(:empty) {
+  padding: 11px 13px 3px;
+}
+.app-shell .card-labels :is(span, button) {
+  border: 1px solid var(--ink);
+  border-radius: 7px;
+  color: var(--ink);
+  font-size: 11px;
+}
+.app-shell .overdue-badge {
+  background: #ffdee7;
+  color: #842440;
+  font-size: 12px;
+  border: 1px solid #842440;
+  border-radius: 8px;
+}
+.app-shell .home-board > .add-inline {
+  width: auto;
+  display: inline-flex;
+  padding: 12px 16px;
+  min-height: 46px;
+  margin-top: 8px;
+  font-size: 14px;
+  border: 2px dashed var(--ink);
+  border-radius: 15px;
+  color: var(--ink);
+  background: #fffefa;
+}
+.column-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 8px;
+  gap: 10px;
+  color: #514556;
+  text-align: center;
+}
+.column-empty .sticker {
+  width: 42px;
+  height: 42px;
+  opacity: 0.85;
+}
+.column-empty p {
+  font-size: 13px;
+  max-width: 150px;
+  line-height: 1.6;
+}
+.app-shell .drag-preview {
+  border: 2.5px solid var(--ink);
+  padding: 20px;
+  box-shadow:
+    5px 8px 0 #25232b25,
+    0 12px 20px #25232b22;
+  background: var(--paper);
+  border-radius: 19px;
+  transform: rotate(-3deg) scale(1.03);
+  font-size: 17px;
+}
+.app-shell .day-holidays {
+  background: var(--sky) !important;
+}
+.app-shell .day-holidays .task-card {
+  padding: 16px;
+}
+/* The daily scrapbook, calendar, conversations and pet share the same materials. */
+.app-shell
+  :is(.panel, .settings-layout > .editor-form, .pause-card, .pet-room) {
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 24px;
+  box-shadow: 3px 4px 0 #25232b1a;
+}
+.app-shell .section-heading h2 {
+  color: var(--ink);
+  font-size: 21px;
+  font-weight: 500;
+}
+.app-shell .day-hero {
+  background: #e5faf4;
+  border: 2.5px solid var(--ink);
+  border-radius: 28px;
+  padding: 30px;
+  box-shadow: 4px 5px 0 #25232b18;
+}
+.app-shell .day-hero h2 {
+  font-family: inherit;
+  font-size: 32px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.03em;
+}
+.app-shell .day-hero p {
+  color: #514d59;
+  font-size: 15px;
+  line-height: 1.7;
+}
+.app-shell .pill {
+  color: var(--ink);
+  background: var(--yellow);
+  border: 1.5px solid var(--ink);
+  padding: 6px 11px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+.app-shell .hero-link {
+  font-size: 14px;
+  color: #285e53;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.app-shell .hero-decor {
+  color: #9983d2;
+}
+.app-shell .stats {
+  gap: 16px;
+}
+.app-shell .stats > div {
+  background: #fff;
+  border: 2px solid var(--ink);
+  border-radius: 20px;
+  padding: 20px;
+  gap: 12px;
+}
+.app-shell .stats strong {
+  font-family: inherit;
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.app-shell .stats > div > div > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.app-shell .stat-icon {
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  color: var(--ink);
+}
+.app-shell .stat-icon.mint {
+  background: var(--mint);
+}
+.app-shell .stat-icon.peach {
+  background: var(--yellow);
+}
+.app-shell .stat-icon.lilac {
+  background: var(--lilac);
+}
+.app-shell :is(.empty-inline, .settings-layout p, .calendar-note) {
+  color: var(--muted);
+  font-size: 14px;
+}
+.app-shell .agenda-item {
+  padding: 14px 0;
+  gap: 14px;
+}
+.app-shell .agenda-item strong {
+  font-size: 15px;
+  font-weight: 500;
+}
+.app-shell .agenda-item :is(time, small) {
+  color: var(--muted);
+  font-size: 12px;
+}
+.app-shell .agenda-item i {
+  background: var(--lilac);
+  border: 1px solid var(--ink);
+}
+.app-shell .pause-card {
+  background: #f0e9ff;
+  padding: 26px;
+}
+.app-shell .pause-card h3 {
+  font-family: inherit;
+  font-size: 24px;
+  color: var(--ink);
+}
+.app-shell .pause-card > span {
+  color: #625378;
+}
+.app-shell .workspace-footer {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+  border-color: #25232b25;
+  margin-top: 28px;
+}
+.app-shell .calendar-toolbar {
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.app-shell .calendar-toolbar h2 {
+  font-size: 21px;
+  font-weight: 500;
+}
+.app-shell .segmented {
+  background: #fff;
+  border: 2px solid var(--ink);
+  border-radius: 17px;
+  padding: 4px;
+}
+.app-shell .segmented button {
+  min-height: 38px;
+  padding: 7px 16px;
+  border-radius: 11px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.app-shell .segmented .active {
+  background: var(--yellow);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+.app-shell :is(.calendar-grid, .month-grid) {
+  border: 2px solid var(--ink);
+  border-radius: 22px;
+  background: #fffefa;
+}
+.app-shell .calendar-day {
+  border-color: #25232b33;
+  padding: 10px;
+}
+.app-shell .calendar-day > header {
+  border-color: #25232b26;
+}
+.app-shell .calendar-day header span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.app-shell .calendar-day header strong {
+  font-family: inherit;
+  font-size: 24px;
+  color: var(--ink);
+}
+.app-shell .is-today {
+  background: #f4eeff;
+}
+.app-shell .is-today header strong,
+.app-shell .is-today .day-number {
+  background: var(--yellow);
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+}
+.app-shell :is(.calendar-event, .month-event) {
+  background: var(--mint);
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+  border-radius: 10px;
+  box-shadow: 1px 2px 0 #25232b18;
+}
+.app-shell .calendar-event strong {
+  font-size: 13px;
+}
+.app-shell .calendar-event small {
+  font-size: 11px;
+  color: #42434e;
+}
+.app-shell .calendar-day:nth-child(3n + 2) .calendar-event {
+  background: #e9dfff;
+}
+.app-shell .calendar-day:nth-child(3n + 3) .calendar-event {
+  background: #fff3c6;
+}
+.app-shell .calendar-add {
+  border: 1.5px dashed #766d7f;
+  min-height: 40px;
+  color: var(--muted);
+  border-radius: 10px;
+}
+.app-shell .weekday {
+  color: var(--muted);
+  font-size: 12px;
+}
+.app-shell .month-cell {
+  border-color: #25232b26;
+  min-height: 115px;
+}
+.app-shell .day-number {
+  color: var(--ink);
+  font-size: 14px;
+  min-width: 32px;
+  min-height: 32px;
+}
+.app-shell .month-event {
+  font-size: 12px;
+}
+.app-shell .month-cell.outside {
+  opacity: 0.55;
+}
+.app-shell .mini-month {
+  border-radius: 22px;
+  padding: 18px;
+}
+.app-shell .mini-month-grid {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.app-shell .mini-month-grid .month-cell {
+  min-height: 36px;
+}
+.app-shell .month-title {
+  font-size: 17px;
+  color: var(--ink);
+}
+.app-shell .busy-dot {
+  background: #6550a6;
+}
+.app-shell .chat-app {
+  border: 2.5px solid var(--ink);
+  border-radius: 24px;
+  min-height: 0;
+}
+.app-shell .workspace:has(.chat-app) {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 128px);
+  min-height: 0;
+}
+.app-shell .workspace:has(.chat-app) > .chat-app {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.app-shell .workspace:has(.chat-app) > .demo-banner {
+  flex-shrink: 0;
+}
+.app-shell .workspace:has(.chat-app) > .workspace-footer {
+  display: none;
+}
+.app-shell .chat-history {
+  background: #eee6ff;
+  border-right: 2px solid var(--ink);
+  padding: 16px 12px;
+}
+.app-shell .history-row {
+  border: 1.5px solid transparent;
+  border-radius: 13px;
+}
+.app-shell .history-row.selected {
+  background: #fffefa;
+  border-color: var(--ink);
+}
+.app-shell .history-row button {
+  font-size: 14px;
+  min-height: 40px;
+}
+.app-shell .chat-main > header {
+  border-bottom: 2px solid var(--ink);
+  padding: 14px 18px;
+  background: #fffefa;
+}
+.app-shell .chat-main h1 {
+  font-size: 19px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.app-shell .chat-main small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.app-shell .chat-transcript {
+  background: #fffefa;
+}
+.app-shell .chat-turn {
+  font-size: 16px;
+  color: var(--ink);
+}
+.app-shell .chat-turn > strong {
+  color: var(--muted);
+  font-size: 13px;
+}
+.app-shell .chat-turn.user {
+  background: #e9ddff;
+  border: 1.5px solid var(--ink);
+  border-radius: 20px 20px 5px 20px;
+}
+.app-shell .chat-empty {
+  margin: 8% auto;
+}
+.app-shell .chat-empty > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 66px;
+  height: 66px;
+  margin-bottom: 15px;
+  background: var(--mint);
+  border: 2px solid var(--ink);
+  border-radius: 22px;
+  color: var(--ink);
+  transform: rotate(-5deg);
+}
+.app-shell .chat-empty h2 {
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.app-shell .chat-empty p {
+  font-size: 15px;
+  color: var(--muted);
+  margin: 12px 0 22px;
+}
+.app-shell .prompt-chips button {
+  border: 1.5px solid var(--ink);
+  border-radius: 13px;
+  background: var(--yellow);
+  font-size: 13px;
+  color: var(--ink);
+  padding: 10px;
+  min-height: 42px;
+}
+.app-shell .chat-composer {
+  border-top: 2px solid var(--ink);
+  background: #f2edff;
+  padding: 13px 16px;
+}
+.app-shell .chat-composer textarea {
+  border: 2px solid var(--ink);
+  background: #fff;
+  border-radius: 16px;
+  font-size: 16px;
+  max-height: 150px;
+  min-height: 50px;
+}
+.app-shell .chat-composer .button {
+  min-height: 50px;
+}
+.app-shell .pet-room {
+  background: #fffefa;
+  padding: 28px;
+  overflow: hidden;
+  position: relative;
+}
+.app-shell .pet-room-heading {
+  position: relative;
+  z-index: 1;
+}
+.app-shell .pet-room-heading h2 {
+  font-size: 32px;
+  font-weight: 500;
+}
+.app-shell :is(.pet-room-heading p, .pet-care-note) {
+  color: var(--muted);
+  font-size: 14px;
+}
+.app-shell .pet-room-stage {
+  position: relative;
+  margin: 18px 0;
+  border: 2px solid var(--ink);
+  border-radius: 26px;
+  background: radial-gradient(#fff 3px, transparent 3px) 0 0 / 26px 26px #ddf9f1;
+}
+.app-shell .pet-room-stage .sticker-cluster {
+  position: absolute;
+  inset: 15px auto auto 12px;
+  transform: scale(0.8);
+  transform-origin: top left;
+}
+.app-shell .pet-meter {
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+  background: var(--paper);
+  padding: 14px;
+}
+.app-shell .pet-meter span {
+  font-size: 13px;
+  color: var(--ink);
+}
+.app-shell .pet-meter progress {
+  height: 12px;
+  border: 1.5px solid var(--ink);
+}
+.app-shell .pet-meter progress::-webkit-progress-bar {
+  background: #f0eef2;
+}
+.app-shell .pet-meter progress::-webkit-progress-value {
+  background: #7edcc9;
+}
+.app-shell .pet-meter.peach progress::-webkit-progress-value {
+  background: #f7df78;
+}
+.app-shell .pet-meter.pink progress::-webkit-progress-value {
+  background: #f4a5c6;
+}
+.app-shell .pet-care-actions button {
+  border: 2px solid var(--ink);
+  box-shadow: 2px 3px 0 var(--ink);
+  border-radius: 18px;
+  font-size: 14px;
+  background: var(--pink);
+  color: var(--ink);
+  min-height: 92px;
+}
+.app-shell .pet-care-actions button:nth-child(2) {
+  background: var(--yellow);
+}
+.app-shell .pet-care-actions button:nth-child(3) {
+  background: var(--lilac);
+}
+.app-shell .pet-care-actions button:nth-child(4) {
+  background: var(--sky);
+}
+.app-shell .pet-care-actions button:active {
+  transform: translate(2px, 3px);
+  box-shadow: none;
+}
+.app-shell .pet-balloon,
+.welcome .pet-balloon {
+  border: 2px solid var(--ink);
+  border-radius: 18px;
+  background: #fffefa;
+  color: var(--ink);
+  box-shadow: 2px 3px 0 #25232b1a;
+  font-family: inherit;
+  font-size: 13px;
+}
+/* Editors retain their own scroll surface and readable form controls. */
+:is(.app-shell, .welcome) :is(.dialog, .modal),
+.modal {
+  background: #fffefa;
+  color: var(--ink);
+  border: 2.5px solid var(--ink);
+  border-radius: 26px;
+  box-shadow:
+    5px 6px 0 #25232b26,
+    0 24px 70px #25232b26;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 40px);
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+:is(.dialog, .modal)::backdrop {
+  background: #27223566;
+  backdrop-filter: blur(4px);
+}
+:is(.dialog, .modal) > header {
+  position: sticky;
+  top: -25px;
+  z-index: 2;
+  padding: 6px 0 13px;
+  background: #fffefa;
+  border-bottom: 1.5px solid #25232b22;
+}
+:is(.dialog, .modal) h2 {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--ink);
+}
+:is(.dialog, .modal) .editor-form {
+  gap: 18px;
+}
+.editor-form label,
+.app-shell .editor-form label {
+  color: var(--ink);
+  font-size: 15px;
+  gap: 7px;
+}
+.editor-form fieldset {
+  border: 2px solid var(--ink);
+  border-radius: 18px;
+  background: #f3edff;
+  padding: 16px;
+}
+.editor-form legend {
+  padding: 0 7px;
+  font-size: 17px;
+}
+.editor-form :is(small, p),
+.app-shell .settings-layout small {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.form-actions {
+  border-color: #25232b22;
+  gap: 12px;
+}
+.app-shell .routine-editor :is(p, summary) {
+  color: var(--muted);
+  font-size: 14px;
+}
+.app-shell .routine-editor details {
+  border-color: #25232b2e;
+}
+.app-shell .routine-editor summary {
+  padding: 8px 0;
+  color: var(--ink);
+}
+.app-shell .routine-slot {
+  flex-wrap: wrap;
+}
+.app-shell .color-options button {
+  border: 2px solid var(--ink);
+}
+.pastel-palette {
+  gap: 10px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.pastel-palette button {
+  height: 40px;
+  min-width: 0;
+  border: 1.5px solid #25232b70;
+  border-radius: 12px;
+}
+.pastel-palette button[aria-pressed="true"] {
+  border: 3px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+  color: var(--ink);
+}
+.app-shell .toast {
+  background: var(--yellow);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+  box-shadow: 3px 4px 0 #25232b;
+  font-size: 14px;
+  max-width: calc(100vw - 32px);
+}
+.welcome.welcome {
+  margin: 20px;
+  min-height: calc(100dvh - 40px);
+  border: 2.5px solid var(--ink);
+  border-radius: 32px;
+  padding: 30px 6%;
+  background: #fffefa;
+  box-shadow: 6px 8px 0 #25232b15;
+}
+.welcome .welcome-brand {
+  color: var(--ink);
+  font-size: 32px;
+  font-weight: 600;
+}
+.welcome .welcome-brand small {
+  background: var(--lilac);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  border-radius: 8px;
+  font-size: 10px;
+}
+.welcome .welcome-content h1 {
+  font-family: inherit;
+  color: var(--ink);
+  font-size: clamp(42px, 5.4vw, 72px);
+  line-height: 1.06;
+  letter-spacing: -0.04em;
+  font-weight: 600;
+}
+.welcome .welcome-content h1 em {
+  font: inherit;
+  background: linear-gradient(
+    transparent 55%,
+    var(--pink) 55%,
+    var(--pink) 95%,
+    transparent 95%
+  );
+  color: var(--ink);
+}
+.welcome .welcome-content p {
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.7;
+}
+.welcome .welcome-content .text-button {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  justify-content: flex-start;
+  color: #534278;
+  padding-left: 0;
+}
+.welcome .welcome-content small {
+  color: var(--muted);
+  font-size: 13px;
+}
+.welcome .welcome-pet {
+  position: relative;
+  padding: 48px 24px 25px;
+  border: 2.5px solid var(--ink);
+  border-radius: 48% 48% 28px 28px;
+  background: radial-gradient(#fff 3px, transparent 3px) 0 0 / 24px 24px
+    var(--mint);
+  box-shadow: 5px 6px 0 #25232b;
+  transform: rotate(3deg);
+}
+.welcome .welcome-pet .sticker-cluster {
+  position: absolute;
+  top: -45px;
+  right: -20px;
+}
+.welcome .pet-caption {
+  font-family: inherit;
+  color: var(--ink);
+  font-size: 13px;
+}
+.welcome > footer {
+  color: var(--muted);
+  font-size: 13px;
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  :is(.app-shell, .welcome, .dialog, .modal) .button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 2px 5px 0 var(--ink);
+  }
+  .app-shell .task-card:hover {
+    box-shadow: 3px 5px 0 var(--ink);
+  }
+}
+@media (max-width: 1100px) {
+  .board-heading-art {
+    display: none;
+  }
+  .app-shell .workspace {
+    padding-left: 22px;
+    padding-right: 22px;
+  }
+  .app-shell .home-board .board-toolbar {
+    grid-template-columns: minmax(160px, 1fr) 165px 165px 48px;
+  }
+  .app-shell .page-heading h1 {
+    font-size: 34px;
+  }
+}
+@media (max-width: 760px) {
+  .app-shell.app-shell {
+    margin: 0;
+    width: 100%;
+    min-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding-bottom: 0;
+    background: radial-gradient(#ffffffaa 2px, transparent 2px) 0 0 / 24px 24px
+      #e6faf4;
+  }
+  .app-shell .sidebar,
+  .app-shell.mobile-app .sidebar {
+    position: fixed;
+    inset: auto 10px max(10px, env(safe-area-inset-bottom));
+    width: auto;
+    height: auto;
+    padding: 5px;
+    z-index: 60;
+    border: 2.5px solid var(--ink);
+    border-radius: 23px;
+    background: #fffefa;
+    box-shadow:
+      3px 4px 0 #25232b,
+      0 -4px 18px #25232b0a;
+    backdrop-filter: none;
+  }
+  .app-shell .sidebar :is(.brand, .sidebar-bottom) {
+    display: none;
+  }
+  .app-shell nav,
+  .app-shell.mobile-app nav {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+    gap: 3px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .app-shell .nav-item,
+  .app-shell.mobile-app .nav-item {
+    min-height: 56px;
+    padding: 6px 0;
+    border-radius: 16px;
+    gap: 3px;
+    font-size: 11px;
+    min-width: 0;
+  }
+  .app-shell .nav-item span {
+    font-size: 11px;
+  }
+  .app-shell .main-area {
+    margin: 0;
+    width: 100%;
+  }
+  .app-shell .topbar,
+  .app-shell.mobile-app .topbar {
+    height: auto;
+    min-height: 78px;
+    padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+    gap: 8px;
+  }
+  .app-shell .topbar > span {
+    font-size: 12px;
+  }
+  .app-shell .topbar > div {
+    padding: 3px 5px;
+    gap: 1px;
+    border-radius: 20px;
+  }
+  .app-shell .top-account-name {
+    display: none;
+  }
+  .app-shell .top-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
+  }
+  .app-shell .topbar .icon-button {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+  .app-shell .workspace,
+  .app-shell.mobile-app .workspace {
+    padding: 12px 16px calc(106px + env(safe-area-inset-bottom));
+  }
+  .app-shell .page-heading {
+    flex-wrap: wrap;
+    margin-bottom: 22px;
+    gap: 16px;
+  }
+  .app-shell .page-heading h1 {
+    font-size: clamp(29px, 7.9vw, 38px);
+    line-height: 1.12;
+  }
+  .app-shell .page-heading p {
+    font-size: 14px;
+    margin-top: 8px;
+  }
+  .app-shell .home-board .page-heading {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 14px 8px;
+  }
+  .board-heading-copy {
+    grid-column: 1 / -1;
+    padding-right: 54px;
+  }
+  .board-heading-art {
+    display: block;
+    position: absolute;
+    top: 12px;
+    right: 2px;
+    width: 44px;
+    height: 48px;
+  }
+  .board-heading-art .sticker:not(.sticker-star) {
+    display: none;
+  }
+  .board-heading-art .sticker-star {
+    left: 0;
+    top: 0;
+    width: 43px;
+    height: 43px;
+    transform: rotate(12deg);
+  }
+  .app-shell .home-board .page-heading > .button {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-height: 48px;
+    font-size: 16px;
+  }
+  .app-shell .home-board .board-toolbar {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 48px;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .board-search {
+    grid-column: 1 / -1;
+  }
+  .app-shell .home-board .board-toolbar :is(input, select) {
+    font-size: 14px;
+    padding-left: 10px;
+    height: 48px;
+  }
+  .app-shell .home-board .board-search input {
+    font-size: 16px;
+    padding-left: 42px;
+  }
+  .app-shell .board-shortcuts {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 2px 3px 7px 0;
+    margin-bottom: 2px;
+    scrollbar-width: none;
+  }
+  .board-shortcuts button {
+    border: 1.5px solid var(--ink);
+    border-radius: 13px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 8px 13px;
+    color: var(--ink);
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .board-shortcuts button[aria-pressed="true"] {
+    box-shadow: 2px 3px 0 var(--ink);
+    font-weight: 500;
+  }
+  .board-shortcuts small {
+    min-width: 19px;
+    border: 1px solid #25232b77;
+    border-radius: 6px;
+    background: #ffffff99;
+    font-size: 11px;
+    padding: 0 4px;
+  }
+  .board-scroll-note {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--muted);
+    margin: 6px 2px;
+  }
+  .app-shell .home-board .kanban {
+    gap: 14px;
+    padding-top: 4px;
+    padding-bottom: 15px;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: 0;
+  }
+  .app-shell .home-board .kanban.is-dragging {
+    scroll-snap-type: none;
+  }
+  .app-shell .home-board .kanban-column {
+    flex: 0 0 calc(100% - 22px);
+    width: calc(100% - 22px);
+    min-width: 0;
+    min-height: 265px;
+    padding: 10px;
+    border-radius: 23px;
+    scroll-snap-align: start;
+  }
+  .app-shell .kanban-column > header {
+    margin-bottom: 8px;
+    gap: 1px;
+  }
+  .app-shell .kanban-column > header :is(.icon-button, .drag-handle) {
+    width: 42px;
+    min-width: 42px;
+    min-height: 48px;
+    height: 48px;
+  }
+  .app-shell .kanban-column > header .drag-handle {
+    width: 28px;
+    min-width: 28px;
+  }
+  .app-shell .column-title {
+    font-size: 18px;
+    min-height: 48px;
+    overflow-wrap: anywhere;
+  }
+  .app-shell .card-controls {
+    padding: 0 7px;
+  }
+  .app-shell .card-controls :is(.drag-handle, .text-link) {
+    min-height: 48px;
+    min-width: 48px;
+    width: 48px;
+  }
+  .app-shell .card-main {
+    padding: 3px 16px 14px;
+  }
+  .app-shell .task-card h3 {
+    font-size: 18px;
+  }
+  .app-shell .task-card select {
+    min-height: 48px;
+    font-size: 15px;
+  }
+  .app-shell .home-board > .add-inline {
+    min-height: 48px;
+  }
+  .app-shell .day-hero {
+    padding: 24px 20px;
+    gap: 14px;
+  }
+  .app-shell .day-hero h2 {
+    font-size: 28px;
+  }
+  .app-shell .day-hero p {
+    font-size: 14px;
+  }
+  .app-shell .day-hero .pet-scene {
+    width: 140px;
+    flex-shrink: 0;
+  }
+  .app-shell .stats {
+    gap: 8px;
+  }
+  .app-shell .stats > div {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 13px;
+    gap: 10px;
+    border-radius: 17px;
+  }
+  .app-shell .stats strong {
+    font-size: 25px;
+  }
+  .app-shell .stats > div > div > span {
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .app-shell .stats .stat-icon {
+    width: 34px;
+    height: 34px;
+  }
+  .app-shell .day-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .app-shell .panel {
+    padding: 20px;
+  }
+  .app-shell .section-heading h2 {
+    font-size: 21px;
+  }
+  .app-shell .calendar-toolbar {
+    margin: 16px 0;
+  }
+  .app-shell .calendar-toolbar > div {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .app-shell .calendar-toolbar > div:first-child {
+    width: 100%;
+  }
+  .app-shell .calendar-toolbar h2 {
+    font-size: 20px;
+    flex: 1;
+    order: -1;
+    width: 100%;
+    flex-basis: 100%;
+    margin-bottom: 4px;
+  }
+  .app-shell .segmented {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .app-shell .segmented button {
+    min-height: 44px;
+    padding: 6px;
+    font-size: 14px;
+  }
+  .app-shell .calendar-grid:not(.daily) {
+    grid-template-columns: repeat(7, minmax(155px, 1fr));
+    scroll-snap-type: x proximity;
+  }
+  .app-shell .calendar-day {
+    scroll-snap-align: start;
+    min-height: 300px;
+  }
+  .app-shell .calendar-event {
+    padding: 10px;
+    min-height: 48px;
+  }
+  .app-shell .calendar-add {
+    min-height: 48px;
+  }
+  .app-shell .month-cell {
+    min-height: 88px;
+    padding: 2px;
+  }
+  .app-shell .month-event {
+    font-size: 10px;
+    border-width: 1px;
+    border-radius: 6px;
+    padding: 4px 2px;
+  }
+  .app-shell .month-grid .month-event,
+  .app-shell .month-grid .text-link {
+    display: none;
+  }
+  .app-shell .month-grid .month-summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    font-size: 14px;
+    width: 100%;
+    min-height: 34px;
+    padding: 3px;
+    background: var(--lilac);
+    border: 1px solid var(--ink);
+    border-radius: 9px;
+    color: var(--ink);
+  }
+  .app-shell .month-grid .weekday {
+    font-size: 11px;
+    padding: 10px 0;
+  }
+  .app-shell .month-grid .text-link {
+    font-size: 10px;
+    min-height: 28px;
+  }
+  .app-shell .month-grid .day-number {
+    min-width: 36px;
+    min-height: 36px;
+  }
+  .app-shell .year-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .app-shell .mini-month {
+    padding: 18px;
+  }
+  .app-shell .mini-month-grid .month-cell {
+    min-height: 40px;
+  }
+  .app-shell .mini-month-grid .day-number {
+    width: 100%;
+    min-height: 40px;
+  }
+  .app-shell .month-title {
+    min-height: 44px;
+    font-size: 20px;
+  }
+  .app-shell .workspace:has(.chat-app) {
+    height: calc(100dvh - 78px - env(safe-area-inset-top));
+    padding: 8px 10px calc(94px + env(safe-area-inset-bottom));
+  }
+  .app-shell .chat-app {
+    display: flex;
+    border-radius: 22px;
+    min-height: 0;
+  }
+  .app-shell .chat-history {
+    display: none;
+  }
+  .app-shell .chat-history.expanded {
+    display: flex;
+    position: absolute;
+    inset: 78px 12% 0 0;
+    z-index: 5;
+    box-shadow: 10px 0 20px #25232b1c;
+    border-top: 2px solid var(--ink);
+  }
+  .app-shell .chat-main {
+    width: 100%;
+  }
+  .app-shell .chat-app .history-toggle {
+    display: block;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .app-shell .chat-main > header {
+    padding: 10px;
+    gap: 8px;
+  }
+  .app-shell .chat-main h1 {
+    font-size: 17px;
+  }
+  .app-shell .chat-main small {
+    font-size: 11px;
+  }
+  .app-shell .chat-transcript {
+    padding: 18px 14px;
+    overscroll-behavior: contain;
+  }
+  .app-shell .chat-empty {
+    margin: 20px auto;
+  }
+  .app-shell .chat-empty h2 {
+    font-size: 25px;
+  }
+  .app-shell .chat-composer {
+    padding: 10px;
+  }
+  .app-shell .chat-composer textarea {
+    padding: 11px;
+    resize: none;
+  }
+  .app-shell .chat-composer .button {
+    padding: 10px 12px;
+  }
+  .app-shell .pet-room {
+    padding: 20px 14px;
+  }
+  .app-shell .pet-room-heading h2 {
+    font-size: 29px;
+  }
+  .app-shell .pet-room-stage {
+    min-height: 275px;
+  }
+  .app-shell .pet-room-stage .sticker-cluster {
+    transform: scale(0.6);
+    inset: 5px auto auto 5px;
+  }
+  .app-shell .pet-meters {
+    gap: 7px;
+    margin-bottom: 20px;
+  }
+  .app-shell .pet-meter {
+    padding: 10px 8px;
+    border-radius: 14px;
+  }
+  .app-shell .pet-meter span {
+    flex-direction: column;
+    gap: 2px;
+    font-size: 13px;
+  }
+  .app-shell .pet-meter strong {
+    font-size: 19px;
+    font-weight: 500;
+  }
+  .app-shell .pet-care-actions {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .app-shell .pet-care-actions button {
+    flex-direction: row;
+    justify-content: center;
+    min-height: 64px;
+    gap: 9px;
+    padding: 12px 4px;
+  }
+  .app-shell .pet-room > .button {
+    width: 100%;
+    min-height: 48px;
+  }
+  .app-shell .settings-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .app-shell .settings-layout > .editor-form {
+    padding: 20px 16px;
+  }
+  .app-shell .pet-settings {
+    flex-wrap: wrap;
+  }
+  .app-shell .routine-slot input {
+    max-width: calc(50% - 24px);
+  }
+  :is(.app-shell, .welcome) :is(.dialog, .modal),
+  .modal {
+    max-width: calc(100vw - 16px);
+    width: calc(100vw - 16px);
+    max-height: calc(
+      100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+    );
+    padding: 20px;
+    border-radius: 26px;
+  }
+  .editor-form label {
+    font-size: 15px;
+  }
+  :is(.dialog, .modal) > header {
+    top: -21px;
+    padding-top: 4px;
+  }
+  :is(.dialog, .modal) > header h2 {
+    font-size: 23px;
+  }
+  :is(.dialog, .modal) .icon-button {
+    width: 48px;
+    min-width: 48px;
+    height: 48px;
+  }
+  .editor-form .form-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .editor-form fieldset {
+    padding: 14px;
+  }
+  .form-actions {
+    position: sticky;
+    bottom: -21px;
+    background: #fffefa;
+    margin-bottom: -1px;
+    padding: 16px 0 6px;
+    z-index: 1;
+  }
+  .form-actions .button.primary {
+    flex: 1;
+    min-height: 48px;
+  }
+  .column-editor {
+    padding: 0;
+  }
+  .pastel-palette {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .pastel-palette button {
+    min-height: 42px;
+  }
+  .app-shell .toast {
+    bottom: calc(96px + env(safe-area-inset-bottom));
+    font-size: 14px;
+    white-space: normal;
+  }
+  .app-shell .workspace-footer {
+    font-size: 11px;
+    gap: 15px;
+  }
+  .welcome.welcome {
+    margin: 10px;
+    padding: 24px;
+    min-height: calc(100dvh - 20px);
+    border-radius: 26px;
+  }
+  .welcome .welcome-content {
+    padding: 35px 0 10px;
+    gap: 65px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .welcome .welcome-content h1 {
+    font-size: 44px;
+  }
+  .welcome .welcome-content p {
+    font-size: 16px;
+  }
+  .welcome .welcome-content .button {
+    width: 100%;
+    min-height: 48px;
+    font-size: 15px;
+  }
+  .welcome .welcome-pet {
+    width: 260px;
+    max-width: 100%;
+    margin: 0 auto 10px;
+    min-width: 0;
+    padding: 40px 14px 20px;
+  }
+  .welcome > footer {
+    font-size: 12px;
+  }
+}
+@media (max-width: 390px) {
+  .app-shell .workspace {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .app-shell .topbar {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .app-shell .nav-item span {
+    font-size: 10px;
+  }
+  .app-shell .home-board .board-toolbar select {
+    font-size: 13px;
+    padding-left: 7px;
+  }
+  .app-shell .kanban-column > header .drag-handle {
+    min-width: 22px;
+    width: 22px;
+  }
+  .app-shell .column-title {
+    font-size: 16px;
+  }
+  .app-shell .day-hero {
+    flex-direction: column;
+  }
+  .app-shell .day-hero .pet-scene {
+    align-self: center;
+    width: 170px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

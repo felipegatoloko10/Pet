@@ -9,6 +9,7 @@ import {
   type PetState,
 } from "@pingo/core";
 import { Pet } from "./Pet";
+import { StickerCluster } from "./Stickers";
 export function PetRoom({
   w,
   act,
@@ -87,6 +88,7 @@ export function PetRoom({
         <p>Cuide do seu dia. E receba um carinho no caminho.</p>
       </div>
       <div className="pet-room-stage">
+        <StickerCluster />
         <Pet
           preferences={w.preferences}
           care={care}

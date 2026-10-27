@@ -1,4 +1,13 @@
-Pingo 2.5.0-beta.1 — tarefas e agenda próprias, com uso offline e Supabase.
+Pingo 2.5.0-beta.2 — um caderninho kawaii para sua rotina.
+
+- Visual renovado em Android, web e painel Windows: menta, rosa, lilás, amarelo e azul, contornos escuros e cartões como adesivos.
+- Fonte Fredoka incorporada, sem downloads de fontes durante o uso e disponível offline.
+- Quadro com atalhos para as colunas no celular, áreas maiores para toque, arraste suave e preferência de movimento reduzido respeitada.
+- Novos quadros começam com A fazer em rosa, Fazendo em amarelo, Aguardando em lilás e Feito em menta. As cores e os nomes já personalizados são preservados.
+- Agenda, conversas, cantinho do pet, entrada e formulários seguem o novo visual. No mês, o celular mostra a quantidade de compromissos em cada dia; tocar abre os detalhes.
+- Navegação inferior em telas pequenas, campos legíveis e botão de salvar acessível durante a rolagem dos formulários.
+
+Mantidos os recursos da versão 2.5:
 
 - Quadro e agenda disponíveis sem conta em **Usar neste aparelho**.
 - Conta do Pingo com **Não tem conta? Criar conta**: nome, e-mail e senha, sem convite ou Google. Cada cadastro começa vazio.

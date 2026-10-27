@@ -54,6 +54,7 @@ import {
   nextDay,
 } from "@pingo/core";
 import { PingoMark } from "./PingoMark";
+import { StickerCluster } from "./Stickers";
 import { useModalScrollLock } from "./modal-scroll";
 import {
   Api,
@@ -174,6 +175,9 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   const chosenProfile = useRef(false);
   const [, render] = useState(0);
   const [screen, setScreen] = useState<Screen>("day");
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [screen]);
   const [requestedConversation, setRequestedConversation] = useState<{
     id: string;
     requestId: number;
@@ -560,6 +564,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
             )}
           </div>
           <div className="welcome-pet">
+            <StickerCluster />
             <Pet
               soundEnabled={soundEnabled}
               speak={platform.speak}
@@ -617,6 +622,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
               }
               title={n.label}
               className={screen === n.id ? "nav-item selected" : "nav-item"}
+              aria-current={screen === n.id ? "page" : undefined}
               onClick={() => {
                 setToast("");
                 setScreen(n.id);
@@ -663,7 +669,9 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
       <div className="main-area">
         <header className="topbar">
           <span>
-            <span className="online-dot" />
+            <span className="topbar-mark">
+              <PingoMark />
+            </span>
             {client.demo
               ? "Demonstração local"
               : client.online

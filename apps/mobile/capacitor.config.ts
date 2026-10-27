@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   loggingBehavior: "none",
   webDir: "dist",
   server: { androidScheme: "https", hostname: "localhost", cleartext: false },
-  android: { allowMixedContent: false, backgroundColor: "#edf7f4" },
+  android: { allowMixedContent: false, backgroundColor: "#fffefa" },
   plugins: { Keyboard: { resize: "body", resizeOnFullScreen: true } },
 };
 export default config;

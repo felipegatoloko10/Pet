@@ -29,7 +29,7 @@ test("demonstração permite editar, mover e persistir tarefas sem Google", asyn
 
   await page
     .getByLabel("Mover Tarefa persistente do teste")
-    .selectOption({ label: "Em andamento" });
+    .selectOption({ label: "Fazendo" });
   // Simulate restart after the app acknowledges that the local transaction committed.
   await expect(page.locator(".toast")).toHaveText(
     "Modificação salva na demonstração local.",

@@ -19,6 +19,15 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  Archive,
+  ArrowLeft,
+  ArrowRight,
+  CalendarDays,
+  Plus,
+  Search,
+} from "lucide-react";
+import { Sticker, StickerCluster } from "./Stickers";
+import {
   taskOrder,
   type Task,
   type Workspace,
@@ -39,6 +48,17 @@ type Props = {
   onEdit: (t: Partial<Task>) => void;
   onEventEdit?: (e: import("@pingo/core").CalendarEvent) => void;
 };
+const columnColor = (column: Column) =>
+  column.color ??
+  (
+    {
+      todo: "#FFC8DD",
+      active: "#FFF3A8",
+      waiting: "#C9B6FF",
+      done: "#A8F0E0",
+    } as Record<string, string>
+  )[column.kind] ??
+  "#B8E0FF";
 export function Board({
   w,
   today,
@@ -57,6 +77,46 @@ export function Board({
   const [columnEditor, setColumnEditor] = useState<Column | "new" | null>(null);
   const b =
     w.boards.find((b) => b.id === w.preferences.defaultBoardId) ?? w.boards[0];
+  const kanban = useRef<HTMLDivElement>(null);
+  const [visibleColumn, setVisibleColumn] = useState("");
+  const [reduceMotion, setReduceMotion] = useState(false);
+  useEffect(() => {
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduceMotion(preference.matches);
+    update();
+    preference.addEventListener("change", update);
+    return () => preference.removeEventListener("change", update);
+  }, []);
+  function showColumn(id: string) {
+    const container = kanban.current;
+    const column =
+      container &&
+      [...container.querySelectorAll<HTMLElement>("[data-column-id]")].find(
+        (element) => element.dataset.columnId === id,
+      );
+    if (!container || !column) return;
+    container.scrollTo({
+      left:
+        container.scrollLeft +
+        column.getBoundingClientRect().left -
+        container.getBoundingClientRect().left,
+      behavior: reduceMotion ? "instant" : "smooth",
+    });
+    setVisibleColumn(id);
+  }
+  function trackColumn() {
+    const container = kanban.current;
+    if (!container) return;
+    const left = container.getBoundingClientRect().left;
+    const closest = [
+      ...container.querySelectorAll<HTMLElement>("[data-column-id]"),
+    ].sort(
+      (a, b) =>
+        Math.abs(a.getBoundingClientRect().left - left) -
+        Math.abs(b.getBoundingClientRect().left - left),
+    )[0];
+    if (closest?.dataset.columnId) setVisibleColumn(closest.dataset.columnId);
+  }
   const perform = (c: Command) => {
     setError("");
     void act(c).catch((e) => setError(e.message));
@@ -209,35 +269,47 @@ export function Board({
   return (
     <section className="home-board" aria-label="Meu quadro de tarefas">
       <div className="page-heading">
-        <div>
-          <div className="eyebrow">SEU DIA EM MOVIMENTO</div>
+        <div className="board-heading-copy">
+          <div className="board-date">
+            <CalendarDays size={15} aria-hidden="true" />
+            {new Intl.DateTimeFormat("pt-BR", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+              timeZone: "UTC",
+            }).format(new Date(today + "T12:00:00Z"))}
+          </div>
           <h1>
             Uma coisa <em>de cada vez.</em>
           </h1>
-          <p>Organize agora. Abra espaço para o resto do dia.</p>
+          <p>Pequenos passos. Um dia com a sua cara.</p>
         </div>
+        <StickerCluster className="board-heading-art" />
         <button
           className="button primary"
           aria-label="Nova tarefa"
           disabled={!b}
           onClick={() => onEdit({ boardId: b?.id })}
         >
-          ＋ Nova tarefa
+          <Plus size={19} aria-hidden="true" /> Nova tarefa
         </button>
       </div>
       <div className="board-toolbar">
-        <input
-          aria-label="Buscar tarefas"
-          placeholder="Buscar título ou descrição"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        <div className="board-search">
+          <Search size={18} aria-hidden="true" />
+          <input
+            aria-label="Buscar tarefas"
+            placeholder="Buscar título ou descrição"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
         <select
           aria-label="Filtrar prioridade"
           value={priority}
           onChange={(e) => setPriority(e.target.value)}
         >
-          <option value="">Todas as prioridades</option>
+          <option value="">Prioridade</option>
           <option value="high">Alta</option>
           <option value="normal">Normal</option>
           <option value="low">Baixa</option>
@@ -247,7 +319,7 @@ export function Board({
           value={label}
           onChange={(e) => setLabel(e.target.value)}
         >
-          <option value="">Todas as etiquetas</option>
+          <option value="">Etiquetas</option>
           {labels.map((l) => (
             <option key={l.id} value={l.id}>
               {l.name}
@@ -255,7 +327,7 @@ export function Board({
           ))}
         </select>
         <button
-          className="button small"
+          className="button small archive-toggle"
           aria-label={archive ? "Voltar ao quadro" : "Arquivados"}
           title={archive ? "Voltar ao quadro" : "Arquivados"}
           aria-pressed={archive}
@@ -263,8 +335,38 @@ export function Board({
             setArchive(!archive);
           }}
         >
-          {archive ? "↩" : "▣"}
+          {archive ? (
+            <ArrowLeft size={19} aria-hidden="true" />
+          ) : (
+            <Archive size={19} aria-hidden="true" />
+          )}
         </button>
+      </div>
+      {b && (
+        <div
+          className="board-shortcuts"
+          role="group"
+          aria-label="Ir para uma coluna"
+        >
+          {b.columns.map((column) => (
+            <button
+              key={column.id}
+              aria-label={`Ver coluna ${column.title}`}
+              aria-pressed={(visibleColumn || b.columns[0]?.id) === column.id}
+              style={{ background: columnColor(column) }}
+              onClick={() => showColumn(column.id)}
+            >
+              {column.title}
+              <small>
+                {visible.filter((t) => t.columnId === column.id).length}
+              </small>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="board-scroll-note">
+        <span>Deslize para explorar o quadro</span>
+        <ArrowRight size={15} aria-hidden="true" />
       </div>
       {error && (
         <p role="alert" className="error">
@@ -294,7 +396,11 @@ export function Board({
             items={b.columns.map((c) => c.id)}
             strategy={horizontalListSortingStrategy}
           >
-            <div className="kanban">
+            <div
+              ref={kanban}
+              onScroll={trackColumn}
+              className={`kanban ${active ? "is-dragging" : ""}`}
+            >
               {!archive && !!holidays.length && (
                 <section className="kanban-column day-holidays">
                   <header>
@@ -390,7 +496,13 @@ export function Board({
               ))}
             </div>
           </SortableContext>
-          <DragOverlay>
+          <DragOverlay
+            dropAnimation={
+              reduceMotion
+                ? null
+                : { duration: 280, easing: "cubic-bezier(.22,1.25,.4,1)" }
+            }
+          >
             {active && (
               <div className="task-card drag-preview">
                 {cards.find((t) => t.id === active)?.title ??
@@ -650,17 +762,14 @@ function BoardColumn({
     id: col.id,
     data: { kind: "column", columnId: col.id },
     disabled: archive,
+    transition: { duration: 260, easing: "cubic-bezier(.22,1.2,.4,1)" },
   });
   return (
     <section
+      data-column-id={col.id}
       ref={sortable.setNodeRef}
       style={{
-        background:
-          col.color ??
-          pastelColors[
-            ["todo", "active", "waiting", "done"].indexOf(col.kind) * 4
-          ] ??
-          pastelColors[8],
+        background: columnColor(col),
         transform: CSS.Transform.toString(sortable.transform),
         transition: sortable.transition,
       }}
@@ -702,6 +811,32 @@ function BoardColumn({
         </button>
       </header>
       {children}
+      {count === 0 && (
+        <div className="column-empty">
+          <Sticker
+            shape={
+              col.kind === "done"
+                ? "star"
+                : col.kind === "active"
+                  ? "heart"
+                  : col.kind === "waiting"
+                    ? "bow"
+                    : "cloud"
+            }
+          />
+          <p>
+            {archive
+              ? "Nenhum cartão arquivado por aqui."
+              : col.kind === "done"
+                ? "Um lugar para suas pequenas conquistas."
+                : col.kind === "active"
+                  ? "Uma coisa de cada vez. Você consegue!"
+                  : col.kind === "waiting"
+                    ? "Tudo bem dar um tempinho."
+                    : "Seu próximo pequeno passo começa aqui."}
+          </p>
+        </div>
+      )}
     </section>
   );
 }
@@ -739,6 +874,7 @@ function Card({
     id: t.id,
     data: { kind: "task", columnId: t.columnId },
     disabled: archive,
+    transition: { duration: 260, easing: "cubic-bezier(.22,1.2,.4,1)" },
   });
   return (
     <article

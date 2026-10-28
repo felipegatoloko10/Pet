@@ -259,3 +259,42 @@ it("horário local sobrevive à mudança de horário de verão", () => {
     "2026-11-02T19:00:00.000Z",
   );
 });
+
+it("editar as próximas a partir de uma concluída preserva sua conclusão", () => {
+  let w = create();
+  const original = w.tasks[0];
+  w = applyCommand(
+    w,
+    {
+      type: "task.move",
+      id: original.id,
+      columnId: w.boards[0].columns.find((c) => c.kind === "done")!.id,
+      beforeId: null,
+      expectedRevision: original.revision,
+    },
+    "done-selected",
+    now,
+  );
+  const t = w.tasks.find((x) => x.id === original.id)!,
+    series = w.taskSeries![0];
+  w = applyCommand(
+    w,
+    {
+      type: "task.upsert",
+      task: { ...t, title: "Piscina atualizada" },
+      expectedRevision: t.revision,
+      repetition: series.rule,
+      scope: "future",
+      expectedSeriesRevision: series.revision,
+    },
+    "next-completed",
+    now,
+  );
+  expect(w.tasks.find((x) => x.id === t.id)?.completed).toBe(true);
+  expect(
+    w.tasks.filter((x) => x.dueDate === t.dueDate && !x.deleted),
+  ).toHaveLength(1);
+  expect(w.tasks.find((x) => x.dueDate === "2026-10-28")?.completed).toBe(
+    false,
+  );
+});

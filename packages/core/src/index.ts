@@ -1218,8 +1218,12 @@ export function applyCommand(
           (w.taskSeries ??= []).push(series);
           // The first real occurrence receives the edited task only if it matches the rule.
           const oldId = t.id;
-          w.tasks = w.tasks.filter((x) => x.id !== oldId);
-          w.events = w.events.filter((e) => e.taskId !== oldId);
+          if (!prior || !t.completed) {
+            w.tasks = w.tasks.filter((x) => x.id !== oldId);
+            w.events = w.events.filter((e) => e.taskId !== oldId);
+          } else if (!series.exclusions?.includes(t.dueDate)) {
+            (series.exclusions ??= []).push(t.dueDate);
+          }
           materializeSeries(
             w,
             t.dueDate >

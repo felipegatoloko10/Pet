@@ -1401,6 +1401,20 @@ export function applyCommand(
     ].includes(c.type)
   )
     reconcileTaskCalendars(w, enqueue, now);
+  if (
+    c.type.startsWith("task.") &&
+    !(
+      c.type === "task.upsert" &&
+      c.scope === "future" &&
+      c.repetition !== undefined
+    )
+  ) {
+    const id =
+      c.type === "task.upsert" ? c.task.id : "id" in c ? c.id : undefined;
+    const changed = w.tasks.find((t) => t.id === id);
+    const series = w.taskSeries?.find((s) => s.id === changed?.seriesId);
+    if (series) series.revision++;
+  }
   w.revision++;
   return w;
 }

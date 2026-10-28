@@ -298,3 +298,38 @@ it("editar as próximas a partir de uma concluída preserva sua conclusão", () 
     false,
   );
 });
+
+it("edição futura detecta uma ocorrência alterada em outro dispositivo", () => {
+  let w = create();
+  const stale = w.taskSeries![0],
+    target = w.tasks[0],
+    other = w.tasks[1];
+  w = applyCommand(
+    w,
+    {
+      type: "task.upsert",
+      task: { ...other, title: "Alteração do outro aparelho" },
+      expectedRevision: other.revision,
+    },
+    "other-device",
+    now,
+  );
+  expect(() =>
+    applyCommand(
+      w,
+      {
+        type: "task.upsert",
+        task: { ...target, title: "Alterar próximas" },
+        expectedRevision: target.revision,
+        repetition: stale.rule,
+        scope: "future",
+        expectedSeriesRevision: stale.revision,
+      },
+      "stale-edit",
+      now,
+    ),
+  ).toThrow(/outro dispositivo/);
+  expect(w.tasks.find((t) => t.id === other.id)?.title).toBe(
+    "Alteração do outro aparelho",
+  );
+});

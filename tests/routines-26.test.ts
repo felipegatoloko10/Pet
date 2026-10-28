@@ -333,3 +333,12 @@ it("edição futura detecta uma ocorrência alterada em outro dispositivo", () =
     "Alteração do outro aparelho",
   );
 });
+
+it("trocar repetição semanal para diária não depende de dias ocultos", () => {
+  expect(
+    repetitionSchema.safeParse({ kind: "weekly", weekdays: [] }).success,
+  ).toBe(false);
+  expect(
+    repetitionSchema.safeParse({ kind: "daily", weekdays: [] }).success,
+  ).toBe(true);
+});

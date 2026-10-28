@@ -661,24 +661,38 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
               tudo de uma vez.
             </p>
           </div>
-          <button
-            className="account"
-            onClick={() => void logout()}
-            title="Sair"
-          >
-            <span className="avatar-letter">{user.name[0]}</span>
-            <span>
-              {user.name.split(" ")[0]}
+          <details className="account-menu sidebar-account">
+            <summary
+              className="account"
+              aria-label="Menu da conta na barra lateral"
+            >
+              <span className="avatar-letter">{user.name[0]}</span>
+              <span>
+                {user.name.split(" ")[0]}
+                <small>
+                  {client.localOnly
+                    ? "Neste aparelho"
+                    : client.demo
+                      ? "Demonstração local"
+                      : "Espaço individual"}
+                </small>
+              </span>
+              <LogOut size={16} />
+            </summary>
+            <div className="account-popover">
               <small>
-                {client.localOnly
-                  ? "Neste aparelho"
-                  : client.demo
-                    ? "Demonstração local"
-                    : "Espaço individual"}
+                {client.localOnly ? "Somente neste aparelho" : user.email}
               </small>
-            </span>
-            <LogOut size={16} />
-          </button>
+              {client.localOnly && (
+                <button className="button primary" onClick={() => void login()}>
+                  Entrar ou criar conta
+                </button>
+              )}
+              <button className="button" onClick={() => void logout()}>
+                Sair
+              </button>
+            </div>
+          </details>
         </div>
       </aside>
       <div className="main-area">

@@ -121,3 +121,23 @@ test("permissão pede de forma contextual e respeita Agora não", async ({
   await page.reload();
   await expect(permission).not.toBeVisible();
 });
+
+test("perfil lateral abre Sair sem encerrar a sessão antes do clique", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Explorar demonstração local" })
+    .click();
+  await page
+    .getByLabel("Menu da conta na barra lateral", { exact: true })
+    .click();
+  await expect(page.locator(".home-board")).toBeVisible();
+  await page
+    .locator(".sidebar-account .account-popover")
+    .getByRole("button", { name: "Sair", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Explorar demonstração local" }),
+  ).toBeVisible();
+});

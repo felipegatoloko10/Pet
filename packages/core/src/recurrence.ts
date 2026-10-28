@@ -4,17 +4,17 @@ import { nextDay, zonedDateTime, localDay } from "./planning";
 export const repetitionSchema = z
   .object({
     kind: z.enum(["daily", "weekly", "monthly", "interval"]),
-    weekdays: z
-      .array(z.number().int().min(0).max(6))
-      .min(1)
-      .max(7)
-      .default([1]),
+    weekdays: z.array(z.number().int().min(0).max(6)).max(7).default([1]),
     monthDays: z.array(z.number().int().min(1).max(31)).max(31).default([1]),
     lastDay: z.boolean().default(false),
     interval: z.number().int().min(1).max(3650).default(1),
     until: z.iso.date().nullable().default(null),
     count: z.number().int().min(1).max(10000).nullable().default(null),
   })
+  .refine(
+    (r) => r.kind !== "weekly" || r.weekdays.length > 0,
+    "Escolha pelo menos um dia da semana.",
+  )
   .refine(
     (r) => r.kind !== "monthly" || r.monthDays.length > 0 || r.lastDay,
     "Escolha pelo menos um dia do mês.",

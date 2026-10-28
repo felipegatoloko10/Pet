@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../browser/permission-fixture";
 import { inflateSync } from "node:zlib";
 
 const desktopOrigin = `http://127.0.0.1:${process.env.PINGO_DESKTOP_TEST_PORT ?? "1420"}`;

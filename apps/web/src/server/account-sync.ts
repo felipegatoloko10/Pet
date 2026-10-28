@@ -1,5 +1,7 @@
 import {
   dayBounds,
+  materializeSeries,
+  reconcileTaskCalendars,
   DomainError,
   type CalendarEvent,
   type Workspace,
@@ -22,6 +24,8 @@ export async function calendarRange(
   )
     throw new DomainError("range", "Escolha um período de até um ano.", 400);
   const w = await readWorkspace(userId);
+  materializeSeries(w, end.slice(0, 10), new Date(), start.slice(0, 10));
+  reconcileTaskCalendars(w, () => {});
   return w.events.filter((e) => {
     if (e.deleted || e.recurrence) return false;
     const from = e.allDay

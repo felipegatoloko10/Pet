@@ -163,6 +163,11 @@ export class PingoClient {
   }
   async refresh() {
     if (!this.active) return;
+    if (this.workspace.storageMode === "pingo") {
+      this.workspace = preparePingoWorkspace(this.workspace);
+      await this.persist();
+      this.emit();
+    }
     if (this.demo || this.localOnly) {
       this.emit();
       return;
@@ -306,7 +311,6 @@ export class PingoClient {
     }
   }
   async sync() {
-    if (this.demo || this.localOnly) return;
     await this.refresh();
   }
   async discardConflict() {

@@ -1,3 +1,4 @@
+import { materializeSeries } from "./recurrence";
 import {
   emptyWorkspace,
   newBoard,
@@ -48,6 +49,7 @@ export function preparePingoWorkspace(value: Workspace): Workspace {
     if (event.syncState === "conflict" || event.syncState === "error")
       event.syncState = "pending";
   }
+  materializeSeries(w);
   reconcileTaskCalendars(w, () => {});
   return w;
 }

@@ -113,8 +113,15 @@ export function reconcileTaskCalendars(
   enqueue: Enqueue,
   now = new Date().toISOString(),
 ) {
+  const byTask = new Map(
+    w.events.filter((e) => e.taskId && !e.deleted).map((e) => [e.taskId, e]),
+  );
+  const byId = new Map(w.events.map((e, index) => [e.id, { event: e, index }]));
   for (const t of w.tasks) {
-    let e = w.events.find((e) => e.taskId === t.id && !e.deleted);
+    const taskZone =
+      w.taskSeries?.find((s) => s.id === t.seriesId)?.timezone ??
+      w.preferences.timezone;
+    let e = byTask.get(t.id);
     if (
       e &&
       w.outbox.some((j) => j.entityId === e!.id && j.state === "uncertain")
@@ -132,12 +139,9 @@ export function reconcileTaskCalendars(
     if (!t.dueDate || t.calendarSuppressed) continue;
     if (t.syncState === "conflict" || e?.syncState === "conflict") continue;
     const allDay = !t.scheduledStart;
-    if (
-      !allDay &&
-      localDay(t.scheduledStart!, w.preferences.timezone) !== t.dueDate
-    ) {
+    if (!allDay && localDay(t.scheduledStart!, taskZone) !== t.dueDate) {
       const local = new Intl.DateTimeFormat("en-GB", {
-        timeZone: w.preferences.timezone,
+        timeZone: taskZone,
         hour: "2-digit",
         minute: "2-digit",
         hourCycle: "h23",
@@ -147,11 +151,7 @@ export function reconcileTaskCalendars(
         Date.parse(t.scheduledEnd ?? "") - Date.parse(t.scheduledStart!) ||
           1800000,
       );
-      t.scheduledStart = zonedDateTime(
-        t.dueDate,
-        local,
-        w.preferences.timezone,
-      );
+      t.scheduledStart = zonedDateTime(t.dueDate, local, taskZone);
       t.scheduledEnd = new Date(
         Date.parse(t.scheduledStart) + duration,
       ).toISOString();
@@ -165,7 +165,8 @@ export function reconcileTaskCalendars(
     if (!allDay) t.scheduledEnd = end;
     const title = `${t.completed ? "✓ " : ""}${t.title}`;
     if (!e) {
-      const prior = w.events.find((e) => e.id === mirrorId(t.id));
+      const priorEntry = byId.get(mirrorId(t.id));
+      const prior = priorEntry?.event;
       if (prior?.deleted && prior.googleId) {
         t.calendarSuppressed = true;
         continue;
@@ -181,7 +182,13 @@ export function reconcileTaskCalendars(
         revision: (prior?.revision ?? 0) + 1,
         syncState: "pending",
       };
-      w.events = w.events.filter((x) => x.id !== e!.id).concat(e);
+      if (priorEntry) w.events[priorEntry.index] = e;
+      else w.events.push(e);
+      byId.set(e.id, {
+        event: e,
+        index: priorEntry?.index ?? w.events.length - 1,
+      });
+      byTask.set(t.id, e);
       enqueue("event", e.id, "upsert");
     } else if (
       e.title !== title ||

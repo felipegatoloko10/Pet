@@ -1,3 +1,7 @@
+import {
+  isPermissionGranted,
+  requestPermission,
+} from "@tauri-apps/plugin-notification";
 import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { createRoot } from "react-dom/client";
 import { invoke, isTauri } from "@tauri-apps/api/core";
@@ -16,6 +20,20 @@ if (isPet) {
 }
 const platform = {
   kind: "desktop" as const,
+  notifications: {
+    status: async () => ((await isPermissionGranted()) ? "granted" : "default"),
+    enable: async () => {
+      await requestPermission();
+    },
+    settings: async () => {
+      await openUrl("ms-settings:notifications");
+    },
+    privacy: async () =>
+      localStorage.getItem("pingo:notification-hidden") === "true",
+    setPrivacy: async (hidden: boolean) => {
+      localStorage.setItem("pingo:notification-hidden", String(hidden));
+    },
+  },
   api,
   onOpenConversation: (handler: (id: string) => void) => {
     const stop = listen<{ id: string }>("open-conversation", (event) =>

@@ -1,3 +1,4 @@
+import { validPassword } from "@pingo/core";
 import { randomUUID } from "node:crypto";
 import { APIError, type BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";
@@ -10,8 +11,14 @@ import { digest, secretEqual } from "./crypto";
 
 const enrollment = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email().max(254)),
-  password: z.string().min(10).max(128),
-  name: z.string().trim().min(1).max(100),
+  password: z
+    .string()
+    .max(128)
+    .refine(
+      validPassword,
+      "Use 8 caracteres com maiúscula, minúscula, número e caractere especial.",
+    ),
+  name: z.string().trim().min(1).max(100).default("Pessoa"),
   inviteCode: z.string().regex(/^[a-zA-Z0-9_-]{43}$/),
   purpose: z.enum(["register", "recover"]).default("register"),
 });
@@ -88,15 +95,13 @@ export function passwordAuth() {
                 .where(eq(account.id, credential.id));
               await tx.delete(session).where(eq(session.userId, owner.id));
             } else
-              await tx
-                .insert(account)
-                .values({
-                  id: randomUUID(),
-                  accountId: owner.id,
-                  providerId: "credential",
-                  userId: owner.id,
-                  password: hash,
-                });
+              await tx.insert(account).values({
+                id: randomUUID(),
+                accountId: owner.id,
+                providerId: "credential",
+                userId: owner.id,
+                password: hash,
+              });
             await tx
               .update(invitations)
               .set({ activationUsedAt: new Date() })

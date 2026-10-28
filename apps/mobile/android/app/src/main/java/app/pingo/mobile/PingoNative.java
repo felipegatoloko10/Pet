@@ -72,6 +72,11 @@ public final class PingoNative extends Plugin {
             NotificationCoordinator.replace(getContext(), u, config, reminders); call.resolve();
         } catch (Exception ignored) { call.reject("Não consegui atualizar os lembretes locais."); }
     }
+    @PluginMethod public void notificationStatus(PluginCall call) {
+        boolean enabled=androidx.core.app.NotificationManagerCompat.from(getContext()).areNotificationsEnabled();
+        String status=enabled ? (NotificationCoordinator.prefs(getContext()).getBoolean("enabled",false) ? "granted" : "default") : (Build.VERSION.SDK_INT >= 33 && getPermissionState("notifications") != PermissionState.DENIED ? "default" : "denied");
+        call.resolve(new JSObject().put("status",status));
+    }
     @PluginMethod public void enableNotifications(PluginCall call) {
         if (Build.VERSION.SDK_INT >= 33 && getPermissionState("notifications") != PermissionState.GRANTED) requestPermissionForAlias("notifications", call, "notificationsGranted");
         else { NotificationCoordinator.prefs(getContext()).edit().putBoolean("enabled", true).commit(); token(call, true); }
@@ -85,6 +90,14 @@ public final class PingoNative extends Plugin {
         call.resolve(new JSObject().put("token", JSONObject.NULL));
     }
     @PluginMethod public void getPushToken(PluginCall call) { call.resolve(new JSObject().put("token", JSONObject.NULL)); }
+    @PluginMethod public void openNotificationSettings(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            try {
+                Intent i = Build.VERSION.SDK_INT >= 26 ? new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getContext().getPackageName()) : new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getContext().getPackageName()));
+                getActivity().startActivity(i); call.resolve();
+            } catch(Exception ignored) { call.reject("Abra Ajustes do Android > Apps > Pingo > Notificações."); }
+        });
+    }
     @PluginMethod public void settings(PluginCall call) {
         getActivity().runOnUiThread(() -> {
             boolean allowed = Build.VERSION.SDK_INT < 31 || getContext().getSystemService(AlarmManager.class).canScheduleExactAlarms();

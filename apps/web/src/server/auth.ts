@@ -1,3 +1,5 @@
+import { validPassword } from "@pingo/core";
+import { createAuthMiddleware } from "better-auth/api";
 import { betterAuth, APIError } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, deviceAuthorization } from "better-auth/plugins";
@@ -20,9 +22,30 @@ function createAuth() {
     emailAndPassword: {
       enabled: true,
       disableSignUp: false,
-      minPasswordLength: 10,
+      minPasswordLength: 8,
       maxPasswordLength: 128,
       requireEmailVerification: false,
+    },
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        if (
+          [
+            "/sign-up/email",
+            "/reset-password",
+            "/change-password",
+            "/password/sign-up",
+          ].includes(ctx.path)
+        ) {
+          const password = ctx.body?.newPassword ?? ctx.body?.password;
+          if (typeof password !== "string" || !validPassword(password))
+            throw new APIError("BAD_REQUEST", {
+              message:
+                "Use no mínimo 8 caracteres, com maiúscula, minúscula, número e caractere especial.",
+            });
+        }
+        if (ctx.path === "/sign-up/email" && !ctx.body?.name)
+          ctx.body = { ...ctx.body, name: "Pessoa" };
+      }),
     },
     trustedOrigins: [
       process.env.BETTER_AUTH_URL ?? "http://localhost:3000",

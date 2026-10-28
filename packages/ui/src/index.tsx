@@ -1,4 +1,9 @@
 "use client";
+import { NotificationPermission } from "./NotificationPermission";
+import { RepeatPicker } from "./RepeatPicker";
+import type { Repetition } from "@pingo/core";
+import { SettingsPage } from "./Settings";
+import { StatusPicker } from "./StatusPicker";
 import {
   useState,
   useEffect,
@@ -84,8 +89,10 @@ export type { Storage };
 export type Platform = {
   kind?: "web" | "desktop" | "android";
   notifications?: {
+    status?: () => Promise<string>;
     enable: () => Promise<void>;
     settings: () => Promise<void>;
+    permissionSettings?: () => Promise<void>;
     privacy: () => Promise<boolean>;
     setPrivacy: (hidden: boolean) => Promise<void>;
   };
@@ -192,6 +199,13 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   useEffect(
     () =>
       platform.onBack?.(() => {
+        const sheet = document.querySelector<HTMLDialogElement>(
+          ".status-sheet[open]",
+        );
+        if (sheet) {
+          sheet.close();
+          return true;
+        }
         if (taskEditor) {
           setTaskEditor(null);
           return true;
@@ -592,6 +606,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     <div
       className={`app-shell ${platform.kind === "android" ? "mobile-app" : ""}`}
     >
+      <NotificationPermission platform={platform} client={client} />
       <aside className="sidebar">
         <a
           className="brand"
@@ -689,13 +704,40 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
             </button>
             <button
               className="icon-button notification-button"
-              onClick={() => setNoticesOpen(true)}
+              onClick={() => {
+                setNoticesOpen(true);
+                const ids = w.notices.filter((n) => !n.read).map((n) => n.id);
+                if (ids.length)
+                  void act({ type: "notice.readMany", ids }).catch(() => {});
+              }}
               aria-label="Abrir notificações"
             >
               <Bell size={19} />
               {w.notices.some((n) => !n.read) && <i />}
             </button>
-            <span className="top-avatar">{user.name[0]}</span>
+            <details className="account-menu">
+              <summary className="top-avatar" aria-label="Minha conta">
+                {(user.name === "Pessoa"
+                  ? user.email
+                  : user.name)?.[0]?.toUpperCase() ?? "P"}
+              </summary>
+              <div className="account-popover">
+                <small>
+                  {client.localOnly ? "Somente neste aparelho" : user.email}
+                </small>
+                {client.localOnly && (
+                  <button
+                    className="button primary"
+                    onClick={() => void login()}
+                  >
+                    Entrar ou criar conta
+                  </button>
+                )}
+                <button className="button" onClick={() => void logout()}>
+                  Sair
+                </button>
+              </div>
+            </details>
             <span className="top-account-name">{user.name.split(" ")[0]}</span>
           </div>
         </header>
@@ -1156,6 +1198,11 @@ function TaskEditor({
   onClose: () => void;
   onSchedule: (t: Task) => void;
 }) {
+  const series = w.taskSeries?.find((s) => s.id === initial.seriesId);
+  const [repetition, setRepetition] = useState<Repetition | null>(
+    series?.rule ?? null,
+  );
+  const [scope, setScope] = useState<"one" | "future">("one");
   const first =
     w.boards.find(
       (b) => b.id === (initial.boardId ?? w.preferences.defaultBoardId),
@@ -1215,6 +1262,9 @@ function TaskEditor({
     try {
       await act({
         type: "task.upsert",
+        ...(!series || scope === "future"
+          ? { repetition, scope, expectedSeriesRevision: series?.revision }
+          : {}),
         task: {
           ...t,
           timeMode,
@@ -1276,16 +1326,11 @@ function TaskEditor({
         <div className="form-grid">
           <label>
             Etapa
-            <select
+            <StatusPicker
+              columns={board?.columns ?? []}
               value={t.columnId}
-              onChange={(e) => setT({ ...t, columnId: e.target.value })}
-            >
-              {board?.columns.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title}
-                </option>
-              ))}
-            </select>
+              onChange={(columnId) => setT({ ...t, columnId })}
+            />
           </label>
           <label>
             Dia da tarefa
@@ -1313,6 +1358,72 @@ function TaskEditor({
             </select>
           </label>
         </div>
+        {series && (
+          <fieldset>
+            <legend>Esta tarefa se repete</legend>
+            <div className="repeat-options">
+              <button
+                type="button"
+                className="button"
+                aria-pressed={scope === "one"}
+                onClick={() => setScope("one")}
+              >
+                Somente esta ocorrência
+              </button>
+              <button
+                type="button"
+                className="button"
+                aria-pressed={scope === "future"}
+                onClick={() => setScope("future")}
+              >
+                Esta e as próximas
+              </button>
+            </div>
+            <button
+              type="button"
+              className="text-link"
+              onClick={() =>
+                void act({
+                  type: "series.pause",
+                  id: series.id,
+                  expectedRevision: series.revision,
+                  date: zonedParts(new Date(), w.preferences.timezone).date,
+                  paused: !series.pauses.some((p) => !p.end),
+                })
+                  .then(onClose)
+                  .catch((e) => setError(e.message))
+              }
+            >
+              {series.pauses.some((p) => !p.end)
+                ? "Retomar repetição"
+                : "Pausar repetição"}
+            </button>
+            <button
+              type="button"
+              className="text-link danger"
+              onClick={() => {
+                if (
+                  confirm(
+                    "Encerrar esta repetição a partir desta data? O histórico anterior será preservado.",
+                  )
+                )
+                  void act({
+                    type: "series.stop",
+                    id: series.id,
+                    expectedRevision: series.revision,
+                    date: initial.occurrenceDate ?? t.dueDate!,
+                  })
+                    .then(onClose)
+                    .catch((e) => setError(e.message));
+              }}
+            >
+              Encerrar esta e as próximas
+            </button>
+          </fieldset>
+        )}
+        {(!series || scope === "future") && (
+          <RepeatPicker value={repetition} onChange={setRepetition} />
+        )}
         <fieldset>
           <legend>Horário e lembretes</legend>
           <label>
@@ -1751,634 +1862,4 @@ function SuggestionPreview({
     );
   }
   return <p>Revise esta alteração antes de aprovar.</p>;
-}
-function SettingsPage({
-  platform,
-  w,
-  client,
-  act,
-  openExternal,
-  onToast,
-  onConnect,
-}: {
-  platform: Platform;
-  w: Workspace;
-  client: PingoClient;
-  act: (c: Command) => Promise<void>;
-  openExternal: (url: string) => Promise<void>;
-  onToast: (s: string) => void;
-  onConnect: () => void;
-}) {
-  const [p, setP] = useState(w.preferences);
-  const [key, setKey] = useState("");
-  const [status, setStatus] = useState("");
-  const [hiddenDetails, setHiddenDetails] = useState(false);
-  useEffect(() => {
-    void platform.notifications
-      ?.privacy()
-      .then(setHiddenDetails)
-      .catch(() => {});
-  }, [platform.notifications]);
-  const [migration, setMigration] = useState<{
-    tasks: Record<string, unknown>[];
-    events: Record<string, unknown>[];
-    fingerprint: string;
-  } | null>(null);
-  const destination = p.defaultBoardId || w.boards[0]?.id || "";
-  const [migrationCalendar, setMigrationCalendar] = useState(
-    p.defaultCalendarId,
-  );
-  async function run(fn: () => Promise<void>) {
-    try {
-      await fn();
-      setStatus("Tudo certo.");
-    } catch (e) {
-      setStatus((e as Error).message);
-    }
-  }
-  async function push() {
-    if (client.demo || client.localOnly)
-      throw new Error(
-        "Entre na sua conta para ativar avisos web em segundo plano. Seus avisos no Android funcionam localmente.",
-      );
-    const registration = await navigator.serviceWorker.register("/sw.js");
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted")
-      throw new Error("A permissão de notificações não foi concedida.");
-    const response = await fetch("/push-key");
-    const { key } = await response.json();
-    if (!key) throw new Error("Push ainda não configurado pelo administrador.");
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: key,
-    });
-    await client.api.post("push", subscription.toJSON());
-    onToast("Notificações ativadas neste dispositivo.");
-  }
-  async function preview(file: File) {
-    if (file.size > 5000000) throw new Error("Arquivo maior que 5 MB.");
-    const text = await file.text();
-    const data = JSON.parse(text);
-    const tasks = data.Todos ?? data.todos ?? data.tasks ?? data.Tasks ?? [];
-    const events =
-      data.Events ??
-      data.events ??
-      data.appointments ??
-      data.Appointments ??
-      data.calendarEvents ??
-      data.CalendarEvents ??
-      [];
-    if (!Array.isArray(tasks) || !Array.isArray(events))
-      throw new Error("Formato de legado não reconhecido.");
-    const hash = await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(text),
-    );
-    setMigration({
-      tasks,
-      events,
-      fingerprint: Array.from(new Uint8Array(hash))
-        .map((v) => v.toString(16).padStart(2, "0"))
-        .join(""),
-    });
-  }
-  return (
-    <>
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">DO SEU JEITO</div>
-          <h1>
-            Um Pingo com a <em>sua cara.</em>
-          </h1>
-          <p>Pequenos ajustes para uma companhia que combina com você.</p>
-        </div>
-      </div>
-      <div className="settings-layout">
-        <form
-          className="panel editor-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void run(() => act({ type: "preferences.update", preferences: p }));
-          }}
-        >
-          <h2>Seu companheiro</h2>
-          <div className="pet-settings">
-            <Pet preferences={p} />
-            <div>
-              <label>
-                Nome
-                <input
-                  value={p.name}
-                  maxLength={30}
-                  onChange={(e) => setP({ ...p, name: e.target.value })}
-                  required
-                />
-              </label>
-              <div className="form-grid">
-                <label>
-                  Cor do Pingo
-                  <input
-                    type="color"
-                    value={p.color}
-                    onChange={(e) => setP({ ...p, color: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Detalhes
-                  <input
-                    type="color"
-                    value={p.accent}
-                    onChange={(e) => setP({ ...p, accent: e.target.value })}
-                  />
-                </label>
-              </div>
-            </div>
-          </div>
-          <h2>Seu ritmo</h2>
-          <div className="form-grid">
-            <label>
-              Resumo da manhã
-              <input
-                type="time"
-                value={p.summaryTime}
-                onChange={(e) => setP({ ...p, summaryTime: e.target.value })}
-              />
-            </label>
-            <label>
-              Lembrar com antecedência
-              <select
-                value={p.reminderMinutes}
-                onChange={(e) =>
-                  setP({ ...p, reminderMinutes: Number(e.target.value) })
-                }
-              >
-                {[0, 5, 10, 15, 30, 60].map((n) => (
-                  <option value={n} key={n}>
-                    {n} minutos
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Silêncio a partir de
-              <input
-                type="time"
-                value={p.quietStart}
-                onChange={(e) => setP({ ...p, quietStart: e.target.value })}
-              />
-            </label>
-            <label>
-              Fim do silêncio
-              <input
-                type="time"
-                value={p.quietEnd}
-                onChange={(e) => setP({ ...p, quietEnd: e.target.value })}
-              />
-            </label>
-            <label>
-              Hora de dormir
-              <input
-                type="time"
-                value={p.sleepStart}
-                onChange={(e) => setP({ ...p, sleepStart: e.target.value })}
-              />
-            </label>
-            <label>
-              Hora de acordar
-              <input
-                type="time"
-                value={p.wakeTime}
-                onChange={(e) => setP({ ...p, wakeTime: e.target.value })}
-              />
-            </label>
-          </div>
-          <label>
-            Fuso horário
-            <input
-              value={p.timezone}
-              onChange={(e) => setP({ ...p, timezone: e.target.value })}
-              list="timezones"
-            />
-            <datalist id="timezones">
-              {[
-                "America/Sao_Paulo",
-                "America/Manaus",
-                "America/Recife",
-                "Europe/Lisbon",
-                "UTC",
-              ].map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </datalist>
-          </label>
-          <label>
-            Calendário padrão
-            <select
-              value={p.defaultCalendarId}
-              onChange={(e) =>
-                setP({ ...p, defaultCalendarId: e.target.value })
-              }
-            >
-              <option value="primary">Principal</option>
-              {w.calendars
-                .filter((c) => !c.readOnly)
-                .map((c) => (
-                  <option value={c.id} key={c.id}>
-                    {c.title}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={p.taskCheckIns !== false}
-              onChange={(e) => setP({ ...p, taskCheckIns: e.target.checked })}
-            />
-            Acompanhar tarefas com horário no celular
-          </label>
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={p.voice}
-              onChange={(e) => setP({ ...p, voice: e.target.checked })}
-            />{" "}
-            Ler balões em voz alta
-          </label>
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={p.snore}
-              onChange={(e) => setP({ ...p, snore: e.target.checked })}
-            />{" "}
-            Ronquinho ao dormir
-          </label>
-          <Routine
-            value={p.routine ?? []}
-            onChange={(routine) => setP({ ...p, routine })}
-          />
-          <button className="button primary" type="submit">
-            Salvar meu jeito
-          </button>
-        </form>
-        <div className="settings-secondary">
-          <section className="panel connection-panel">
-            <h2>Seu Pingo, onde você estiver</h2>
-            <p>
-              Tarefas, agenda e cuidados ficam salvos neste aparelho. Uma conta
-              permite sincronizar com seus outros dispositivos quando houver
-              internet.
-            </p>
-            <p>
-              {client.localOnly
-                ? "Você está usando somente este aparelho."
-                : "Sua conta sincroniza os dados entre celular, web e computador."}
-            </p>
-            <button className="button" onClick={onConnect}>
-              {client.localOnly
-                ? "Entrar para sincronizar"
-                : "Entrar novamente"}
-            </button>
-            <button
-              className="button"
-              onClick={() =>
-                download(
-                  "pingo-meus-dados.json",
-                  JSON.stringify(
-                    { format: "pingo-backup-v1", workspace: w },
-                    null,
-                    2,
-                  ),
-                )
-              }
-            >
-              Exportar meus dados
-            </button>
-            <label>
-              Importar cópia do Pingo
-              <input
-                type="file"
-                accept="application/json,.json"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  void run(async () => {
-                    if (file.size > 10000000)
-                      throw new Error("A cópia deve ter até 10 MB.");
-                    const raw = JSON.parse(await file.text());
-                    const data = pingoImportInput().parse(raw.workspace ?? raw);
-                    const count = data.tasks.filter((t) => !t.deleted).length;
-                    const events = data.events.filter(
-                      (e) => !e.deleted && !e.taskId,
-                    ).length;
-                    if (
-                      !confirm(
-                        `Importar ${count} tarefa(s) e ${events} compromisso(s) para este espaço? Conversas serão copiadas como histórico; ajustes e cuidados serão trazidos na primeira importação. Os dados atuais serão preservados.`,
-                      )
-                    )
-                      return;
-                    await act({
-                      type: "workspace.import",
-                      data,
-                      confirmed: true,
-                    });
-                  });
-                  e.target.value = "";
-                }}
-              />
-            </label>
-          </section>
-          <section className="panel editor-form">
-            <h2>Uma ajudinha da IA</h2>
-            <p>Escolha seu provedor. O consumo usa os créditos da sua chave.</p>
-            <label>
-              Provedor
-              <select
-                value={p.aiProvider}
-                onChange={(e) =>
-                  setP({
-                    ...p,
-                    aiProvider: e.target.value as Preferences["aiProvider"],
-                  })
-                }
-              >
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic Claude</option>
-              </select>
-            </label>
-            <label>
-              Modelo
-              <input
-                placeholder="ID do modelo disponível na sua conta"
-                value={p.aiModel}
-                onChange={(e) => setP({ ...p, aiModel: e.target.value })}
-              />
-            </label>
-            <label>
-              Chave de API
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                placeholder="Cole sua chave aqui"
-              />
-            </label>
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={p.proactiveAI}
-                onChange={(e) => setP({ ...p, proactiveAI: e.target.checked })}
-              />{" "}
-              Sugestões proativas (até 2 por dia)
-            </label>
-            <button
-              className="button"
-              disabled={client.demo || !key}
-              onClick={() =>
-                void run(async () => {
-                  await act({ type: "preferences.update", preferences: p });
-                  await client.api.post("ai/key", {
-                    provider: p.aiProvider,
-                    key,
-                  });
-                  setKey("");
-                  onToast("Chave protegida e salva no servidor.");
-                })
-              }
-            >
-              Proteger e salvar chave
-            </button>
-            <button
-              className="text-link danger"
-              disabled={client.demo}
-              onClick={() =>
-                void run(async () => {
-                  await client.api.request("ai/key", {
-                    method: "DELETE",
-                    body: JSON.stringify({ provider: p.aiProvider }),
-                  });
-                  onToast("Chave removida.");
-                })
-              }
-            >
-              Remover chave deste provedor
-            </button>
-          </section>
-          <section className="panel editor-form">
-            <h2>Não perder o momento</h2>
-            <p>
-              Receba avisos neste dispositivo mesmo com o painel fechado. A
-              entrega depende da conexão e do dispositivo.
-            </p>
-            <button
-              className="button"
-              onClick={() =>
-                platform.notifications
-                  ? void run(platform.notifications.enable)
-                  : client.api.base
-                    ? void openExternal(`${client.api.base}/?page=settings`)
-                    : void run(push)
-              }
-            >
-              <Bell size={16} /> Ativar notificações
-            </button>
-            {platform.notifications && (
-              <>
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={hiddenDetails}
-                    onChange={(e) => {
-                      const hidden = e.target.checked;
-                      void run(async () => {
-                        await platform.notifications!.setPrivacy(hidden);
-                        setHiddenDetails(hidden);
-                      });
-                    }}
-                  />{" "}
-                  Ocultar detalhes na tela bloqueada
-                </label>
-                <button
-                  className="text-link"
-                  onClick={() => void run(platform.notifications!.settings)}
-                >
-                  Precisão dos lembretes e permissões Android
-                </button>
-              </>
-            )}
-          </section>
-          <section className="panel editor-form">
-            <h2>Trazer minha rotina antiga</h2>
-            <p>
-              Selecione o state.json do Pingo anterior. Vamos mostrar uma
-              prévia; o arquivo original e os tokens serão preservados.
-            </p>
-            <label>
-              Arquivo de dados
-              <input
-                type="file"
-                accept="application/json,.json"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void run(() => preview(file));
-                }}
-              />
-            </label>
-            {migration && (
-              <>
-                <p>
-                  {migration.tasks.length} tarefas · {migration.events.length}{" "}
-                  compromissos
-                </p>
-                <ul>
-                  {migration.tasks.slice(0, 5).map((t, i) => (
-                    <li key={i}>
-                      {String(t.title ?? t.Title ?? "Sem título")}
-                    </li>
-                  ))}
-                  {migration.events.slice(0, 5).map((e, i) => (
-                    <li key={`event-${i}`}>
-                      {String(e.title ?? e.Title ?? "Compromisso")} ·{" "}
-                      {String(e.start ?? e.Start ?? "")}
-                    </li>
-                  ))}
-                </ul>
-                <label>
-                  Calendário de destino
-                  <select
-                    value={migrationCalendar}
-                    onChange={(e) => setMigrationCalendar(e.target.value)}
-                  >
-                    <option value="primary">Principal</option>
-                    {w.calendars.map((c) => (
-                      <option value={c.id} key={c.id}>
-                        {c.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  className="button"
-                  disabled={!destination}
-                  onClick={() =>
-                    void run(async () => {
-                      await importLegacy(
-                        migration,
-                        {
-                          ...w,
-                          preferences: {
-                            ...w.preferences,
-                            defaultCalendarId: migrationCalendar,
-                          },
-                        },
-                        destination,
-                        act,
-                      );
-                      setMigration(null);
-                      onToast(
-                        "Importação concluída. A sincronização pode continuar em segundo plano.",
-                      );
-                    })
-                  }
-                >
-                  Confirmar importação
-                </button>
-              </>
-            )}
-          </section>
-          <section className="panel">
-            <h2>Seu espaço é seu</h2>
-            <button
-              className="button"
-              onClick={() =>
-                download("pingo-exportacao.json", JSON.stringify(w, null, 2))
-              }
-            >
-              <Download size={15} /> Exportar meus dados
-            </button>
-          </section>
-        </div>
-      </div>
-      {status && (
-        <p className="settings-status" role="status">
-          {status}
-        </p>
-      )}
-    </>
-  );
-}
-async function importLegacy(
-  data: {
-    tasks: Record<string, unknown>[];
-    events: Record<string, unknown>[];
-    fingerprint: string;
-  },
-  w: Workspace,
-  boardId: string,
-  act: (c: Command) => Promise<void>,
-) {
-  const b = w.boards.find((b) => b.id === boardId)!;
-  for (const [i, t] of data.tasks.entries()) {
-    const source = String(t.id ?? t.Id ?? data.fingerprint + ":" + i);
-    const importId = `legacy:wpf:task:${source}`;
-    if (w.tasks.some((t) => t.importId === importId)) continue;
-    const done = Boolean(
-      t.Done ??
-      t.done ??
-      t.isCompleted ??
-      t.IsCompleted ??
-      t.completed ??
-      false,
-    );
-    await act({
-      type: "task.upsert",
-      expectedRevision: 0,
-      task: {
-        id: crypto.randomUUID(),
-        boardId: b.id,
-        columnId: b.columns.find((c) => c.kind === (done ? "done" : "todo"))!
-          .id,
-        title: String(t.title ?? t.Title ?? "Tarefa importada"),
-        notes: String(t.notes ?? t.Notes ?? ""),
-        dueDate:
-          typeof (t.Due ?? t.due ?? t.dueDate ?? t.DueDate) === "string"
-            ? String(t.Due ?? t.due ?? t.dueDate ?? t.DueDate).slice(0, 10)
-            : null,
-        scheduledStart: null,
-        scheduledEnd: null,
-        priority: "normal",
-        importId,
-      },
-    });
-  }
-  for (const [i, e] of data.events.entries()) {
-    const importId = `legacy:wpf:event:${String(e.id ?? e.Id ?? data.fingerprint + ":" + i)}`;
-    if (w.events.some((e) => e.importId === importId)) continue;
-    const start = String(
-      e.start ?? e.Start ?? e.startTime ?? e.StartTime ?? "",
-    );
-    const end = String(e.end ?? e.End ?? e.endTime ?? e.EndTime ?? "");
-    if (!start || !end) continue;
-    await act({
-      type: "event.upsert",
-      expectedRevision: 0,
-      confirmed: false,
-      event: {
-        id: crypto.randomUUID(),
-        title: String(e.title ?? e.Title ?? "Compromisso importado"),
-        start:
-          (e.AllDay ?? e.allDay)
-            ? start.slice(0, 10)
-            : new Date(start).toISOString(),
-        end:
-          (e.AllDay ?? e.allDay)
-            ? end.slice(0, 10)
-            : new Date(end).toISOString(),
-        allDay: Boolean(e.AllDay ?? e.allDay),
-        calendarId: w.preferences.defaultCalendarId,
-        importId,
-      },
-    });
-  }
 }

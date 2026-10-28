@@ -128,8 +128,12 @@ const platform: Platform = {
     : undefined,
   notifications: native
     ? {
+        status: async () => (await Native.notificationStatus()).status,
         enable: async () => {
           await Native.enableNotifications();
+        },
+        permissionSettings: async () => {
+          await Native.openNotificationSettings();
         },
         settings: async () => {
           await Native.settings();

@@ -11,6 +11,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: process.platform === "win32" ? 1 : undefined,
   use: {
+    permissions: ["notifications"],
     baseURL: process.env.PINGO_TEST_URL ?? "http://127.0.0.1:3210",
     ...devices["Desktop Chrome"],
     channel: process.env.CI ? "chrome" : undefined,

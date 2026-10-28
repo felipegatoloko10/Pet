@@ -1,3 +1,24 @@
+# Pingo 2.6.0-beta.1 — rotinas e ajustes mais simples
+
+- Sininho marca os avisos presentes como visualizados ao abrir.
+- Perfil com opção Sair em Android, web e Windows.
+- Ajustes em caixas expansíveis, sem configurações Google, com opções avançadas recolhidas.
+- Cadastro com e-mail, senha e confirmação. Requisitos visíveis: 8 caracteres, maiúscula, minúscula, número e símbolo. Contas antigas preservadas.
+- Orientação contextual para ativar notificações; lembrar novamente após sete dias, com opção de não insistir.
+- Tarefas repetidas diariamente, em dias da semana, dias do mês ou a cada X dias. Data final ou quantidade opcionais; pausa, retomada e edição desta/próximas ocorrências.
+- Ocorrências independentes e pendências atrasadas preservadas. Dias inexistentes usam o último dia do mês.
+- Menu de etapas com cores, botões grandes e suporte a teclado.
+
+Instale por cima da versão anterior, sem desinstalar, para preservar os dados locais. APK assinado com a chave existente. A versão anterior permanece recuperável.
+
+## Homologação no aparelho
+
+Esta versão permanece em rascunho até testar: permissão de notificações; criar uma tarefa repetida; fechar e reabrir offline; concluir uma ocorrência pela notificação sem concluir a seguinte; sincronizar com outro dispositivo; sair e entrar novamente.
+
+Lembretes Android conhecidos cobrem os próximos sete dias e são renovados ao abrir, sincronizar ou receber atualização em segundo plano. Restrições de bateria e encerramento forçado continuam sujeitos ao Android. Rotinas não têm integração Google.
+
+---
+
 Pingo 2.5.0-beta.2 — um caderninho kawaii para sua rotina.
 
 - Visual renovado em Android, web e painel Windows: menta, rosa, lilás, amarelo e azul, contornos escuros e cartões como adesivos.

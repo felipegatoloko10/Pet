@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { materializeSeries, reconcileTaskCalendars } from "@pingo/core";
+import { useEffect, useState, useMemo } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   addDays,
@@ -89,7 +90,13 @@ export function Calendar({
       live = false;
     };
   }, [client, start, end, w.preferences.timezone]);
-  const merged = new Map(w.events.map((e) => [e.id, e]));
+  const projected = useMemo(() => {
+    const copy = structuredClone(w);
+    materializeSeries(copy, end, new Date(), start);
+    reconcileTaskCalendars(copy, () => {});
+    return copy;
+  }, [w, start, end]);
+  const merged = new Map(projected.events.map((e) => [e.id, e]));
   for (const e of extra)
     if (!merged.has(e.id) || merged.get(e.id)!.revision < e.revision)
       merged.set(e.id, e);
@@ -108,7 +115,8 @@ export function Calendar({
       .filter((e) => eventOnDate(e, date, w.preferences.timezone))
       .sort((a, b) => a.start.localeCompare(b.start));
   const openEvent = (e: CalendarEvent) => {
-    const t = e.taskId && w.tasks.find((t) => t.id === e.taskId && !t.deleted);
+    const t =
+      e.taskId && projected.tasks.find((t) => t.id === e.taskId && !t.deleted);
     if (t && onTaskEdit) onTaskEdit(t);
     else onEdit(e);
   };

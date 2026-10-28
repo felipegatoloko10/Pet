@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./permission-fixture";
 import { localWorkspace } from "../../packages/core/src/index";
 
 test("instalação local cria tarefas sem login e abre agenda pela primeira vez offline", async ({
@@ -78,23 +78,30 @@ test("cadastro direto usa nome, e-mail e senha e começa vazio sem importar o es
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("button", { name: "Ajustes", exact: true }).click();
   await page
-    .getByRole("button", { name: "Entrar para sincronizar", exact: true })
+    .locator(".settings-section > summary")
+    .filter({ hasText: "Conta e sincronização" })
+    .click();
+  await page
+    .getByRole("button", { name: "Entrar ou criar conta", exact: true })
     .click();
   const dialog = page.getByRole("dialog", { name: "Sua conta Pingo" });
   await dialog
     .getByRole("button", { name: "Não tem conta? Criar conta" })
     .click();
-  await dialog.getByLabel("Seu nome", { exact: true }).fill(user.name);
+
   await dialog.getByLabel("E-mail", { exact: true }).fill(user.email);
   await dialog
     .getByLabel("Senha", { exact: true })
+    .fill("Senha-de-fixture-123");
+  await dialog
+    .getByLabel("Confirmar senha", { exact: true })
     .fill("Senha-de-fixture-123");
   await dialog
     .getByRole("button", { name: "Criar minha conta", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   expect(registration).toEqual({
-    name: user.name,
+    name: "Pessoa",
     email: user.email,
     password: "Senha-de-fixture-123",
   });
@@ -126,7 +133,10 @@ test("login exibe senha e cadastro e não oferece autorização Google", async (
   await form
     .getByRole("button", { name: "Não tem conta? Criar conta" })
     .click();
-  await expect(form.getByLabel("Seu nome", { exact: true })).toBeVisible();
+  await expect(form.getByLabel("Seu nome", { exact: true })).toHaveCount(0);
+  await expect(
+    form.getByLabel("Confirmar senha", { exact: true }),
+  ).toBeVisible();
   await expect(form.getByLabel(/Convite/)).toHaveCount(0);
   await expect(form.getByLabel("Senha", { exact: true })).toHaveAttribute(
     "autocomplete",

@@ -25,7 +25,7 @@ const emails = ["alice", "bob", "expired"].map(
   (n) => `${n}-${suffix}@verification.pingo.invalid`,
 );
 const codes = emails.map(() => randomBytes(32).toString("base64url"));
-const password = randomBytes(24).toString("base64url");
+const password = randomBytes(24).toString("base64url") + "Aa1!";
 const tickets: string[] = [];
 const subnet = randomBytes(1)[0];
 let checks = 0,
@@ -106,7 +106,10 @@ try {
     (await request("/api/auth/sign-up/email", registration(0))).status === 422,
   );
   await pool.query("DELETE FROM invitations WHERE email=$1", [emails[1]]);
-  const b = await request("/api/auth/sign-up/email", registration(1));
+  const b = await request(
+    "/api/auth/sign-up/email",
+    registration(1, { password: "Aa1!abcd" }),
+  );
   check(b.ok);
   const cookieB = cookies(b);
   const userB = (await b.json()).user;
@@ -245,9 +248,76 @@ try {
   const exchanged = await request("/api/v1/mobile-auth/exchange", exchange);
   check(exchanged.ok);
   check(!(await request("/api/v1/mobile-auth/exchange", exchange)).ok);
+  const repeatId = randomUUID();
+  const repeatOp = {
+    operationId: repeatId,
+    command: {
+      ...operation.command,
+      task: {
+        ...operation.command.task,
+        id: randomUUID(),
+        title: "Rotina temporária",
+        dueDate: new Date().toISOString().slice(0, 10),
+        scheduledStart: null,
+        scheduledEnd: null,
+      },
+      repetition: {
+        kind: "daily",
+        weekdays: [1],
+        monthDays: [1],
+        lastDay: false,
+        interval: 1,
+        until: null,
+        count: 3,
+      },
+    },
+  };
+  const repeatSaved = await request("/api/v1/operations", repeatOp, cookieA);
+  check(repeatSaved.ok);
+  const repeatWorkspace = (await repeatSaved.json()).workspace;
+  check(
+    repeatWorkspace.taskSeries.length === 1 &&
+      repeatWorkspace.tasks.filter(
+        (t: { seriesId?: string }) => t.seriesId === repeatId,
+      ).length === 3,
+  );
+  check((await request("/api/v1/operations", repeatOp, cookieA)).ok);
+  const anotherRead = (
+    await (await request("/api/v1/workspace", undefined, cookieA)).json()
+  ).workspace;
+  check(
+    anotherRead.tasks.length === repeatWorkspace.tasks.length &&
+      anotherRead.events.length === repeatWorkspace.events.length,
+  );
+  check(
+    (await (await request("/api/v1/workspace", undefined, cookieB)).json())
+      .workspace.taskSeries?.length !== 1,
+  );
+  const repeatTask = anotherRead.tasks.find(
+    (t: { seriesId?: string }) => t.seriesId === repeatId,
+  );
+  const move = {
+    operationId: randomUUID(),
+    command: {
+      type: "task.move",
+      id: repeatTask.id,
+      columnId: board.columns.find((c: { kind: string }) => c.kind === "done")
+        .id,
+      beforeId: null,
+      expectedRevision: repeatTask.revision,
+    },
+  };
+  const moved = await request("/api/v1/operations", move, cookieA);
+  check(moved.ok);
+  check(
+    (await moved.json()).workspace.tasks.filter(
+      (t: { seriesId?: string; completed: boolean }) =>
+        t.seriesId === repeatId && t.completed,
+    ).length === 1,
+  );
   ip = `10.60.${subnet}.3`;
   const recovery = randomBytes(32).toString("base64url"),
-    nextPassword = randomBytes(24).toString("base64url");
+    nextPassword = randomBytes(24).toString("base64url") + "Aa1!";
   await pool.query(
     "UPDATE invitations SET activation_hash=$2,activation_used_at=NULL,activation_purpose='recover' WHERE email=$1",
     [emails[0], createHash("sha256").update(recovery).digest("hex")],

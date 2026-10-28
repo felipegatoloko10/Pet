@@ -31,8 +31,8 @@ export function Routine({
     <section className="routine-editor">
       <h2>Trabalho e tempo pessoal</h2>
       <p>
-        Horários não cadastrados são desconhecidos para o Pingo. Separe os
-        blocos para incluir suas pausas.
+        Se quiser, indique seus horários de trabalho e quando costuma ter tempo
+        livre. Adicione intervalos separados para deixar espaço para suas pausas.
       </p>
       {[1, 2, 3, 4, 5, 6, 0].map((day) => {
         const current = value.find((d) => d.day === day) ?? {

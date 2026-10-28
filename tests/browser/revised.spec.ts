@@ -1,7 +1,7 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./permission-fixture";
 test("arraste com mouse move o cartão para uma coluna vazia",async({page})=>{
  await demo(page);const card=page.locator('.task-card').first(),title=await card.locator('h3').innerText();const from=await card.getByRole('button',{name:`Arrastar ${title}`,exact:true}).boundingBox(),to=await page.locator('.kanban-column').nth(2).boundingBox();
- if(!from||!to)throw new Error('Cartão ou destino não visível');await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();await page.mouse.move(from.x+from.width/2+12,from.y+from.height/2,{steps:4});await expect(page.locator('.drag-preview')).toBeVisible();await page.mouse.move(to.x+to.width/2,to.y+130,{steps:20});await page.mouse.up();await expect(page.getByLabel(`Mover ${title}`,{exact:true})).toHaveValue('demo:waiting');
+ if(!from||!to)throw new Error('Cartão ou destino não visível');await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();await page.mouse.move(from.x+from.width/2+12,from.y+from.height/2,{steps:4});await expect(page.locator('.drag-preview')).toBeVisible();await page.mouse.move(to.x+to.width/2,to.y+130,{steps:20});await page.mouse.up();await expect(page.getByLabel(`Mover ${title}`,{exact:true})).toContainText('Aguardando');
 });
 async function demo(page: import("@playwright/test").Page) {
   await page.goto("/");

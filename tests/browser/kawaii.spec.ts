@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./permission-fixture";
 
 test("quadro cabe no celular, atalhos alcançam colunas e a cor escolhida sobrevive ao reinício", async ({
   page,

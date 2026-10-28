@@ -1,3 +1,11 @@
+import {
+  repetitionSchema,
+  materializeSeries,
+  previousDay,
+  type TaskSeries,
+} from "./recurrence";
+export * from "./recurrence";
+export * from "./password";
 import { z } from "zod";
 import { TZDate } from "@date-fns/tz";
 import {
@@ -90,6 +98,8 @@ export type Board = {
   revision: number;
 };
 export type Task = {
+  seriesId?: string;
+  occurrenceDate?: string;
   timeMode?: "none" | "point" | "range";
   completedAt?: string | null;
   actualStartedAt?: string | null;
@@ -252,6 +262,7 @@ export type SyncJob = {
   sentAt?: string;
 };
 export type Workspace = {
+  taskSeries?: TaskSeries[];
   storageMode?: "pingo";
   migrationSettingsRestored?: boolean;
   petCare?: PetCare;
@@ -466,6 +477,19 @@ export const preferenceInput = z.object({
 });
 export const commandSchema = z.discriminatedUnion("type", [
   z.object({
+    type: z.literal("series.pause"),
+    id,
+    expectedRevision: z.number().int(),
+    date,
+    paused: z.boolean(),
+  }),
+  z.object({
+    type: z.literal("series.stop"),
+    id,
+    expectedRevision: z.number().int(),
+    date,
+  }),
+  z.object({
     type: z.literal("workspace.import"),
     data: pingoImportInput(),
     confirmed: z.literal(true),
@@ -562,6 +586,9 @@ export const commandSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("task.upsert"),
+    repetition: repetitionSchema.nullable().optional(),
+    scope: z.enum(["one", "future"]).optional(),
+    expectedSeriesRevision: z.number().int().optional(),
     task: taskInput,
     expectedRevision: z.number().int().min(0),
   }),
@@ -589,6 +616,7 @@ export const commandSchema = z.discriminatedUnion("type", [
     preferences: preferenceInput,
   }),
   z.object({ type: z.literal("notice.read"), id }),
+  z.object({ type: z.literal("notice.readMany"), ids: z.array(id).max(10000) }),
   z.object({ type: z.literal("notice.ack"), id, deviceId: id }),
 ]);
 export type Command = z.infer<typeof commandSchema>;
@@ -625,6 +653,28 @@ export function applyCommand(
 ): Workspace {
   const w = normalizeWorkspace(structuredClone(original));
   const c = commandSchema.parse(command);
+  const occurrence =
+    "id" in c && typeof c.id === "string"
+      ? c.id.match(/@(\d{4}-\d{2}-\d{2})$/)?.[1]
+      : undefined;
+  const taskDate =
+    c.type === "task.upsert"
+      ? c.task.id.match(/@(\d{4}-\d{2}-\d{2})$/)?.[1]
+      : undefined;
+  materializeSeries(w, occurrence ?? taskDate, new Date(now));
+  const targetId =
+    c.type === "task.upsert" ? c.task.id : "id" in c ? c.id : undefined;
+  if (
+    (occurrence || taskDate) &&
+    typeof targetId === "string" &&
+    c.type.startsWith("task.") &&
+    !w.tasks.some((t) => t.id === targetId)
+  )
+    throw new DomainError(
+      "conflict",
+      "Esta ocorrência foi removida ou a repetição mudou. Atualize o quadro antes de continuar.",
+      409,
+    );
   if (
     w.storageMode === "pingo" &&
     c.type === "event.upsert" &&
@@ -978,6 +1028,37 @@ export function applyCommand(
       b.revision++;
       break;
     }
+    case "series.pause":
+    case "series.stop": {
+      const series = w.taskSeries?.find((s) => s.id === c.id);
+      if (!series) throw new DomainError("missing", "Rotina não encontrada.");
+      checkRevision(series, c.expectedRevision);
+      if (c.type === "series.stop") series.end = previousDay(c.date);
+      else if (c.paused) {
+        if (!series.pauses.some((p) => !p.end))
+          series.pauses.push({ start: c.date });
+      } else {
+        const pause = series.pauses.find((p) => !p.end);
+        if (pause) pause.end = previousDay(c.date);
+      }
+      // Only untouched projections are removed; edited occurrences and history survive.
+      const removed = new Set(
+        w.tasks
+          .filter(
+            (t) =>
+              t.seriesId === series.id &&
+              (t.occurrenceDate ?? "") >= c.date &&
+              !t.completed,
+          )
+          .map((t) => t.id),
+      );
+      w.tasks = w.tasks.filter((t) => !removed.has(t.id));
+      w.events = w.events.filter((e) => !e.taskId || !removed.has(e.taskId));
+      series.revision++;
+      materializeSeries(w, undefined, new Date(now));
+      reconcileTaskCalendars(w, enqueue, now);
+      break;
+    }
     case "task.upsert": {
       const b = w.boards.find((b) => b.id === c.task.boardId);
       const col = b?.columns.find((x) => x.id === c.task.columnId);
@@ -1072,6 +1153,99 @@ export function applyCommand(
           "Não é possível mover entre listas nesta versão.",
         );
       w.tasks = w.tasks.filter((t) => t.id !== c.task.id).concat(t);
+      if (
+        c.repetition !== undefined &&
+        (!old?.seriesId || c.scope === "future")
+      ) {
+        if (!t.dueDate)
+          throw new DomainError("date", "Escolha a data inicial da rotina.");
+        const prior = w.taskSeries?.find((s) => s.id === old?.seriesId);
+        const from = old?.occurrenceDate ?? t.dueDate;
+        if (prior) {
+          checkRevision(prior, c.expectedSeriesRevision ?? -1);
+          prior.end = previousDay(from);
+          prior.revision++;
+          const removed = new Set(
+            w.tasks
+              .filter(
+                (x) =>
+                  x.seriesId === prior.id &&
+                  (x.occurrenceDate ?? "") >= from &&
+                  x.id !== t.id &&
+                  !x.completed,
+              )
+              .map((x) => x.id),
+          );
+          w.tasks = w.tasks.filter((x) => !removed.has(x.id));
+          w.events = w.events.filter(
+            (e) => !e.taskId || !removed.has(e.taskId),
+          );
+        }
+        if (c.repetition) {
+          if (c.repetition.until && c.repetition.until < t.dueDate)
+            throw new DomainError(
+              "date",
+              "A repetição deve terminar depois de começar.",
+            );
+          const seriesId = operationId;
+          const template = structuredClone(t);
+          delete template.seriesId;
+          delete template.occurrenceDate;
+          const series: TaskSeries = {
+            id: seriesId,
+            revision: 1,
+            start: t.dueDate,
+            timezone: w.preferences.timezone,
+            template,
+            rule: c.repetition,
+            pauses: [],
+            exclusions: prior
+              ? w.tasks
+                  .filter(
+                    (x) =>
+                      x.seriesId === prior.id &&
+                      x.completed &&
+                      (x.occurrenceDate ?? "") >= from,
+                  )
+                  .map((x) => x.occurrenceDate!)
+              : [],
+          };
+          if ((w.taskSeries?.filter((s) => !s.end).length ?? 0) >= 100)
+            throw new DomainError(
+              "quota",
+              "Você já tem 100 rotinas. Encerre ou remova uma antes de criar outra.",
+            );
+          (w.taskSeries ??= []).push(series);
+          // The first real occurrence receives the edited task only if it matches the rule.
+          const oldId = t.id;
+          w.tasks = w.tasks.filter((x) => x.id !== oldId);
+          w.events = w.events.filter((e) => e.taskId !== oldId);
+          materializeSeries(
+            w,
+            t.dueDate >
+              new Date(Date.parse(now) + 7 * 86400000)
+                .toISOString()
+                .slice(0, 10)
+              ? t.dueDate
+              : undefined,
+            new Date(now),
+          );
+          const first = w.tasks.find(
+            (x) => x.id === `${seriesId}@${t.dueDate}`,
+          );
+          if (first) {
+            Object.assign(first, {
+              columnId: t.columnId,
+              completed: t.completed,
+              completedAt: t.completedAt,
+              revision: 1,
+            });
+          }
+        } else {
+          delete t.seriesId;
+          delete t.occurrenceDate;
+        }
+      }
       enqueue("task", t.id, "upsert");
       break;
     }
@@ -1196,6 +1370,11 @@ export function applyCommand(
           w.preferences.defaultBoardId || c.preferences.defaultBoardId,
       };
       break;
+    case "notice.readMany": {
+      const ids = new Set(c.ids);
+      for (const n of w.notices) if (ids.has(n.id)) n.read = true;
+      break;
+    }
     case "notice.read": {
       const n = w.notices.find((n) => n.id === c.id);
       if (n) n.read = true;

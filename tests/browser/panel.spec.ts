@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./permission-fixture";
 import {
   emptyWorkspace,
   newBoard,
@@ -14,7 +14,7 @@ test("demonstração permite editar, mover e persistir tarefas sem Google", asyn
     .getByRole("button", { name: "Explorar demonstração local" })
     .click();
   await expect(
-    page.getByText("Demonstração local"),
+    page.getByRole("banner").getByText("Demonstração local"),
   ).toBeVisible();
   await page.getByRole("button", { name: "Nova tarefa", exact: true }).click();
   await page
@@ -27,9 +27,37 @@ test("demonstração permite editar, mover e persistir tarefas sem Google", asyn
     page.getByRole("button", { name: /^Tarefa persistente do teste/ }),
   ).toBeVisible();
 
+  await page.getByLabel("Mover Tarefa persistente do teste").click();
   await page
-    .getByLabel("Mover Tarefa persistente do teste")
-    .selectOption({ label: "Fazendo" });
+    .getByRole("dialog", { name: "Alterar etapa" })
+    .getByRole("button", { name: "Fazendo", exact: true })
+    .click();
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const r = indexedDB.open("pingo-v2:demo");
+          r.onsuccess = () => resolve(r.result);
+          r.onerror = () => reject(r.error);
+        });
+        const raw = await new Promise<string>((resolve, reject) => {
+          const r = db
+            .transaction("state")
+            .objectStore("state")
+            .get("snapshot");
+          r.onsuccess = () => resolve(r.result);
+          r.onerror = () => reject(r.error);
+        });
+        db.close();
+        return raw
+          ? JSON.parse(raw).workspace.tasks.find(
+              (t: { title: string }) =>
+                t.title === "Tarefa persistente do teste",
+            )?.columnId
+          : undefined;
+      }),
+    )
+    .toBe("demo:active");
   // Simulate restart after the app acknowledges that the local transaction committed.
   await expect(page.locator(".toast")).toHaveText(
     "Modificação salva na demonstração local.",
@@ -41,7 +69,7 @@ test("demonstração permite editar, mover e persistir tarefas sem Google", asyn
 
   await expect(
     page.getByLabel("Mover Tarefa persistente do teste"),
-  ).toHaveValue("demo:active");
+  ).toContainText("Fazendo");
   await page.screenshot({
     path: ".verification/kanban-desktop.png",
     fullPage: true,
@@ -64,10 +92,14 @@ test("painel móvel e preferências do pet", async ({ page }) => {
     ),
   ).toBe(true);
   await page.getByRole("button", { name: "Ajustes", exact: true }).click();
-  await page.getByLabel("Nome", { exact: true }).fill("Gotinha");
+  await page
+    .locator(".settings-section > summary")
+    .filter({ hasText: "Meu Pingo" })
+    .click();
+  await page.getByLabel("Nome do Pingo", { exact: true }).fill("Gotinha");
   await expect(page.getByLabel("Reduzir movimentos")).toHaveCount(0);
   await page.getByLabel("Ler balões em voz alta", { exact: true }).check();
-  await page.getByRole("button", { name: "Salvar meu jeito" }).click();
+  await page.getByRole("button", { name: "Salvar ajustes" }).click();
   await expect(
     page.getByRole("button", { name: "Gotinha:", exact: false }).first(),
   ).toBeVisible();

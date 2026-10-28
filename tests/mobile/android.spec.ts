@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../browser/permission-fixture";
 test.use({
   viewport: { width: 393, height: 851 },
   hasTouch: true,

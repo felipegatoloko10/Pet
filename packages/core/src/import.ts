@@ -1,3 +1,4 @@
+import { repetitionSchema } from "./recurrence";
 import { z } from "zod";
 import {
   taskInput,
@@ -20,6 +21,34 @@ const column = z.object({
 });
 export function pingoImportInput() {
   return z.object({
+    taskSeries: z
+      .array(
+        z.object({
+          id: z.string().max(200),
+          revision: z.number().int(),
+          start: z.iso.date(),
+          end: z.iso.date().optional(),
+          rule: repetitionSchema,
+          timezone: preferenceInput.shape.timezone,
+          template: taskInput.extend({
+            completed: z.boolean(),
+            revision: z.number().int(),
+            syncState: z.enum([
+              "pending",
+              "syncing",
+              "synced",
+              "error",
+              "conflict",
+            ]),
+          }),
+          exclusions: z.array(z.iso.date()).optional(),
+          pauses: z.array(
+            z.object({ start: z.iso.date(), end: z.iso.date().optional() }),
+          ),
+        }),
+      )
+      .max(1000)
+      .optional(),
     calendars: z
       .array(
         z.object({
@@ -74,6 +103,8 @@ export function pingoImportInput() {
     tasks: z
       .array(
         taskInput.extend({
+          seriesId: z.string().max(200).optional(),
+          occurrenceDate: z.iso.date().optional(),
           completed: z.boolean().default(false),
           completedAt: z.iso.datetime({ offset: true }).nullable().optional(),
           deleted: z.boolean().optional(),
@@ -131,6 +162,18 @@ export function importPingoData(w: Workspace, input: PingoImport) {
       }
       columns.set(c.id, target.id);
     }
+  for (const series of input.taskSeries ?? [])
+    if (!w.taskSeries?.some((s) => s.id === series.id))
+      (w.taskSeries ??= []).push({
+        ...series,
+        template: {
+          ...series.template,
+          boardId: destination.id,
+          columnId:
+            columns.get(series.template.columnId) ??
+            destination.columns.find((c) => c.kind === "todo")!.id,
+        },
+      });
   for (const t of input.tasks.filter((t) => !t.deleted)) {
     // Existing Pingo IDs are preserved, so moving the same backup between devices is safe.
     if (w.tasks.some((x) => x.id === t.id)) continue;

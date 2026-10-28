@@ -4,9 +4,9 @@ Companheiro pessoal para tarefas, agenda, rotina e pequenos cuidados. Beta gratu
 
 [Abrir o Pingo](https://pingo-gilt.vercel.app) · [Android](docs/ANDROID.md) · [Migração para Supabase](docs/OFFLINE-SUPABASE.md)
 
-O visual da **2.5.0-beta.2** combina cores pastel, contornos de adesivo e navegação adaptada ao celular. As cores das colunas continuam personalizáveis. A fonte [Fredoka](https://github.com/google/fonts/tree/main/ofl/fredoka) é incorporada ao app sob a [licença OFL](packages/ui/src/fonts/OFL-Fredoka.txt), e os adesivos são vetores locais. Não é necessária conexão para carregar esses recursos.
+O visual da **2.6.0-beta.1** combina cores pastel, contornos de adesivo e navegação adaptada ao celular. As cores das colunas continuam personalizáveis. A fonte [Fredoka](https://github.com/google/fonts/tree/main/ofl/fredoka) é incorporada ao app sob a [licença OFL](packages/ui/src/fonts/OFL-Fredoka.txt), e os adesivos são vetores locais. Não é necessária conexão para carregar esses recursos.
 
-**Usar neste aparelho** abre um quadro e uma agenda reais, sem conta e sem internet. Dados são guardados no SQLite do Android/Windows e no IndexedDB da web. Uma conta do Pingo, por e-mail e senha, permite sincronizar os dispositivos quando houver conexão. Selecione **Não tem conta? Criar conta**, preencha nome, e-mail e senha e comece com um espaço vazio, sem convite ou autorização Google.
+**Usar neste aparelho** abre um quadro e uma agenda reais, sem conta e sem internet. Dados são guardados no SQLite do Android/Windows e no IndexedDB da web. Uma conta do Pingo, por e-mail e senha, permite sincronizar os dispositivos quando houver conexão. Selecione **Não tem conta? Criar conta**, preencha e-mail, senha e confirmação e comece com um espaço vazio, sem convite ou autorização Google.
 
 A versão 2.5 não consulta Google Tasks, Agenda ou Gmail e não usa Firebase para notificações. Tarefas e horários pertencem ao Pingo. O avatar permanece transparente, com animações e cuidados locais. Conversa com IA é opcional e necessita de internet e uma chave OpenAI ou Claude.
 
@@ -51,3 +51,12 @@ Sessões nativas permanecem no armazenamento protegido do sistema. O backend der
 Instale as atualizações sobre a versão anterior, sem desinstalar. O APK mantém a chave de assinatura; Windows usa instalador NSIS. O workflow gera instaladores e uma pré-release em rascunho. Novas versões passam por homologação antes da publicação. A [2.4.1](https://github.com/felipegatoloko10/Pet/releases/tag/v2.4.1-beta.1) e o protótipo WPF permanecem recuperáveis.
 
 Internet é necessária para primeiro download do site, login, sincronização e IA. Alarmes conhecidos funcionam localmente; restrições de bateria e encerramento forçado podem atrasá-los. Quadros compartilhados, iPhone e cobrança ficam fora deste beta.
+
+
+### Rotinas e controles 2.6
+
+Tarefas podem repetir todos os dias, nos dias da semana escolhidos, em dias do mês (dias inexistentes usam o último dia) ou a cada X dias. Cada ocorrência tem seu próprio status, checklist e lembretes; atrasadas continuam visíveis. Você pode editar somente uma ocorrência ou esta e as próximas. Em Ajustes → Minha rotina, é possível pausar e retomar. O fuso da série preserva seus horários locais.
+
+Ao abrir o sininho, os avisos existentes são marcados como visualizados. O perfil abre o menu Sair em todas as superfícies. Ajustes são organizados em caixas expansíveis; funções opcionais e importação ficam recolhidas.
+
+Novas senhas exigem ao menos oito caracteres, maiúscula, minúscula, número e símbolo, com confirmação no cadastro. Senhas anteriores continuam válidas para entrar. A permissão de notificações pertence a cada aparelho e é solicitada de forma contextual; o convite pode reaparecer após sete dias, com opção de não lembrar novamente.

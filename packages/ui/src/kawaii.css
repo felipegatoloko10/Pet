@@ -2011,3 +2011,255 @@ body:has(.loading) {
     scroll-behavior: auto !important;
   }
 }
+
+/* Everyday controls: shared across native shells and web. */
+.account-menu {
+  position: relative;
+  z-index: 20;
+}
+.account-menu summary {
+  cursor: pointer;
+  list-style: none;
+}
+.account-menu summary::-webkit-details-marker {
+  display: none;
+}
+.account-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 12px);
+  width: min(280px, 80vw);
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+  background: #fffefa;
+  border: 3px solid #25232b;
+  border-radius: 22px;
+  box-shadow: 4px 5px 0 #25232b;
+}
+.account-popover small {
+  overflow-wrap: anywhere;
+}
+.password-rules {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+.valid,
+.password-rules .valid {
+  color: #216546;
+}
+.invalid,
+.password-rules .invalid {
+  color: #a32946;
+}
+.settings-organized {
+  display: grid;
+  gap: 18px;
+  max-width: 900px;
+  margin: auto;
+}
+.settings-section {
+  border: 3px solid #25232b;
+  border-radius: 26px;
+  background: #fffefa;
+  box-shadow: 3px 4px 0 #25232b;
+  overflow: clip;
+}
+.settings-section > summary {
+  padding: 22px;
+  cursor: pointer;
+  background: #ffc8dd;
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  position: relative;
+  padding-right: 48px;
+}
+.settings-section:nth-child(2n) > summary {
+  background: #fff3a8;
+}
+.settings-section:nth-child(3n) > summary {
+  background: #b8e0ff;
+}
+.settings-section:nth-child(4n) > summary {
+  background: #a8f0e0;
+}
+.settings-section:nth-child(5n) > summary {
+  background: #c9b6ff;
+}
+.settings-section > summary::after {
+  content: "+";
+  position: absolute;
+  right: 22px;
+  top: 25px;
+  font-size: 24px;
+}
+.settings-section[open] > summary::after {
+  content: "−";
+}
+.settings-section > summary strong {
+  font-size: 1.15rem;
+}
+.settings-section > .editor-form {
+  padding: 22px;
+}
+.settings-section details {
+  border: 2px solid #25232b;
+  border-radius: 16px;
+  padding: 14px;
+}
+.settings-section details summary {
+  cursor: pointer;
+  padding: 8px 0;
+}
+.status-picker {
+  display: block;
+  min-width: 0;
+}
+.status-trigger {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  border: 2px solid #25232b;
+  border-radius: 16px;
+  background: #fffefa;
+  min-height: 48px;
+  padding: 10px 14px;
+  font: inherit;
+  text-align: left;
+}
+.status-trigger > span:last-child,
+.status-options button > span {
+  margin-left: auto;
+}
+.status-trigger i,
+.status-options i {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 2px solid #25232b;
+  border-radius: 50%;
+}
+.status-sheet,
+.permission-dialog {
+  background: #fffefa;
+  color: #25232b;
+  border: 3px solid #25232b;
+  border-radius: 28px;
+  padding: 24px;
+  max-width: min(460px, calc(100vw - 24px));
+  max-height: 85dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.status-sheet::backdrop,
+.permission-dialog::backdrop {
+  background: #24253655;
+  backdrop-filter: blur(4px);
+}
+.status-sheet header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.status-options {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+.status-options button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  min-height: 52px;
+  font: inherit;
+  border: 2px solid #25232b;
+  border-radius: 16px;
+  background: #fffefa;
+}
+.status-options button[aria-pressed="true"] {
+  background: #a8f0e0;
+  box-shadow: 2px 3px 0 #25232b;
+}
+.repeat-picker {
+  display: grid;
+  gap: 16px;
+}
+.repeat-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.repeat-options .button[aria-pressed="true"],
+.day-options button[aria-pressed="true"] {
+  background: #c9b6ff;
+  box-shadow: 2px 3px 0 #25232b;
+}
+.day-options {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 7px;
+}
+.day-options button {
+  min-height: 44px;
+  padding: 4px;
+  border: 2px solid #25232b;
+  border-radius: 12px;
+  background: #fffefa;
+  font: inherit;
+}
+@media (max-width: 760px) {
+  .status-sheet[open] {
+    position: fixed;
+    inset: auto 0 0;
+    margin: 0 auto;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 28px 28px 0 0;
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+  .settings-section > .editor-form {
+    padding: 18px;
+  }
+  .settings-section .pet-settings {
+    grid-template-columns: 1fr;
+  }
+  .repeat-options .button {
+    flex: 1 1 120px;
+  }
+}
+
+.settings-organized .routine-editor details {
+  border: 2px solid #25232b;
+  background: #f5fbff;
+  margin: 10px 0;
+}
+.settings-organized .routine-editor summary {
+  font-weight: 500;
+}
+.routine-series {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 14px;
+  padding: 16px;
+  border: 2px solid #25232b;
+  border-radius: 18px;
+  background: #f7f0ff;
+}
+.routine-series strong {
+  overflow-wrap: anywhere;
+}
+.routine-series small {
+  grid-column: 1;
+}
+.routine-series button {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: center;
+}

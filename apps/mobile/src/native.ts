@@ -42,9 +42,11 @@ export interface NativeBridge {
     quietEnd: string;
     reminders: Reminder[];
   }): Promise<void>;
+  notificationStatus(): Promise<{ status: string }>;
   enableNotifications(): Promise<{ token: string }>;
   getPushToken(): Promise<{ token: string | null }>;
   settings(): Promise<void>;
+  openNotificationSettings(): Promise<void>;
   getPrivacy(): Promise<{ hidden: boolean }>;
   setPrivacy(v: { hidden: boolean }): Promise<void>;
   logout(): Promise<void>;

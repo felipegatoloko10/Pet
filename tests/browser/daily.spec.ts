@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./permission-fixture";
 import {
   emptyWorkspace,
   newBoard,
@@ -156,7 +156,8 @@ test("coluna tem 24 cores, persiste escolha e exclui sem apagar cartões", async
   await expect(col).toHaveCSS("background-color", "rgb(199, 232, 231)");
   await page
     .getByLabel("Mover Hoje", { exact: true })
-    .selectOption({ label: "Pessoal" });
+    .click();
+  await page.getByRole("dialog",{name:"Alterar etapa"}).getByRole("button",{name:"Pessoal",exact:true}).click();
   await page
     .getByRole("button", { name: "Editar coluna Pessoal", exact: true })
     .click();
@@ -165,9 +166,7 @@ test("coluna tem 24 cores, persiste escolha e exclui sem apagar cartões", async
   await dialog
     .getByRole("button", { name: "Excluir coluna", exact: true })
     .click();
-  await expect(page.getByLabel("Mover Hoje", { exact: true })).toHaveValue(
-    "b:todo",
-  );
+  await expect(page.getByLabel("Mover Hoje", { exact: true })).toContainText("A fazer");
   expect(state().tasks.find((t) => t.id === "Hoje")!.deleted).not.toBe(true);
   await page.screenshot({
     path: ".verification/v24-board.png",

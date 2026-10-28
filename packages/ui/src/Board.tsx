@@ -1,3 +1,4 @@
+import { StatusPicker } from "./StatusPicker";
 import { useEffect, useRef, useState } from "react";
 import {
   DndContext,
@@ -933,6 +934,9 @@ function Card({
         {taskIsLate(t, today) && !t.id.startsWith("event:") && (
           <strong className="overdue-badge">Atrasada · {t.dueDate}</strong>
         )}
+        {t.seriesId && (
+          <small className="repeat-badge">↻ Tarefa com repetição</small>
+        )}
         <small className="card-due">
           {t.dueDate ?? "Sem data"}
           {t.scheduledStart
@@ -971,17 +975,12 @@ function Card({
           </small>
         )}
       </button>
-      <select
-        aria-label={`Mover ${t.title}`}
+      <StatusPicker
+        label={`Mover ${t.title}`}
         value={t.columnId}
-        onChange={(e) => onMove(e.target.value)}
-      >
-        {columns.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.title}
-          </option>
-        ))}
-      </select>
+        columns={columns}
+        onChange={onMove}
+      />
     </article>
   );
 }

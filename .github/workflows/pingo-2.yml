@@ -105,9 +105,9 @@ jobs:
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v2.')
         run: |
           mkdir -p .verification/android-release
-          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk .verification/android-release/Pingo_2.6.0-beta.1_android.apk
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk .verification/android-release/Pingo_2.7.0-beta.1_android.apk
           cd .verification/android-release
-          sha256sum Pingo_2.6.0-beta.1_android.apk > SHA256SUMS-Android.txt
+          sha256sum Pingo_2.7.0-beta.1_android.apk > SHA256SUMS-Android.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v2.')
         with:

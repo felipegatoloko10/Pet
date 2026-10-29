@@ -315,6 +315,60 @@ try {
         t.seriesId === repeatId && t.completed,
     ).length === 1,
   );
+  const gameRead = (
+    await (await request("/api/v1/workspace", undefined, cookieA)).json()
+  ).workspace;
+  check(gameRead.companion.rewarded.includes(repeatTask.id));
+  const rewardCount = gameRead.companion.rewarded.length;
+  const stock = gameRead.companion.food;
+  check((await request("/api/v1/operations", move, cookieA)).ok);
+  const repeatReward = (
+    await (await request("/api/v1/workspace", undefined, cookieA)).json()
+  ).workspace;
+  check(
+    repeatReward.companion.rewarded.length === rewardCount &&
+      repeatReward.companion.food === stock,
+  );
+  const feedOp = {
+    operationId: randomUUID(),
+    command: { type: "pet.care", action: "feed" },
+  };
+  check((await request("/api/v1/operations", feedOp, cookieA)).ok);
+  check((await request("/api/v1/operations", feedOp, cookieA)).ok);
+  check(
+    (await (await request("/api/v1/workspace", undefined, cookieA)).json())
+      .workspace.companion.food ===
+      stock - 1,
+  );
+  const deleteRoutine = {
+    operationId: randomUUID(),
+    command: {
+      type: "series.delete",
+      scope: "all",
+      confirmed: true,
+      targets: repeatReward.taskSeries.map(
+        (s: { id: string; revision: number }) => ({
+          id: s.id,
+          expectedRevision: s.revision,
+        }),
+      ),
+    },
+  };
+  check(!(await request("/api/v1/operations", deleteRoutine, cookieB)).ok);
+  const deletedRoutine = await request(
+    "/api/v1/operations",
+    deleteRoutine,
+    cookieA,
+  );
+  check(deletedRoutine.ok);
+  const deletedWorkspace = (await deletedRoutine.json()).workspace;
+  check(
+    deletedWorkspace.tasks
+      .filter((t: { seriesId?: string }) => t.seriesId === repeatId)
+      .every((t: { deleted: boolean }) => t.deleted),
+  );
+  check(deletedWorkspace.companion.rewarded.length === rewardCount);
+  check((await request("/api/v1/operations", deleteRoutine, cookieA)).ok);
   ip = `10.60.${subnet}.3`;
   const recovery = randomBytes(32).toString("base64url"),
     nextPassword = randomBytes(24).toString("base64url") + "Aa1!";

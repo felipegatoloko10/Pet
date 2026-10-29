@@ -14,7 +14,9 @@ test.beforeEach(async ({ page }) => {
         : JSON.stringify({ error: "Entre no Pingo." }),
     }),
   );
-  await page.goto(`http://127.0.0.1:${process.env.PINGO_MOBILE_TEST_PORT ?? "1430"}`);
+  await page.goto(
+    `http://127.0.0.1:${process.env.PINGO_MOBILE_TEST_PORT ?? "1430"}`,
+  );
   await page
     .getByRole("button", { name: "Explorar demonstração local" })
     .click();
@@ -35,7 +37,7 @@ test("Android navigation keeps Kanban first and care persists after restart", as
   await expect(
     page.getByRole("heading", { name: "Um momento com Pingo" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Alimentar", exact: true }).click();
+  await page.getByRole("button", { name: /^Alimentar/ }).click();
   await expect(
     page.getByRole("progressbar", { name: "Saciedade" }),
   ).toHaveAttribute("value", /100|99\./);

@@ -4,7 +4,7 @@ Companheiro pessoal para tarefas, agenda, rotina e pequenos cuidados. Beta gratu
 
 [Abrir o Pingo](https://pingo-gilt.vercel.app) · [Android](docs/ANDROID.md) · [Migração para Supabase](docs/OFFLINE-SUPABASE.md)
 
-O visual da **2.6.0-beta.1** combina cores pastel, contornos de adesivo e navegação adaptada ao celular. As cores das colunas continuam personalizáveis. A fonte [Fredoka](https://github.com/google/fonts/tree/main/ofl/fredoka) é incorporada ao app sob a [licença OFL](packages/ui/src/fonts/OFL-Fredoka.txt), e os adesivos são vetores locais. Não é necessária conexão para carregar esses recursos.
+O visual da **2.7.0-beta.1** combina cores pastel, contornos de adesivo e navegação adaptada ao celular. As cores das colunas continuam personalizáveis. A fonte [Fredoka](https://github.com/google/fonts/tree/main/ofl/fredoka) é incorporada ao app sob a [licença OFL](packages/ui/src/fonts/OFL-Fredoka.txt), e os adesivos são vetores locais. Não é necessária conexão para carregar esses recursos.
 
 **Usar neste aparelho** abre um quadro e uma agenda reais, sem conta e sem internet. Dados são guardados no SQLite do Android/Windows e no IndexedDB da web. Uma conta do Pingo, por e-mail e senha, permite sincronizar os dispositivos quando houver conexão. Selecione **Não tem conta? Criar conta**, preencha e-mail, senha e confirmação e comece com um espaço vazio, sem convite ou autorização Google.
 
@@ -60,3 +60,11 @@ Tarefas podem repetir todos os dias, nos dias da semana escolhidos, em dias do m
 Ao abrir o sininho, os avisos existentes são marcados como visualizados. O perfil abre o menu Sair em todas as superfícies. Ajustes são organizados em caixas expansíveis; funções opcionais e importação ficam recolhidas.
 
 Novas senhas exigem ao menos oito caracteres, maiúscula, minúscula, número e símbolo, com confirmação no cadastro. Senhas anteriores continuam válidas para entrar. A permissão de notificações pertence a cada aparelho e é solicitada de forma contextual; o convite pode reaparecer após sete dias, com opção de não lembrar novamente.
+
+## Cuidar do dia e do Pingo (2.7)
+
+Concluir uma tarefa pela primeira vez dá uma comidinha e 10 pontos de humor. Alimentar consome uma unidade e recupera 25 de saciedade. Carinho e brincadeiras são animações livres; energia se recupera com descanso. Oito itens são conquistados aos 1, 5, 10, 20, 35, 50, 75 e 100 cumprimentos. A coleção é permanente, sem moedas, morte ou penalidades sobre tarefas.
+
+O registro de recompensas por tarefa/ocorrência impede ganho repetido ao reabrir, reenviar uma operação ou sincronizar dois dispositivos. Ações nativas Android gravam recibos junto à tarefa no SQLite; o núcleo compartilha a contabilização ao retomar. Importações não geram recompensas retroativas nem somam saldos de coleções. O primeiro acesso recupera indicadores baixos para 80 e dá duas comidinhas, sem punição por ausência anterior.
+
+A exclusão de rotina exige escopo explícito e revisões de todos os segmentos relacionados. Marcadores de exclusão e exceções impedem nova geração. Segmentos antigos sem vínculo comprovado permanecem separados e podem ser selecionados juntos nos Ajustes. Etiquetas antigas são preservadas internamente; arquivamento de tarefas é neutralizado para clientes antigos. Não há alteração de tabelas: a migração do espaço é versionada dentro do snapshot existente.

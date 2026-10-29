@@ -395,3 +395,9 @@
     transition: none !important;
   }
 }
+
+/* Quiet posture preserves the account color and transparent window. */
+.pet[data-disposition="depleted"] .pet-head {
+  transform: translateY(4px) rotate(3deg);
+  transform-origin: 110px 110px;
+}

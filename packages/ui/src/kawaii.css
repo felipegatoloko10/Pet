@@ -2281,3 +2281,223 @@ body:has(.loading) {
   left: 0;
   right: auto;
 }
+
+/* Pingo 2.7: care, collection and clear destructive choices. */
+.app-shell .home-board .board-toolbar {
+  grid-template-columns: minmax(180px, 1fr) 190px;
+}
+.pet-day-glance {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0 0 18px;
+  padding: 10px 15px;
+  border: 2px solid var(--ink);
+  border-radius: 20px;
+  background: var(--cream, #fff3a8);
+  font-size: 14px;
+  text-align: left;
+}
+.pet-day-glance small {
+  color: var(--muted);
+}
+.pet-journey {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  border: 3px solid var(--ink);
+  background: #fff3a8;
+  border-radius: 22px;
+  padding: 16px;
+  margin: 16px 0;
+  box-shadow: 3px 4px 0 #25232b18;
+}
+.pet-journey strong {
+  margin-left: auto;
+}
+.pet-journey progress {
+  width: 100%;
+  height: 14px;
+  accent-color: #4b967f;
+}
+.pet-journey small {
+  width: 100%;
+}
+.pet-room-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+}
+.pet-room-tabs button {
+  flex: 1;
+  min-height: 48px;
+  border: 2px solid var(--ink);
+  border-radius: 18px;
+  background: #fffefa;
+  color: var(--ink);
+  font: inherit;
+  padding: 8px;
+}
+.pet-room-tabs button[aria-pressed="true"] {
+  background: #ffc8dd;
+  box-shadow: 2px 3px 0 var(--ink);
+}
+.pet-collection {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.collection-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  border: 3px solid var(--ink);
+  border-radius: 24px;
+  padding: 16px 12px;
+  box-shadow: 3px 5px 0 #25232b18;
+}
+.collection-item.locked {
+  background: #f3f1f5 !important;
+}
+.collection-item .button {
+  margin-top: auto;
+  min-height: 44px;
+}
+.collection-item small {
+  color: #514955;
+}
+.pet-item-art {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+.collection-item > .pet-item-art {
+  width: 100px;
+  height: 80px;
+}
+.pet-room-stage {
+  position: relative;
+  isolation: isolate;
+}
+.room-decoration {
+  position: absolute;
+  width: 85px;
+  height: 75px;
+  pointer-events: none;
+}
+.decoration-rug {
+  width: 64%;
+  height: 110px;
+  bottom: 0;
+  left: 18%;
+  z-index: -1;
+}
+.decoration-cushion {
+  bottom: 10px;
+  left: 5%;
+  transform: rotate(-8deg);
+}
+.decoration-plant {
+  bottom: 20px;
+  right: 4%;
+}
+.decoration-lamp {
+  top: 30px;
+  right: 7%;
+}
+
+.routine-delete {
+  width: min(520px, calc(100vw - 24px));
+  max-height: 85dvh;
+  overflow: auto;
+  border: 3px solid #25232b;
+  border-radius: 28px;
+  background: #fffefa;
+  color: #25232b;
+  padding: 24px;
+}
+.routine-delete::backdrop {
+  background: #23382d66;
+  backdrop-filter: blur(5px);
+}
+.routine-delete header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.deletion-choices {
+  display: grid;
+  gap: 10px;
+}
+.deletion-choices button {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  text-align: left;
+  border: 2px solid #25232b;
+  border-radius: 18px;
+  background: #f1f8f4;
+  color: #25232b;
+  font: inherit;
+  min-height: 64px;
+}
+.deletion-choices small {
+  font-size: 13px;
+}
+.deletion-choices button[aria-pressed="true"] {
+  background: #ffc8dd;
+  box-shadow: 3px 3px 0 #25232b;
+}
+.routine-manager .routine-series {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 14px;
+  border: 2px solid var(--ink);
+  border-radius: 18px;
+  margin: 12px 0;
+  background: #fff;
+}
+.routine-manager .routine-series small {
+  flex: 1 1 100%;
+}
+.routine-manager .routine-series button {
+  flex: 1 1 110px;
+  min-height: 46px;
+}
+.routine-manager .routine-series label {
+  flex: 1 1 100%;
+}
+@media (max-width: 600px) {
+  .app-shell .home-board .board-toolbar {
+    grid-template-columns: minmax(0, 1fr) 115px;
+  }
+  .pet-collection {
+    gap: 10px;
+  }
+  .collection-item {
+    padding: 12px 8px;
+  }
+  .pet-room-tabs {
+    gap: 6px;
+  }
+  .pet-room-tabs button {
+    font-size: 14px;
+  }
+  .routine-delete {
+    padding: 18px;
+  }
+  .routine-delete .dialog-actions {
+    flex-wrap: wrap;
+  }
+  .routine-delete .dialog-actions button {
+    min-height: 48px;
+    flex: 1;
+  }
+}

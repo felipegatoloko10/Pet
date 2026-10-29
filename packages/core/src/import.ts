@@ -1,3 +1,4 @@
+import { companionSchema } from "./companion";
 import { repetitionSchema } from "./recurrence";
 import { z } from "zod";
 import {
@@ -21,10 +22,13 @@ const column = z.object({
 });
 export function pingoImportInput() {
   return z.object({
+    companion: companionSchema.optional(),
     taskSeries: z
       .array(
         z.object({
           id: z.string().max(200),
+          routineId: z.string().max(200).optional(),
+          deleted: z.boolean().optional(),
           revision: z.number().int(),
           start: z.iso.date(),
           end: z.iso.date().optional(),
@@ -190,6 +194,12 @@ export function importPingoData(w: Workspace, input: PingoImport) {
       syncState: "pending",
     };
     w.tasks.push(copy);
+    if (
+      copy.completed &&
+      w.companion &&
+      !w.companion.baseline.includes(copy.id)
+    )
+      w.companion.baseline.push(copy.id);
   }
   for (const e of input.events.filter((e) => !e.deleted && !e.taskId)) {
     if (w.events.some((x) => x.id === e.id)) continue;
@@ -222,6 +232,19 @@ export function importPingoData(w: Workspace, input: PingoImport) {
       w.preferences.aiModel = "";
     }
     if (input.petCare) w.petCare = input.petCare;
+    // Restore once into a fresh account/device; never add balances to an existing game.
+    if (
+      input.companion &&
+      w.companion &&
+      !w.companion.rewarded.length &&
+      !w.companion.careOperations.length
+    )
+      w.companion = {
+        ...structuredClone(input.companion),
+        baseline: [
+          ...new Set([...w.companion.baseline, ...input.companion.baseline]),
+        ],
+      };
     w.migrationSettingsRestored = true;
   }
   destination.revision++;

@@ -1,4 +1,5 @@
 "use client";
+import { PetAccessory } from "./PetItems";
 import { useEffect, useState, useRef, type CSSProperties } from "react";
 import {
   petState,
@@ -19,6 +20,7 @@ export function Pet({
   soundEnabled = false,
   speak,
   care,
+  accessory,
 }: {
   preferences: Preferences;
   message?: string;
@@ -29,6 +31,7 @@ export function Pet({
   soundEnabled?: boolean;
   speak?: (text: string) => () => void;
   care?: PetCare;
+  accessory?: string | null;
 }) {
   const [naturalState, setState] = useState<PetState>("idle");
   const [petted, setPetted] = useState(false);
@@ -166,7 +169,8 @@ export function Pet({
             ? "speak"
             : currentCare && currentCare.energy < 25
               ? "yawn"
-              : currentCare && currentCare.mood < 25
+              : currentCare &&
+                  Math.min(currentCare.mood, currentCare.satiety) < 25
                 ? "sit"
                 : choices[Math.floor(Math.random() * choices.length)],
         );
@@ -216,6 +220,15 @@ export function Pet({
         </div>
       )}
       <button
+        data-disposition={
+          care &&
+          Math.min(
+            advancePetCare(care, p).mood,
+            advancePetCare(care, p).satiety,
+          ) < 10
+            ? "depleted"
+            : "normal"
+        }
         className={`pet pet-${state}`}
         data-pet-interactive
         aria-label={`${p.name}: ${state === "sleep" ? "dormindo" : "clique para dar carinho"}`}
@@ -366,6 +379,7 @@ export function Pet({
                 </g>
               )}
             </g>
+            <PetAccessory id={accessory} />
             <g className="pet-arm-left">
               <path
                 d="M64 143 Q43 162 66 172"

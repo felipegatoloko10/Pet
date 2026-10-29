@@ -1,5 +1,5 @@
 /* Cache only the public shell and static assets. Private API data lives in account-scoped IndexedDB. */
-const CACHE = "pingo-shell-v2.6-beta1";
+const CACHE = "pingo-shell-v2.7-beta1";
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {

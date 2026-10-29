@@ -102,7 +102,11 @@ export function makeModel(
     case "openai":
       return createOpenAI({ apiKey: key })(model);
     case "google":
-      throw new DomainError("provider", "Escolha OpenAI ou Claude nos Ajustes.", 400);
+      throw new DomainError(
+        "provider",
+        "Escolha OpenAI ou Claude nos Ajustes.",
+        400,
+      );
     case "anthropic":
       return createAnthropic({ apiKey: key })(model);
   }
@@ -218,7 +222,9 @@ export function scopedTools(
             w.boards.find((b) => b.id === w.preferences.defaultBoardId) ??
             w.boards[0]
           )?.columns,
-          tasks: w.tasks.filter((t) => !t.deleted && !t.archivedAt),
+          tasks: w.tasks
+            .filter((t) => !t.deleted)
+            .map(({ labels, archivedAt, ...task }) => task),
           events: w.events.filter((e) => !e.deleted),
         };
       },
@@ -249,7 +255,7 @@ export function scopedTools(
       description:
         "Cria ou edita uma tarefa. Use os IDs e a revisão consultados. Para criar, gere UUID e revisão 0. Datas de prazo são somente YYYY-MM-DD.",
       inputSchema: z.object({
-        task: taskInput,
+        task: taskInput.omit({ labels: true, archivedAt: true }),
         expectedRevision: z.number().int(),
       }),
       execute: async (input) => {

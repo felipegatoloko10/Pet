@@ -1,7 +1,28 @@
 import { test, expect } from "./permission-fixture";
-test("arraste com mouse move o cartão para uma coluna vazia",async({page})=>{
- await demo(page);const card=page.locator('.task-card').first(),title=await card.locator('h3').innerText();const from=await card.getByRole('button',{name:`Arrastar ${title}`,exact:true}).boundingBox(),to=await page.locator('.kanban-column').nth(2).boundingBox();
- if(!from||!to)throw new Error('Cartão ou destino não visível');await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();await page.mouse.move(from.x+from.width/2+12,from.y+from.height/2,{steps:4});await expect(page.locator('.drag-preview')).toBeVisible();await page.mouse.move(to.x+to.width/2,to.y+130,{steps:20});await page.mouse.up();await expect(page.getByLabel(`Mover ${title}`,{exact:true})).toContainText('Aguardando');
+test("arraste com mouse move o cartão para uma coluna vazia", async ({
+  page,
+}) => {
+  await demo(page);
+  const card = page.locator(".task-card").first(),
+    title = await card.locator("h3").innerText();
+  const from = await card
+      .getByRole("button", { name: `Arrastar ${title}`, exact: true })
+      .boundingBox(),
+    to = await page.locator(".kanban-column").nth(2).boundingBox();
+  if (!from || !to) throw new Error("Cartão ou destino não visível");
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    from.x + from.width / 2 + 12,
+    from.y + from.height / 2,
+    { steps: 4 },
+  );
+  await expect(page.locator(".drag-preview")).toBeVisible();
+  await page.mouse.move(to.x + to.width / 2, to.y + 130, { steps: 20 });
+  await page.mouse.up();
+  await expect(
+    page.getByLabel(`Mover ${title}`, { exact: true }),
+  ).toContainText("Aguardando");
 });
 async function demo(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -9,29 +30,20 @@ async function demo(page: import("@playwright/test").Page) {
     .getByRole("button", { name: "Explorar demonstração local" })
     .click();
 }
-test("Kanban inicial organiza, arquiva e restaura sem perder metadados", async ({
+test("Kanban simplificado preserva checklist sem etiquetas ou arquivo", async ({
   page,
 }) => {
   await demo(page);
-  await expect(
-    page.getByRole("region", { name: "Meu quadro de tarefas" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Quadros", exact: true }),
-  ).toHaveCount(0);
   const card = page.locator(".task-card").first();
   const title = await card.locator("h3").innerText();
   await card
     .getByRole("button", { name: `Organizar ${title}`, exact: true })
     .click();
   const dialog = page.getByRole("dialog", { name: "Organizar cartão" });
-  await dialog.getByLabel("Nome da etiqueta").fill("Casa");
-  await dialog
-    .getByRole("button", { name: "Adicionar etiqueta", exact: true })
-    .click();
+  await expect(dialog.getByLabel("Nome da etiqueta")).toHaveCount(0);
   await expect(
-    dialog.getByRole("button", { name: "Casa ×", exact: true }),
-  ).toBeVisible();
+    dialog.getByRole("button", { name: "Arquivar", exact: true }),
+  ).toHaveCount(0);
   await dialog
     .getByLabel("Novo item do checklist")
     .fill("Separar os documentos");
@@ -39,32 +51,24 @@ test("Kanban inicial organiza, arquiva e restaura sem perder metadados", async (
     .getByRole("button", { name: "Adicionar item", exact: true })
     .click();
   await dialog.getByLabel("Separar os documentos", { exact: true }).check();
-  await dialog.getByRole("button", { name: "Arquivar", exact: true }).click();
   await expect(
-    page
-      .locator(".task-card")
-      .filter({ has: page.getByRole("heading", { name: title, exact: true }) }),
+    dialog.getByLabel("Separar os documentos", { exact: true }),
+  ).toBeChecked();
+  await dialog.getByRole("button", { name: "Fechar organização" }).click();
+  await expect(page.getByLabel("Filtrar etiqueta")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Arquivados", exact: true }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Arquivados", exact: true }).click();
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Explorar demonstração local" })
+    .click();
   await page
     .getByRole("button", { name: `Organizar ${title}`, exact: true })
     .click();
   await expect(
     page.getByLabel("Separar os documentos", { exact: true }),
   ).toBeChecked();
-  await page.getByRole("button", { name: "Restaurar", exact: true }).click();
-  await page.getByRole("button", { name: "Voltar ao quadro" }).click();
-  await page.reload();
-  await page
-    .getByRole("button", { name: "Explorar demonstração local" })
-    .click();
-  await expect(
-    page.locator(".card-labels").getByText("Casa", { exact: true }),
-  ).toBeVisible();
-  await page.screenshot({
-    path: ".verification/revised-kanban.png",
-    fullPage: true,
-  });
 });
 test("calendário abre na semana e apresenta mês e doze meses do ano", async ({
   page,

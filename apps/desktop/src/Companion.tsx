@@ -11,7 +11,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { Pet } from "@pingo/ui/Pet";
-import type { PetState, Preferences } from "@pingo/core";
+import type { PetState, Preferences, PetCare } from "@pingo/core";
 
 const playStates: PetState[] = [
   "wave",
@@ -29,6 +29,8 @@ const playStates: PetState[] = [
 ];
 export function Companion({
   preferences,
+  care,
+  accessory,
   message,
   activity,
   busy = false,
@@ -44,6 +46,8 @@ export function Companion({
   scale = 1,
 }: {
   preferences: Preferences;
+  care?: PetCare;
+  accessory?: string | null;
   message?: string;
   activity?: PetState;
   busy?: boolean;
@@ -206,6 +210,8 @@ export function Companion({
       <div className="companion-character">
         <Pet
           preferences={preferences}
+          care={care}
+          accessory={accessory}
           soundEnabled={soundEnabled}
           message={text}
           activity={

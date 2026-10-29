@@ -58,7 +58,7 @@ async function handler(r: Request) {
     const path = url.pathname.replace("/api/v1/", "");
     if (path === "health")
       return Response.json({
-        version: "2.6.0-beta.1",
+        version: "2.7.0-beta.1",
         configured: !!(
           process.env.DATABASE_URL && process.env.BETTER_AUTH_SECRET
         ),

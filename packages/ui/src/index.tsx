@@ -1,4 +1,6 @@
 "use client";
+import { DeleteRoutine } from "./DeleteRoutine";
+import { useAccountMenus } from "./useAccountMenus";
 import { NotificationPermission } from "./NotificationPermission";
 import { RepeatPicker } from "./RepeatPicker";
 import type { Repetition } from "@pingo/core";
@@ -195,7 +197,14 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
   );
   const [noticesOpen, setNoticesOpen] = useState(false);
   const [focus, setFocus] = useState(false);
+  useAccountMenus(screen);
   const [toast, setToast] = useState("");
+  const [rewarding, setRewarding] = useState(false);
+  useEffect(() => {
+    if (!rewarding) return;
+    const timer = setTimeout(() => setRewarding(false), 2400);
+    return () => clearTimeout(timer);
+  }, [rewarding]);
   useEffect(
     () =>
       platform.onBack?.(() => {
@@ -420,17 +429,22 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
     if (!client) return;
     setError("");
     try {
+      const rewardsBefore = client.workspace?.companion?.rewarded.length ?? 0;
       await client.command(command);
+      if ((client.workspace?.companion?.rewarded.length ?? 0) > rewardsBefore)
+        setRewarding(true);
       setToast(
-        client.localOnly
-          ? "Salvei neste aparelho."
-          : client.demo
-            ? "Modificação salva na demonstração local."
-            : client.pending.length
-              ? navigator.onLine
-                ? "Alteração salva no aparelho. Sincronizando…"
-                : "Guardei aqui. Vou sincronizar quando houver conexão."
-              : "Alteração salva.",
+        (client.workspace?.companion?.rewarded.length ?? 0) > rewardsBefore
+          ? "Você cuidou do seu dia! +1 comidinha para o Pingo."
+          : client.localOnly
+            ? "Salvei neste aparelho."
+            : client.demo
+              ? "Modificação salva na demonstração local."
+              : client.pending.length
+                ? navigator.onLine
+                  ? "Alteração salva no aparelho. Sincronizando…"
+                  : "Guardei aqui. Vou sincronizar quando houver conexão."
+                : "Alteração salva.",
       );
     } catch (e) {
       if (!document.querySelector("dialog[open]")) setError(errorMessage(e));
@@ -812,6 +826,18 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
           )}
           {screen === "day" && (
             <>
+              <button
+                className="pet-day-glance"
+                onClick={() => setScreen("pet")}
+              >
+                <Heart size={18} aria-hidden="true" />
+                <strong>{w.preferences.name}</strong>
+                <span>🍎 {w.companion?.food ?? 0} comidinha(s)</span>
+                <small>
+                  {w.companion?.rewarded.length ?? 0} tarefa(s) cuidada(s) · Ver
+                  meu Pingo →
+                </small>
+              </button>
               <Board
                 localOnly={client.localOnly}
                 w={w}
@@ -879,6 +905,7 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
                   speak={platform.speak}
                   preferences={prefs}
                   care={w.petCare}
+                  accessory={w.companion?.accessory}
                   message={
                     pending.length
                       ? "Estou aqui para ajudar. ♡"
@@ -886,7 +913,11 @@ export function PingoApp({ platform = {} }: { platform?: Platform }) {
                   }
                   focus={focus}
                   activity={
-                    client.syncing ? "think" : toast ? "celebrate" : undefined
+                    rewarding
+                      ? "celebrate"
+                      : client.syncing
+                        ? "think"
+                        : undefined
                   }
                 />
                 <div className="hero-decor">✦</div>
@@ -1212,6 +1243,7 @@ function TaskEditor({
   onClose: () => void;
   onSchedule: (t: Task) => void;
 }) {
+  const [deleting, setDeleting] = useState(false);
   const series = w.taskSeries?.find((s) => s.id === initial.seriesId);
   const [repetition, setRepetition] = useState<Repetition | null>(
     series?.rule ?? null,
@@ -1415,23 +1447,9 @@ function TaskEditor({
             <button
               type="button"
               className="text-link danger"
-              onClick={() => {
-                if (
-                  confirm(
-                    "Encerrar esta repetição a partir desta data? O histórico anterior será preservado.",
-                  )
-                )
-                  void act({
-                    type: "series.stop",
-                    id: series.id,
-                    expectedRevision: series.revision,
-                    date: initial.occurrenceDate ?? t.dueDate!,
-                  })
-                    .then(onClose)
-                    .catch((e) => setError(e.message));
-              }}
+              onClick={() => setDeleting(true)}
             >
-              Encerrar esta e as próximas
+              Excluir ocorrências…
             </button>
           </fieldset>
         )}
@@ -1512,6 +1530,15 @@ function TaskEditor({
             {error}
           </p>
         )}
+        {deleting && (
+          <DeleteRoutine
+            w={w}
+            task={initial as Task}
+            act={act}
+            onClose={() => setDeleting(false)}
+            onDeleted={onClose}
+          />
+        )}
         <footer className="form-actions">
           {initial.id && (
             <>
@@ -1519,21 +1546,7 @@ function TaskEditor({
                 type="button"
                 className="icon-button danger"
                 aria-label="Excluir tarefa"
-                onClick={() => {
-                  if (
-                    confirm(
-                      "Excluir esta tarefa e seu horário na agenda do Pingo?",
-                    )
-                  )
-                    void act({
-                      type: "task.delete",
-                      id: t.id,
-                      expectedRevision: initial.revision!,
-                      confirmed: true,
-                    })
-                      .then(onClose)
-                      .catch((e) => setError(e.message));
-                }}
+                onClick={() => setDeleting(true)}
               >
                 <Trash2 size={18} />
               </button>

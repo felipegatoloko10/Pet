@@ -145,4 +145,16 @@ public class NotificationCoordinatorTest {
         JSONObject saved=new JSONObject(db.read("alice","snapshot"));assertEquals(12,saved.getInt("serverRevision"));assertEquals(12,saved.getJSONObject("workspace").getInt("revision"));
     }
 
+
+    @Test public void completionPersistsRewardReceiptWithTaskAndOutbox() throws Exception {
+        JSONObject n=timedTask().put("phase","end");
+        TaskActions.enqueue(c,n,"complete");
+        JSONObject snapshot=new JSONObject(PingoDatabase.get(c).read("alice","snapshot"));
+        JSONObject w=snapshot.getJSONObject("workspace");
+        assertTrue(w.getJSONArray("tasks").getJSONObject(0).getBoolean("completed"));
+        assertEquals("task",w.getJSONArray("pendingPetRewards").getJSONObject(0).getString("id"));
+        assertEquals(1,snapshot.getJSONArray("pending").length());
+        try {TaskActions.enqueue(c,n,"complete");} catch(Exception expected) { }
+        assertEquals(1,new JSONObject(PingoDatabase.get(c).read("alice","snapshot")).getJSONObject("workspace").getJSONArray("pendingPetRewards").length());
+    }
 }

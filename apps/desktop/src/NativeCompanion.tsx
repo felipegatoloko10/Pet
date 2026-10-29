@@ -123,6 +123,8 @@ function CompanionSession({
   return (
     <Companion
       preferences={service.workspace.preferences}
+      care={service.workspace.petCare}
+      accessory={service.workspace.companion?.accessory}
       message={reply?.text ?? service.bubble}
       activity={
         reply

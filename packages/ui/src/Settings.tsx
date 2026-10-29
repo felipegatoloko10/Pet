@@ -1,3 +1,4 @@
+import { RoutineManager } from "./DeleteRoutine";
 import { LegacyImport } from "./LegacyImport";
 import { useState, useEffect, type ReactNode } from "react";
 import {
@@ -265,42 +266,7 @@ export function SettingsPage({
             value={p.routine ?? []}
             onChange={(v) => field("routine", v)}
           />
-          <h3>Tarefas que se repetem</h3>
-          {!w.taskSeries?.length && (
-            <p>Crie uma tarefa e escolha Repetir para começar.</p>
-          )}
-          {w.taskSeries
-            ?.filter((s) => !s.end)
-            .map((s) => (
-              <div className="routine-series" key={s.id}>
-                <strong>{s.template.title}</strong>
-                <small>
-                  {s.pauses.some((p) => !p.end) ? "Pausada" : "Ativa"}
-                </small>
-                <button
-                  type="button"
-                  className="button"
-                  onClick={() =>
-                    void run(() =>
-                      act({
-                        type: "series.pause",
-                        id: s.id,
-                        expectedRevision: s.revision,
-                        date: new Intl.DateTimeFormat("en-CA", {
-                          timeZone: s.timezone,
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                        }).format(new Date()),
-                        paused: !s.pauses.some((p) => !p.end),
-                      }),
-                    )
-                  }
-                >
-                  {s.pauses.some((p) => !p.end) ? "Retomar" : "Pausar"}
-                </button>
-              </div>
-            ))}
+          <RoutineManager w={w} act={act} />
         </Section>
         <Section
           title="☁ Conta e sincronização"

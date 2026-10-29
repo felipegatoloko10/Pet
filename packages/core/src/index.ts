@@ -1,3 +1,5 @@
+import { activateCompanion, petItems, type Companion } from "./companion";
+export * from "./companion";
 import {
   repetitionSchema,
   materializeSeries,
@@ -22,7 +24,10 @@ import { pingoImportInput, importPingoData } from "./import";
 export function taskOrder(a: Task, b: Task) {
   return (a.position ?? 1e9) - (b.position ?? 1e9) || a.id.localeCompare(b.id);
 }
-export function normalizeWorkspace(w: Workspace): Workspace {
+export function normalizeWorkspace(
+  w: Workspace,
+  now = new Date().toISOString(),
+): Workspace {
   w.calendars ??= [];
   w.boards ??= [];
   w.tasks ??= [];
@@ -33,7 +38,32 @@ export function normalizeWorkspace(w: Workspace): Workspace {
   w.cursor ??= {};
   w.connection ??= { connected: false, scopes: [] };
   w.preferences = { ...defaultPreferences, ...w.preferences };
-  w.petCare ??= initialPetCare();
+  w.petCare ??= initialPetCare(new Date(now));
+  activateCompanion(w, now);
+  // Native notification actions can finish while JavaScript is closed. Consume their
+  // durable receipts through the same ledger before rendering or queuing more work.
+  for (const receipt of w.pendingPetRewards ?? []) {
+    const t = w.tasks.find((t) => t.id === receipt.id);
+    const game = w.companion!;
+    if (
+      !t?.completed ||
+      t.deleted ||
+      game.rewarded.includes(receipt.id) ||
+      game.baseline.includes(receipt.id)
+    )
+      continue;
+    const at = Date.parse(receipt.at) <= Date.parse(now) ? receipt.at : now;
+    game.rewarded.push(receipt.id);
+    game.food++;
+    w.petCare = advancePetCare(w.petCare!, w.preferences, new Date(at));
+    w.petCare.mood = Math.min(100, w.petCare.mood + 10);
+  }
+  delete w.pendingPetRewards;
+  for (const task of w.tasks) task.archivedAt = null;
+  for (const series of w.taskSeries ?? []) {
+    series.routineId ??= series.id;
+    series.template.archivedAt = null;
+  }
   if (!w.conversations || (!w.conversations.length && w.conversation?.length))
     w.conversations = w.conversation?.length
       ? [
@@ -262,6 +292,8 @@ export type SyncJob = {
   sentAt?: string;
 };
 export type Workspace = {
+  companion?: Companion;
+  pendingPetRewards?: { id: string; at: string }[];
   taskSeries?: TaskSeries[];
   storageMode?: "pingo";
   migrationSettingsRestored?: boolean;
@@ -477,6 +509,30 @@ export const preferenceInput = z.object({
 });
 export const commandSchema = z.discriminatedUnion("type", [
   z.object({
+    type: z.literal("pet.equip"),
+    item: z.enum([
+      "bow",
+      "scarf",
+      "cloud",
+      "crown",
+      "cushion",
+      "plant",
+      "lamp",
+      "rug",
+    ]),
+    enabled: z.boolean(),
+  }),
+  z.object({
+    type: z.literal("series.delete"),
+    targets: z
+      .array(z.object({ id, expectedRevision: z.number().int() }))
+      .min(1)
+      .max(1000),
+    scope: z.enum(["future", "all"]),
+    date: date.optional(),
+    confirmed: z.literal(true),
+  }),
+  z.object({
     type: z.literal("series.pause"),
     id,
     expectedRevision: z.number().int(),
@@ -651,8 +707,11 @@ export function applyCommand(
   operationId: string,
   now = new Date().toISOString(),
 ): Workspace {
-  const w = normalizeWorkspace(structuredClone(original));
+  const w = normalizeWorkspace(structuredClone(original), now);
   const c = commandSchema.parse(command);
+  const completedBefore = new Set(
+    w.tasks.filter((t) => t.completed).map((t) => t.id),
+  );
   const occurrence =
     "id" in c && typeof c.id === "string"
       ? c.id.match(/@(\d{4}-\d{2}-\d{2})$/)?.[1]
@@ -673,6 +732,15 @@ export function applyCommand(
     throw new DomainError(
       "conflict",
       "Esta ocorrência foi removida ou a repetição mudou. Atualize o quadro antes de continuar.",
+      409,
+    );
+  if (
+    c.type.startsWith("task.") &&
+    w.tasks.some((t) => t.id === targetId && t.deleted)
+  )
+    throw new DomainError(
+      "conflict",
+      "Esta tarefa foi excluída. Atualize o quadro.",
       409,
     );
   if (
@@ -876,19 +944,95 @@ export function applyCommand(
       b.revision++;
       break;
     }
+    case "pet.equip": {
+      const item = petItems.find((i) => i.id === c.item)!;
+      const companion = w.companion!;
+      if (companion.rewarded.length < item.at)
+        throw new DomainError(
+          "locked",
+          "Continue cumprindo suas tarefas para conquistar este item.",
+        );
+      if (item.kind === "accessory")
+        companion.accessory = c.enabled
+          ? (item.id as Companion["accessory"])
+          : null;
+      else
+        companion.decorations = c.enabled
+          ? ([
+              ...new Set([...companion.decorations, item.id]),
+            ] as Companion["decorations"])
+          : companion.decorations.filter((id) => id !== item.id);
+      break;
+    }
+    case "series.delete": {
+      if (c.scope === "future" && !c.date)
+        throw new DomainError("date", "Escolha a data inicial da exclusão.");
+      const selected = c.targets.map((target) => {
+        const series = w.taskSeries?.find((s) => s.id === target.id);
+        if (!series || series.deleted)
+          throw new DomainError("missing", "Rotina não encontrada.");
+        checkRevision(series, target.expectedRevision);
+        return series;
+      });
+      const roots = new Set(selected.map((s) => s.routineId ?? s.id));
+      const affected = (w.taskSeries ?? []).filter((s) =>
+        roots.has(s.routineId ?? s.id),
+      );
+      // Every segment must be included in the confirmation snapshot.
+      if (affected.some((s) => !c.targets.some((t) => t.id === s.id)))
+        throw new DomainError(
+          "conflict",
+          "A rotina mudou. Revise a exclusão.",
+          409,
+        );
+      const ids = new Set(affected.map((s) => s.id));
+      for (const series of affected) {
+        if (c.scope === "all") series.deleted = true;
+        else {
+          const end = previousDay(c.date!);
+          series.end = series.end && series.end < end ? series.end : end;
+        }
+        series.revision++;
+      }
+      const removed = new Set<string>();
+      for (const task of w.tasks)
+        if (
+          task.seriesId &&
+          ids.has(task.seriesId) &&
+          (c.scope === "all" ||
+            (task.occurrenceDate ?? task.dueDate ?? "") >= c.date!)
+        ) {
+          task.deleted = true;
+          task.revision++;
+          task.checkIn = undefined;
+          removed.add(task.id);
+        }
+      for (const event of w.events)
+        if (event.taskId && removed.has(event.taskId)) {
+          event.deleted = true;
+          event.revision++;
+        }
+      reconcileTaskCalendars(w, enqueue, now);
+      break;
+    }
     case "pet.care": {
+      if (w.companion!.careOperations.includes(operationId)) break;
       const at = new Date(now);
       const care = advancePetCare(
         w.petCare ?? initialPetCare(at),
         w.preferences,
         at,
       );
-      if (c.action === "feed") care.satiety = Math.min(100, care.satiety + 25);
-      if (c.action === "pet") care.mood = Math.min(100, care.mood + 10);
-      if (c.action === "play") {
-        care.mood = Math.min(100, care.mood + 20);
-        care.energy = Math.max(0, care.energy - 10);
+      if (c.action === "feed") {
+        if (w.companion!.food < 1)
+          throw new DomainError(
+            "food",
+            "Conclua uma tarefa para ganhar uma comidinha.",
+          );
+        w.companion!.food--;
+        care.satiety = Math.min(100, care.satiety + 25);
       }
+      w.companion!.careOperations.push(operationId);
       if (c.action === "nap") {
         care.napUntil = new Date(+at + 1800000).toISOString();
         care.awakeUntil = undefined;
@@ -946,7 +1090,8 @@ export function applyCommand(
       const t = w.tasks.find((x) => x.id === c.id && !x.deleted);
       if (!t) throw new DomainError("missing", "Tarefa não encontrada.");
       checkRevision(t, c.expectedRevision);
-      Object.assign(t, c.metadata);
+      if (c.metadata.checklist !== undefined)
+        t.checklist = c.metadata.checklist;
       t.revision++;
       break;
     }
@@ -1031,7 +1176,8 @@ export function applyCommand(
     case "series.pause":
     case "series.stop": {
       const series = w.taskSeries?.find((s) => s.id === c.id);
-      if (!series) throw new DomainError("missing", "Rotina não encontrada.");
+      if (!series || series.deleted)
+        throw new DomainError("missing", "Rotina não encontrada.");
       checkRevision(series, c.expectedRevision);
       if (c.type === "series.stop") series.end = previousDay(c.date);
       else if (c.paused) {
@@ -1193,6 +1339,7 @@ export function applyCommand(
           delete template.occurrenceDate;
           const series: TaskSeries = {
             id: seriesId,
+            routineId: prior?.routineId ?? prior?.id ?? seriesId,
             revision: 1,
             start: t.dueDate,
             timezone: w.preferences.timezone,
@@ -1210,7 +1357,10 @@ export function applyCommand(
                   .map((x) => x.occurrenceDate!)
               : [],
           };
-          if ((w.taskSeries?.filter((s) => !s.end).length ?? 0) >= 100)
+          if (
+            (w.taskSeries?.filter((s) => !s.end && !s.deleted).length ?? 0) >=
+            100
+          )
             throw new DomainError(
               "quota",
               "Você já tem 100 rotinas. Encerre ou remova uma antes de criar outra.",
@@ -1258,6 +1408,11 @@ export function applyCommand(
       if (!t) throw new DomainError("missing", "Tarefa não encontrada.", 404);
       checkRevision(t, c.expectedRevision);
       t.deleted = true;
+      const series = w.taskSeries?.find((s) => s.id === t.seriesId);
+      if (series && t.occurrenceDate)
+        series.exclusions = [
+          ...new Set([...(series.exclusions ?? []), t.occurrenceDate]),
+        ];
       t.revision++;
       t.syncState = "pending";
       enqueue("task", t.id, "delete");
@@ -1414,6 +1569,28 @@ export function applyCommand(
     const changed = w.tasks.find((t) => t.id === id);
     const series = w.taskSeries?.find((s) => s.id === changed?.seriesId);
     if (series) series.revision++;
+  }
+  for (const task of w.tasks) task.archivedAt = null;
+  // All completion surfaces share this transaction, including native notification actions.
+  if (
+    ["task.move", "task.upsert", "task.checkIn"].includes(c.type) &&
+    !(typeof targetId === "string" && completedBefore.has(targetId))
+  ) {
+    const companion = w.companion!;
+    for (const task of w.tasks) {
+      if (
+        !task.completed ||
+        task.deleted ||
+        completedBefore.has(task.id) ||
+        companion.rewarded.includes(task.id) ||
+        companion.baseline.includes(task.id)
+      )
+        continue;
+      companion.rewarded.push(task.id);
+      companion.food++;
+      w.petCare = advancePetCare(w.petCare!, w.preferences, new Date(now));
+      w.petCare.mood = Math.min(100, w.petCare.mood + 10);
+    }
   }
   w.revision++;
   return w;

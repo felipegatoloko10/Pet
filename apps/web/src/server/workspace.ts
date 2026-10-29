@@ -18,6 +18,9 @@ export async function readWorkspace(userId: string) {
     .select()
     .from(workspaces)
     .where(eq(workspaces.userId, userId));
+  if (rows[0] && !rows[0].data.companion) {
+    return mutateWorkspace(userId, (w) => acknowledgePingoWorkspace(w));
+  }
   return acknowledgePingoWorkspace(
     preparePingoWorkspace(rows[0]?.data ?? localWorkspace()),
   );

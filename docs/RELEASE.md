@@ -1,46 +1,19 @@
-# Pingo 2.6.0-beta.1 — rotinas e ajustes mais simples
+# Pingo 2.7 beta 1 — cuide do seu dia, cuide do seu Pingo
 
-- Sininho marca os avisos presentes como visualizados ao abrir.
-- Perfil com opção Sair em Android, web e Windows.
-- Ajustes em caixas expansíveis, sem configurações Google, com opções avançadas recolhidas.
-- Cadastro com e-mail, senha e confirmação. Requisitos visíveis: 8 caracteres, maiúscula, minúscula, número e símbolo. Contas antigas preservadas.
-- Orientação contextual para ativar notificações; lembrar novamente após sete dias, com opção de não insistir.
-- Tarefas repetidas diariamente, em dias da semana, dias do mês ou a cada X dias. Data final ou quantidade opcionais; pausa, retomada e edição desta/próximas ocorrências.
-- Ocorrências independentes e pendências atrasadas preservadas. Dias inexistentes usam o último dia do mês.
-- Menu de etapas com cores, botões grandes e suporte a teclado.
+- Quadro simplificado: sem etiquetas ou arquivamento. Tarefas arquivadas voltam com suas datas e status preservados.
+- Menu de perfil fecha ao tocar fora, navegar ou pressionar Escape. Voltar no Android também recolhe o menu.
+- Exclusão de repetição com escolhas claras: só esta tarefa, esta e as próximas ou toda a rotina. Inclui horários e lembretes. Ajustes permitem selecionar várias rotinas.
+- Cada tarefa concluída pela primeira vez dá uma comidinha e melhora o humor. Alimentar consome uma comidinha. Reabrir a mesma tarefa não dá outra recompensa.
+- O Pingo demonstra fome e desânimo com o tempo, recuperando-se com tarefas, alimento e descanso. Ele nunca morre, bloqueia tarefas ou perde conquistas.
+- Oito acessórios e enfeites desbloqueáveis em Cuidar, Vestir e Meu cantinho. Os acessórios acompanham o avatar transparente do Windows.
+- Cuidados, inventário, coleção e exclusões funcionam offline e sincronizam pela conta Pingo, sem Google e sem IA para as animações.
 
-Instale por cima da versão anterior, sem desinstalar, para preservar os dados locais. APK assinado com a chave existente. A versão anterior permanece recuperável.
+## Instalar e testar
 
-## Homologação no aparelho
+Instale sobre a versão anterior, sem desinstalar. A chave Android e o SQLite foram preservados. A versão 2.6 continua recuperável no histórico de releases.
 
-Esta versão permanece em rascunho até testar: permissão de notificações; criar uma tarefa repetida; fechar e reabrir offline; concluir uma ocorrência pela notificação sem concluir a seguinte; sincronizar com outro dispositivo; sair e entrar novamente.
+A primeira ativação oferece duas comidinhas e recupera os indicadores baixos até 80. Não há prêmio retroativo para tarefas antigas já concluídas. Ao confirmar a exclusão de toda uma rotina, suas tarefas concluídas também saem do histórico; presentes já conquistados continuam com o Pingo.
 
-Lembretes Android conhecidos cobrem os próximos sete dias e são renovados ao abrir, sincronizar ou receber atualização em segundo plano. Restrições de bateria e encerramento forçado continuam sujeitos ao Android. Rotinas não têm integração Google.
+Rascunho para homologação: teste no Android a conclusão pelo botão da notificação com o app fechado, a recompensa ao reabrir, alimentação, exclusão de rotina offline e sincronização entre aparelhos. Após aprovação em aparelho físico, os instaladores serão liberados como pré-release pública.
 
----
-
-Pingo 2.5.0-beta.2 — um caderninho kawaii para sua rotina.
-
-- Visual renovado em Android, web e painel Windows: menta, rosa, lilás, amarelo e azul, contornos escuros e cartões como adesivos.
-- Fonte Fredoka incorporada, sem downloads de fontes durante o uso e disponível offline.
-- Quadro com atalhos para as colunas no celular, áreas maiores para toque, arraste suave e preferência de movimento reduzido respeitada.
-- Novos quadros começam com A fazer em rosa, Fazendo em amarelo, Aguardando em lilás e Feito em menta. As cores e os nomes já personalizados são preservados.
-- Agenda, conversas, cantinho do pet, entrada e formulários seguem o novo visual. No mês, o celular mostra a quantidade de compromissos em cada dia; tocar abre os detalhes.
-- Navegação inferior em telas pequenas, campos legíveis e botão de salvar acessível durante a rolagem dos formulários.
-
-Mantidos os recursos da versão 2.5:
-
-- Quadro e agenda disponíveis sem conta em **Usar neste aparelho**.
-- Conta do Pingo com **Não tem conta? Criar conta**: nome, e-mail e senha, sem convite ou Google. Cada cadastro começa vazio.
-- Sincronização entre Android, web e Windows com fila persistente, revisões e proteção contra respostas de outra conta.
-- Supabase PostgreSQL exclusivo, conexão TLS verificada, RLS e dados compactados para reduzir tráfego.
-- Importação com prévia das cópias anteriores, exportação JSON e repetição sem duplicar ou substituir itens existentes.
-- Android sem Firebase: alarmes locais, resumos básicos e busca de alterações em segundo plano quando houver internet.
-- Mantidos os botões de status das notificações, silêncio, cuidados e avatar transparente.
-- Removidos o acesso ao Google Tasks, Agenda e Gmail e os painéis de e-mail. IA OpenAI/Claude é opcional e precisa de conexão.
-
-Instale sobre a versão anterior. A chave Android foi preservada; SQLite migra para v4 sem apagar cache ou fila. Não desinstale antes de conferir sua cópia de dados. Não há importação automática da conta antiga. Recuperação de senha é administrativa nesta versão, por link privado de uso único; links de recuperação nunca fazem parte dos arquivos públicos desta release.
-
-O Neon antigo permaneceu bloqueado por cota durante a migração. O banco original e a versão 2.4.1 foram preservados; as cópias já carregadas nos dispositivos podem ser importadas. Não é declarada uma exportação integral do histórico remoto indisponível.
-
-Rascunho para homologação da versão nova. A aprovação física da 2.4.1 não substitui o teste desta atualização. Notificações e execução em segundo plano dependem do Android e são de melhor esforço. Nenhum plano pago ativado.
+Notificações em segundo plano são de melhor esforço e respeitam as restrições do Android. Nenhum plano pago, moeda virtual ou compra foi adicionado.

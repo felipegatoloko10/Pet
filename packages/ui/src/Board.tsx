@@ -70,8 +70,6 @@ export function Board({
 }: Props) {
   const [query, setQuery] = useState(""),
     [priority, setPriority] = useState(""),
-    [label, setLabel] = useState(""),
-    [archive, setArchive] = useState(false),
     [active, setActive] = useState<string | null>(null),
     [detail, setDetail] = useState<string | null>(null),
     [error, setError] = useState("");
@@ -198,11 +196,7 @@ export function Board({
             x.start === e.start,
         ) === i,
     );
-  const labels = [
-    ...new Map(
-      cards.flatMap((t) => t.labels ?? []).map((l) => [l.id, l]),
-    ).values(),
-  ];
+  const archive = false;
   const visible = cards
     .filter(
       (t) =>
@@ -215,8 +209,7 @@ export function Board({
           `${t.title} ${t.notes}`
             .toLowerCase()
             .includes(query.toLowerCase())) &&
-        (!priority || t.priority === priority) &&
-        (!label || t.labels?.some((l) => l.id === label)),
+        (!priority || t.priority === priority),
     )
     .sort(taskOrder);
   function drop(e: DragEndEvent) {
@@ -315,33 +308,6 @@ export function Board({
           <option value="normal">Normal</option>
           <option value="low">Baixa</option>
         </select>
-        <select
-          aria-label="Filtrar etiqueta"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-        >
-          <option value="">Etiquetas</option>
-          {labels.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.name}
-            </option>
-          ))}
-        </select>
-        <button
-          className="button small archive-toggle"
-          aria-label={archive ? "Voltar ao quadro" : "Arquivados"}
-          title={archive ? "Voltar ao quadro" : "Arquivados"}
-          aria-pressed={archive}
-          onClick={() => {
-            setArchive(!archive);
-          }}
-        >
-          {archive ? (
-            <ArrowLeft size={19} aria-hidden="true" />
-          ) : (
-            <Archive size={19} aria-hidden="true" />
-          )}
-        </button>
       </div>
       {b && (
         <div
@@ -535,7 +501,6 @@ export function Board({
         <CardDetails
           key={detail}
           task={cards.find((t) => t.id === detail)!}
-          existingLabels={labels}
           act={act}
           onEdit={onEdit}
           onClose={() => setDetail(null)}
@@ -887,13 +852,6 @@ function Card({
       }}
       className="task-card"
     >
-      <div className="card-labels">
-        {t.labels?.map((l) => (
-          <span key={l.id} style={{ background: l.color }}>
-            {l.name}
-          </span>
-        ))}
-      </div>
       <div className="card-controls">
         <button
           className="drag-handle"
@@ -986,13 +944,11 @@ function Card({
 }
 function CardDetails({
   task: t,
-  existingLabels,
   act,
   onEdit,
   onClose,
 }: {
   task: Task;
-  existingLabels: NonNullable<Task["labels"]>;
   act: (c: Command) => Promise<void>;
   onEdit: (t: Partial<Task>) => void;
   onClose: () => void;
@@ -1005,8 +961,6 @@ function CardDetails({
   }, []);
   useEffect(() => setChecks(t.checklist ?? []), [t.revision]);
   const [title, setTitle] = useState(t.title),
-    [label, setLabel] = useState(""),
-    [color, setColor] = useState("#b9dfcd"),
     [item, setItem] = useState(""),
     [error, setError] = useState("");
   const run = async (c: Command) => {
@@ -1072,66 +1026,6 @@ function CardDetails({
       >
         Editar descrição e prazo
       </button>
-      <h3>Etiquetas</h3>
-      <select
-        aria-label="Adicionar etiqueta existente"
-        value=""
-        onChange={(e) => {
-          const label = existingLabels.find((l) => l.id === e.target.value);
-          if (label && !t.labels?.some((l) => l.id === label.id))
-            metadata({ labels: [...(t.labels ?? []), label] });
-        }}
-      >
-        <option value="">Escolher etiqueta existente</option>
-        {existingLabels
-          .filter((l) => !t.labels?.some((x) => x.id === l.id))
-          .map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.name}
-            </option>
-          ))}
-      </select>
-      <div className="card-labels">
-        {t.labels?.map((l) => (
-          <button
-            key={l.id}
-            style={{ background: l.color }}
-            onClick={() =>
-              metadata({ labels: t.labels?.filter((x) => x.id !== l.id) })
-            }
-            title="Remover etiqueta"
-          >
-            {l.name} ×
-          </button>
-        ))}
-      </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          metadata({
-            labels: [
-              ...(t.labels ?? []),
-              { id: crypto.randomUUID(), name: label, color },
-            ],
-          });
-          setLabel("");
-        }}
-      >
-        <input
-          aria-label="Nome da etiqueta"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          required
-          maxLength={40}
-        />
-        <input
-          aria-label="Cor da etiqueta"
-          type="color"
-          value={color}
-          onChange={(e) => setColor(e.target.value)}
-        />
-        <button className="button">Adicionar etiqueta</button>
-      </form>
       <h3>Checklist</h3>
       {checks.map((i) => (
         <div className="checklist-item" key={i.id}>
@@ -1201,17 +1095,6 @@ function CardDetails({
           }}
         >
           Duplicar
-        </button>
-        <button
-          className="button"
-          onClick={() => {
-            metadata({
-              archivedAt: t.archivedAt ? null : new Date().toISOString(),
-            });
-            onClose();
-          }}
-        >
-          {t.archivedAt ? "Restaurar" : "Arquivar"}
         </button>
       </div>
     </dialog>

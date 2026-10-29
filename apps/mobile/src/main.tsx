@@ -149,6 +149,13 @@ async function main() {
   if (native) {
     await auth.restore();
     await App.addListener("backButton", () => {
+      const accountMenu = document.querySelector<HTMLDetailsElement>(
+        "details.account-menu[open]",
+      );
+      if (accountMenu) {
+        accountMenu.open = false;
+        return;
+      }
       if (!back?.()) void App.minimizeApp();
     });
     await App.addListener("appStateChange", ({ isActive }) => {

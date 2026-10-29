@@ -21,6 +21,8 @@ export const repetitionSchema = z
   );
 export type Repetition = z.infer<typeof repetitionSchema>;
 export type TaskSeries = {
+  routineId?: string;
+  deleted?: boolean;
   id: string;
   revision: number;
   start: string;
@@ -36,6 +38,7 @@ export function previousDay(d: string) {
   return new Date(dateValue(d) - 86400000).toISOString().slice(0, 10);
 }
 export function occurrenceDates(series: TaskSeries, through: string): string[] {
+  if (series.deleted) return [];
   const r = series.rule,
     result: string[] = [];
   const end = [through, series.end, r.until]

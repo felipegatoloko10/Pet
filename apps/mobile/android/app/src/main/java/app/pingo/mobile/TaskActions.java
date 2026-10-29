@@ -60,6 +60,13 @@ final class TaskActions {
                         t.put("syncState","pending");
                     }
                     t.put("checkIn",check).put("revision",revision+1);
+                    if(action.equals("complete")) {
+                        JSONArray rewards=w.optJSONArray("pendingPetRewards");if(rewards==null)rewards=new JSONArray();
+                        rewards.put(new JSONObject().put("id",id).put("at",iso(actionTime)));w.put("pendingPetRewards",rewards);
+                    }
+                    JSONArray series=w.optJSONArray("taskSeries");
+                    if(series!=null)for(int i=0;i<series.length();i++){JSONObject part=series.getJSONObject(i);if(part.optString("id").equals(t.optString("seriesId","-")))part.put("revision",part.optInt("revision")+1);}
+
                 }
                 JSONArray pending=snapshot.optJSONArray("pending");if(pending==null)pending=new JSONArray();if (!user.startsWith("local:")) pending.put(new JSONObject().put("operation",op));
                 else { if(t!=null)t.put("syncState","synced"); android.content.ContentValues receipt=new android.content.ContentValues();receipt.put("user_id",user);receipt.put("operation_id",opId);db.insertWithOnConflict("operation_receipts",null,receipt,android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE); }snapshot.put("pending",pending);

@@ -72,7 +72,8 @@ it("feeding, playing, naps and wake use ordinary operations without Google work"
     crypto.randomUUID(),
     "2026-10-23T12:00:00Z",
   );
-  expect(w.petCare).toMatchObject({ mood: 100, energy: 70 });
+  expect(w.petCare).toMatchObject({ mood: 80, energy: 80 });
+  expect(w.companion!.food).toBe(1);
   w = applyCommand(
     w,
     { type: "pet.care", action: "nap" },
@@ -95,6 +96,7 @@ it("feeding, playing, naps and wake use ordinary operations without Google work"
 });
 it("old clients updating preferences preserve pet state", () => {
   const w = emptyWorkspace();
+  normalizeWorkspace(w);
   w.petCare = { ...initialPetCare(), energy: 23 };
   const next = applyCommand(
     w,
